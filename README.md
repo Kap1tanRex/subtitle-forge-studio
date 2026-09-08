@@ -179,6 +179,7 @@ GNU GPL версии 3 или новее — полный текст в файл
 
 ## Документация
 
+* [docs/IDEAS.md](docs/IDEAS.md) — что добавить для профессиональной работы
 * [docs/THEMES.md](docs/THEMES.md) — темы оформления, акцент, анимации
 * [docs/ROADMAP.md](docs/ROADMAP.md) — что сделано, чего это стоило, что осталось
 * [docs/SECURITY.md](docs/SECURITY.md) — аудит безопасности
