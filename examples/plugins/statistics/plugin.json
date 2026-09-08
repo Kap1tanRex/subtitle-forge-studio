@@ -1,0 +1,9 @@
+{
+  "name": "statistics",
+  "title": "Статистика документа",
+  "version": "1.0",
+  "author": "SubtitleForge",
+  "api_version": 1,
+  "entry": "main.py",
+  "description": "Объём работы в цифрах: реплики, слова, время речи, распределение по говорящим."
+}

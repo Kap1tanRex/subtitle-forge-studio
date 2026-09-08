@@ -1,0 +1,9 @@
+{
+  "name": "uppercase",
+  "title": "Реплики капсом",
+  "version": "1.0",
+  "author": "SubtitleForge",
+  "api_version": 1,
+  "entry": "main.py",
+  "description": "Пример плагина: добавляет пункт меню и запоминает счётчик."
+}

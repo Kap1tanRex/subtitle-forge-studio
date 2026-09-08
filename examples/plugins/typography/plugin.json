@@ -1,0 +1,9 @@
+{
+  "name": "typography",
+  "title": "Типографика",
+  "version": "1.0",
+  "author": "SubtitleForge",
+  "api_version": 1,
+  "entry": "main.py",
+  "description": "Кавычки-ёлочки, тире в диалогах, многоточие. Плюс проверка, которая находит непорядок."
+}

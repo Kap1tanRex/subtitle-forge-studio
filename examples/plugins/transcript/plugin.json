@@ -1,0 +1,9 @@
+{
+  "name": "transcript",
+  "title": "Транскрипт и монтажный лист",
+  "version": "1.0",
+  "author": "SubtitleForge",
+  "api_version": 1,
+  "entry": "main.py",
+  "description": "Экспорт в сплошной текст для перевода и в таблицу для монтажного листа."
+}

@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sfstudio"
+version = "0.2.1"
+description = "SubtitleForge Studio — WYSIWYG subtitle editor"
+readme = "README.md"
+# Проверено 2026-09-07: все зависимости имеют колёса под 3.14
+# (PySide6 cp310-abi3, av cp311-abi3, numpy cp314). Риск R1 закрыт.
+requires-python = ">=3.12,<3.16"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+gui = ["PySide6-Essentials>=6.7"]
+media = ["av>=12.0", "numpy>=1.26", "python-mpv>=1.0.7"]
+io-extra = ["pysubs2>=1.7", "charset-normalizer>=3.3"]
+dev = ["pytest>=8.0", "pytest-cov", "hypothesis>=6.0", "ruff", "mypy"]
+
+[project.scripts]
+sfstudio = "sfstudio.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sfstudio"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "needs_gui: requires PySide6",
+    "needs_media: requires PyAV/numpy",
+    "needs_native: requires libmpv/libass binaries",
+    "slow: измеряет время работы на большом документе",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RET", "ARG", "PTH", "PERF", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # кириллица в строках/комментариях — намеренно
+
+[tool.ruff.lint.per-file-ignores]
+# B008: сигнатуры QAbstractItemModel требуют QModelIndex() как значение
+#       по умолчанию — это часть контракта Qt, обойти нельзя.
+# ARG002: параметры переопределяемых методов Qt и методов Protocol обязаны
+#         присутствовать, даже если конкретная реализация их не использует.
+# RUF009: RGBA — frozen-датакласс, разделяемый экземпляр в значении по умолчанию
+#         безопасен и дешевле, чем default_factory на каждый объект стиля.
+"src/sfstudio/ui/event_table.py" = ["B008"]
+"src/sfstudio/ui/preview.py" = ["ARG002"]
+"src/sfstudio/ui/timeline.py" = ["ARG002"]
+"src/sfstudio/ui/style_dialog.py" = ["ARG002"]
+"src/sfstudio/core/commands/base.py" = ["ARG002"]
+"src/sfstudio/core/style.py" = ["RUF009"]
+# В тестах длинные строки — эталонные данные ASS: перенос изменит содержимое,
+# а на нём держится проверка побайтового round-trip.
+"tests/**" = ["E501", "ARG001", "ARG002", "SIM117", "RUF059", "UP031", "PERF401"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"time.sleep".msg = "Блокирующий вызов. В ui/* запрещён — используйте QTimer."
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src/sfstudio/core", "src/sfstudio/io"]

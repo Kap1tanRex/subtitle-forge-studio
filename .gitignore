@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.benchmarks/
+
+# Готовый exe и рабочий каталог PyInstaller.
+/dist/
+build/onefile/
+
+# Нативные библиотеки: их раскладывает build/vendor_libs.py.
+# Вместе они весят 134 МБ, в репозитории им не место.
+src/sfstudio/_native/
+
+# Локальные настройки и журналы.
+*.log
+settings.json

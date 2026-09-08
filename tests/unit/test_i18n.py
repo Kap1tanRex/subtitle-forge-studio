@@ -1,0 +1,171 @@
+"""Перевод интерфейса: механизм и его устойчивость к неполноте.
+
+Неполный каталог — нормальное состояние, а не ошибка: строки прибавляются
+вместе с возможностями. Механизм обязан это переживать, иначе первый же новый
+пункт меню ломал бы чужой перевод целиком.
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from sfstudio.app import i18n
+
+
+@pytest.fixture(autouse=True)
+def restore_language():
+    """Язык глобальный — за собой надо убирать."""
+    before = i18n.current_language()
+    yield
+    i18n.set_language(before)
+
+
+@pytest.fixture
+def catalog(tmp_path, monkeypatch):
+    """Подменяет каталог переводов на временный."""
+    monkeypatch.setattr(i18n, "locale_dir", lambda: tmp_path)
+
+    def write(code: str, data: dict) -> None:
+        (tmp_path / f"{code}.json").write_text(
+            json.dumps(data, ensure_ascii=False), encoding="utf-8"
+        )
+
+    return write
+
+
+class TestTranslation:
+    def test_source_language_needs_no_catalog(self) -> None:
+        i18n.set_language("ru")
+        assert i18n.tr("Новый проект") == "Новый проект"
+
+    def test_translation_is_applied(self, catalog) -> None:
+        catalog("en", {"Новый проект": "New project"})
+        assert i18n.set_language("en") == "en"
+        assert i18n.tr("Новый проект") == "New project"
+
+    def test_missing_string_stays_as_is(self, catalog) -> None:
+        """Неполный каталог обязан работать — это его обычное состояние."""
+        catalog("en", {"Новый проект": "New project"})
+        i18n.set_language("en")
+        assert i18n.tr("Настройки") == "Настройки"
+
+    def test_empty_translation_is_ignored(self, catalog) -> None:
+        """Пустое значение значит «ещё не переведено», а не «пустая подпись»."""
+        catalog("en", {"Настройки": ""})
+        i18n.set_language("en")
+        assert i18n.tr("Настройки") == "Настройки"
+
+    def test_switching_back(self, catalog) -> None:
+        catalog("en", {"Новый проект": "New project"})
+        i18n.set_language("en")
+        i18n.set_language("ru")
+        assert i18n.tr("Новый проект") == "Новый проект"
+
+
+class TestFailureIsNotFatal:
+    def test_unknown_language_falls_back(self, catalog) -> None:
+        assert i18n.set_language("эльфийский") == "ru"
+
+    def test_broken_file_falls_back(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.setattr(i18n, "locale_dir", lambda: tmp_path)
+        (tmp_path / "en.json").write_text("{это не json", encoding="utf-8")
+        assert i18n.set_language("en") == "ru"
+
+    def test_wrong_shape_falls_back(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.setattr(i18n, "locale_dir", lambda: tmp_path)
+        (tmp_path / "en.json").write_text("[1, 2, 3]", encoding="utf-8")
+        assert i18n.set_language("en") == "ru"
+
+    def test_none_means_source(self) -> None:
+        assert i18n.set_language(None) == "ru"
+
+
+class TestProgress:
+    def test_source_is_complete(self) -> None:
+        assert i18n.translation_progress("ru") == 1.0
+
+    def test_half_translated(self, catalog) -> None:
+        catalog("en", {"раз": "one", "два": ""})
+        assert i18n.translation_progress("en") == pytest.approx(0.5)
+
+    def test_missing_catalog_is_zero(self) -> None:
+        assert i18n.translation_progress("такого-нет") == 0.0
+
+    def test_service_sections_do_not_count(self, catalog) -> None:
+        """Раздел с устаревшими переводами — не часть работы переводчика."""
+        catalog("en", {"раз": "one", "__устаревшие__": "{}"})
+        assert i18n.translation_progress("en") == pytest.approx(1.0)
+
+
+class TestCatalogInRepository:
+    """Каталог, который лежит в поставке, должен быть пригоден."""
+
+    def test_english_catalog_loads(self) -> None:
+        path = i18n.locale_dir() / "en.json"
+        if not path.is_file():
+            pytest.skip("каталог ещё не собран")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert isinstance(data, dict) and data
+
+    def test_startup_strings_are_translated(self) -> None:
+        """Стартовое окно переведено целиком — это образец для остальных."""
+        path = i18n.locale_dir() / "en.json"
+        if not path.is_file():
+            pytest.skip("каталог ещё не собран")
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for key in ("Новый проект", "Открыть…", "Проекты"):
+            assert data.get(key), f"не переведено: {key}"
+
+
+class TestExtractor:
+    """Сборщик строк: он дополняет каталог, а не переписывает его."""
+
+    def test_existing_translations_survive(self, tmp_path, monkeypatch) -> None:
+        import tools.extract_strings as extractor
+
+        monkeypatch.setattr(extractor, "LOCALE", tmp_path)
+        monkeypatch.setattr(extractor, "scan", lambda: ["раз", "два"])
+        (tmp_path / "en.json").write_text(
+            json.dumps({"раз": "one"}, ensure_ascii=False), encoding="utf-8"
+        )
+
+        extractor.update("en")
+        data = json.loads((tmp_path / "en.json").read_text(encoding="utf-8"))
+        assert data["раз"] == "one"
+        assert data["два"] == ""
+
+    def test_orphan_translations_are_kept(self, tmp_path, monkeypatch) -> None:
+        """Строка могла переехать — терять чужую работу из-за этого нельзя."""
+        import tools.extract_strings as extractor
+
+        monkeypatch.setattr(extractor, "LOCALE", tmp_path)
+        monkeypatch.setattr(extractor, "scan", lambda: ["раз"])
+        (tmp_path / "en.json").write_text(
+            json.dumps({"раз": "one", "исчезнувшая": "gone"}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        extractor.update("en")
+        data = json.loads((tmp_path / "en.json").read_text(encoding="utf-8"))
+        assert "gone" in data.get("__устаревшие__", "")
+
+    def test_docstrings_are_not_collected(self, tmp_path) -> None:
+        import tools.extract_strings as extractor
+
+        source = tmp_path / "модуль.py"
+        source.write_text(
+            '"""Это докстрока, её переводить не надо."""\n'
+            'подпись = "А это подпись"\n',
+            encoding="utf-8",
+        )
+        found = extractor.collect(source)
+        assert found == ["А это подпись"]
+
+    def test_strings_without_cyrillic_are_skipped(self, tmp_path) -> None:
+        import tools.extract_strings as extractor
+
+        source = tmp_path / "модуль.py"
+        source.write_text('key = "layout_state"\n', encoding="utf-8")
+        assert extractor.collect(source) == []
