@@ -180,15 +180,35 @@ def build_qss(p: Palette) -> str:
         font-weight: 600;
     }}
 
-    QPlainTextEdit, QLineEdit, QSpinBox, QComboBox {{
+    QPlainTextEdit, QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
         background: {p.bg_sunken};
+        color: {p.text_primary};
         border: 1px solid {p.border};
         border-radius: {RADIUS["sm"]}px;
         padding: 4px 6px;
         selection-background-color: {p.accent_muted};
     }}
-    QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
+    QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus,
+    QDoubleSpinBox:focus, QComboBox:focus {{
         border: 1px solid {p.accent};
+    }}
+    QPlainTextEdit:disabled, QLineEdit:disabled, QSpinBox:disabled,
+    QDoubleSpinBox:disabled, QComboBox:disabled {{ color: {p.text_muted}; }}
+    QSpinBox::up-button, QSpinBox::down-button,
+    QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+        background: {p.bg_elevated};
+        border: none;
+        width: 14px;
+    }}
+    QComboBox::drop-down {{ border: none; width: 18px; }}
+    /* Выпадающий список — отдельное окно, и общий фон на него не
+       распространяется: без этого правила он оставался системным белым. */
+    QComboBox QAbstractItemView {{
+        background: {p.bg_elevated};
+        color: {p.text_primary};
+        border: 1px solid {p.border};
+        selection-background-color: {p.accent_muted};
+        selection-color: {p.text_primary};
     }}
     QPlainTextEdit {{
         font-family: "JetBrains Mono", Consolas, monospace;
@@ -231,6 +251,116 @@ def build_qss(p: Palette) -> str:
         left: {SPACE["2"]}px;
         padding: 0 {SPACE["1"]}px;
         color: {p.text_muted};
+    }}
+
+    /* Всё, что ниже, раньше рисовал системный стиль Windows. На машине со
+       светлой системной темой это давало белые кнопки и белые вкладки с
+       белым же текстом поверх — цвет текста брался отсюда, а фон нет. */
+
+    QDialog, QMessageBox {{ background: {p.bg_base}; }}
+
+    QTabWidget::pane {{
+        border: 1px solid {p.border};
+        border-radius: {RADIUS["sm"]}px;
+        background: {p.bg_base};
+        top: -1px;
+    }}
+    /* Полосу вкладок надо явно прижать влево: со своими правилами Qt
+       начинает её сдвигать, и первая вкладка обрезается краем окна. */
+    QTabWidget::tab-bar {{ left: 0; alignment: left; }}
+    QTabBar {{ background: transparent; }}
+    QTabBar::tab {{
+        background: {p.bg_elevated};
+        color: {p.text_muted};
+        border: 1px solid {p.border};
+        border-bottom: none;
+        border-top-left-radius: {RADIUS["sm"]}px;
+        border-top-right-radius: {RADIUS["sm"]}px;
+        padding: 6px 12px;
+        margin-right: 2px;
+    }}
+    QTabBar::tab:selected {{ background: {p.bg_base}; color: {p.text_primary}; }}
+    QTabBar::tab:hover:!selected {{ background: {p.bg_sunken}; color: {p.text_primary}; }}
+    QTabBar::tab:disabled {{ color: {p.text_muted}; }}
+
+    QPushButton {{
+        background: {p.bg_elevated};
+        color: {p.text_primary};
+        border: 1px solid {p.border};
+        border-radius: {RADIUS["sm"]}px;
+        padding: 4px 10px;
+        min-width: 56px;
+    }}
+    QPushButton:hover {{ background: {p.bg_sunken}; }}
+    QPushButton:pressed {{ background: {p.accent_muted}; }}
+    QPushButton:default {{ border: 1px solid {p.accent}; }}
+    QPushButton:disabled {{ color: {p.text_muted}; background: {p.bg_base}; }}
+
+    QCheckBox, QRadioButton {{ color: {p.text_primary}; spacing: 6px; background: transparent; }}
+    QCheckBox:disabled, QRadioButton:disabled {{ color: {p.text_muted}; }}
+    QCheckBox::indicator, QRadioButton::indicator {{
+        width: 14px;
+        height: 14px;
+        border: 1px solid {p.border};
+        background: {p.bg_sunken};
+    }}
+    QCheckBox::indicator {{ border-radius: 3px; }}
+    QRadioButton::indicator {{ border-radius: 8px; }}
+    QCheckBox::indicator:checked, QRadioButton::indicator:checked {{
+        background: {p.accent};
+        border: 1px solid {p.accent};
+    }}
+    QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
+        border: 1px solid {p.accent};
+    }}
+
+    QListView, QListWidget, QTreeView, QTreeWidget {{
+        background: {p.bg_base};
+        color: {p.text_primary};
+        border: 1px solid {p.border};
+        border-radius: {RADIUS["sm"]}px;
+        selection-background-color: {p.accent_muted};
+        selection-color: {p.text_primary};
+        outline: none;
+    }}
+    QListView::item, QTreeView::item {{ padding: 3px 4px; }}
+    QListView::item:hover, QTreeView::item:hover {{ background: {p.bg_elevated}; }}
+
+    QDockWidget {{ color: {p.text_primary}; }}
+    QDockWidget::title {{
+        background: {p.bg_elevated};
+        color: {p.text_muted};
+        border-bottom: 1px solid {p.border};
+        padding: 5px {SPACE["2"]}px;
+    }}
+
+    QProgressBar {{
+        background: {p.bg_sunken};
+        color: {p.text_primary};
+        border: 1px solid {p.border};
+        border-radius: {RADIUS["sm"]}px;
+        text-align: center;
+    }}
+    QProgressBar::chunk {{ background: {p.accent}; border-radius: {RADIUS["sm"]}px; }}
+
+    QSlider::groove:horizontal {{
+        height: 4px;
+        background: {p.bg_sunken};
+        border-radius: 2px;
+    }}
+    QSlider::sub-page:horizontal {{ background: {p.accent}; border-radius: 2px; }}
+    QSlider::handle:horizontal {{
+        background: {p.accent};
+        width: 12px;
+        margin: -5px 0;
+        border-radius: 6px;
+    }}
+
+    QToolTip {{
+        background: {p.bg_elevated};
+        color: {p.text_primary};
+        border: 1px solid {p.border};
+        padding: 4px 6px;
     }}
     """
 

@@ -99,7 +99,6 @@ class PreferencesDialog(QDialog):
     def __init__(self, settings: Settings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Настройки")
-        self.resize(600, 480)
         self._settings = settings
         # Пока идёт первичное заполнение, обработчики не пишут в настройки:
         # иначе открытие окна само по себе помечало бы их изменёнными.
@@ -126,6 +125,12 @@ class PreferencesDialog(QDialog):
 
         self._load()
         self._loading = False
+
+        # Ширину задаём по полосе вкладок, а не числом. Вкладок восемь, и при
+        # 600 пикселях они не помещались: Qt включал прокрутку и срезал
+        # первую — на снимках это выглядело как «Троекты». От размера шрифта
+        # ширина тоже зависит, поэтому спрашиваем её у самой полосы.
+        self.resize(max(620, self.tabs.tabBar().sizeHint().width() + 72), 500)
 
     def show_tab(self, title: str) -> bool:
         """Открывает вкладку по названию. ``False`` — такой нет."""
