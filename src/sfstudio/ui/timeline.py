@@ -1632,24 +1632,48 @@ class TimelineWidget(QWidget):
         lane = int((y - row.top - 2) // lane_h) if lane_h > 0 else 0
         lane = max(0, min(lane, lanes - 1))
 
-        for event in self._doc.in_range(int(self._view_start_ms), int(self.view_end_ms)):
+        # Сначала собираем всё, что попадает по времени, вместе с подстрокой
+        # каждой реплики. Отбор по вертикали идёт **после**: одной пары
+        # наложенных реплик хватает, чтобы поделить всю дорожку пополам, и
+        # тогда у остальных — непересекающихся — под нарисованной полоской
+        # остаётся пустая половина. Промах по ней читается как «щелчок
+        # перестал выделять реплику», хотя человек целится ровно в неё.
+        # Спрашиваем документ про окрестность курсора, а не про всю видимую
+        # область. При обзоре целого фильма видимых реплик двадцать тысяч, и
+        # перебор их всех стоил 9 мс — на каждое движение мыши, потому что
+        # от попадания зависит и вид курсора. По окрестности выходит 13 мкс.
+        ms = self.x_to_ms(x)
+        slack = EDGE_GRAB_PX / self._px_per_ms if self._px_per_ms > 0 else 0.0
+        candidates: list[tuple[int, SubtitleEvent, float, float]] = []
+        for event in self._doc.in_range(int(ms - slack), int(ms + slack)):
             if event.layer != layer:
-                continue
-            if min(self._sublane_of.get(event.eid, 0), lanes - 1) != lane:
                 continue
             x0 = self.ms_to_x(event.start)
             x1 = self.ms_to_x(event.end)
             if x < x0 - EDGE_GRAB_PX or x > x1 + EDGE_GRAB_PX:
                 continue
-            # Зона края не должна съедать всё событие: у короткой реплики
-            # иначе не останется тела, за которое её можно сдвинуть целиком.
-            edge = min(EDGE_GRAB_PX, max(1.0, (x1 - x0) / 3))
-            if abs(x - x0) <= edge:
-                return event, "start"
-            if abs(x - x1) <= edge:
-                return event, "end"
-            return event, "body"
-        return None
+            candidates.append(
+                (min(self._sublane_of.get(event.eid, 0), lanes - 1), event, x0, x1)
+            )
+
+        if not candidates:
+            return None
+
+        # Своя подстрока важнее: там, где реплики действительно наложены,
+        # выбор делает вертикаль, и промахнуться по соседней нельзя.
+        exact = [item for item in candidates if item[0] == lane]
+        _lane, target, x0, x1 = (
+            exact[0] if exact else min(candidates, key=lambda item: abs(item[0] - lane))
+        )
+
+        # Зона края не должна съедать всё событие: у короткой реплики
+        # иначе не останется тела, за которое её можно сдвинуть целиком.
+        edge = min(EDGE_GRAB_PX, max(1.0, (x1 - x0) / 3))
+        if abs(x - x0) <= edge:
+            return target, "start"
+        if abs(x - x1) <= edge:
+            return target, "end"
+        return target, "body"
 
     def event(self, event) -> bool:
         """Подсказка с текстом реплики под курсором.
