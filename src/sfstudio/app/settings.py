@@ -37,6 +37,12 @@ DEFAULTS: dict[str, Any] = {
     "config_version": CONFIG_VERSION,
     "ui": {
         "theme": "dark",
+        # Акцентный цвет поверх темы. Пусто — тот, что задан в самой теме.
+        "accent": "",
+        # Плавные появления и переходы. По умолчанию берётся из системной
+        # настройки: тот, кто выключил анимации в Windows, не должен
+        # выключать их ещё и здесь.
+        "animations": None,
         "layout_state": None,        # base64 из QMainWindow.saveState
         "layout_geometry": None,     # base64 из QMainWindow.saveGeometry
         "layout_preset": "default",

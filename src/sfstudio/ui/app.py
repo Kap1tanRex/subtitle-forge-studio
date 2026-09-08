@@ -27,8 +27,9 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 from sfstudio.app.i18n import set_language
 from sfstudio.app.settings import Settings
 from sfstudio.core.project import PROJECT_SUFFIX
+from sfstudio.ui.appearance import apply as apply_appearance
 from sfstudio.ui.main_window import MainWindow
-from sfstudio.ui.theme import apply_font_scale, build_qss, palette_by_name
+from sfstudio.ui.theme import apply_font_scale
 
 #: По расширению решаем, чем является переданный файл. Разбирать содержимое
 #: медиа ради этого не нужно: ошибка расширения здесь стоит лишь одного
@@ -64,15 +65,12 @@ def run(path: Path | None = None) -> int:
     app.setApplicationName("SubtitleForge Studio")
 
     settings = Settings()
-    # Тема читается до создания окон: виджеты получают палитру при сборке,
-    # и применять её потом пришлось бы обходом всего дерева.
-    theme = str(settings.get("ui.theme", "dark"))
-    app.setStyleSheet(build_qss(palette_by_name(theme)))
-    # Отметка для окна: оно не станет пересчитывать тот же стиль заново.
     # Язык ставится раньше окон: подписи читаются при их сборке, и
     # переключение после этого потребовало бы пересобрать интерфейс.
     set_language(settings.get("ui.language", "ru"))
-    app.setProperty("sfstudio_theme", theme)
+    # Тема тоже до создания окон: виджеты получают палитру при сборке,
+    # и применять её потом пришлось бы обходом всего дерева.
+    apply_appearance(app, settings)
     apply_font_scale(app, settings.get("ui.font_scale", 100))
     plan = _decide(path, settings)
     if plan is None:

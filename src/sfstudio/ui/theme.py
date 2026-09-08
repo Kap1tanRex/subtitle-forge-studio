@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-__all__ = ["DARK", "LIGHT", "THEMES", "Palette", "build_qss", "palette_by_name", "repolish"]
+__all__ = [
+    "ACCENTS", "BUILTIN", "CONTRAST", "DARK", "LIGHT", "SEPIA", "THEMES", "Palette",
+    "build_qss", "is_dark", "mix", "palette_by_name", "repolish", "with_accent",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +74,50 @@ LIGHT = Palette(
     guide="#0B62E0",
     wave_fill="#B7C0CE",
     wave_rms="#7C90AC",
+)
+
+#: Тёплая светлая тема. Чисто белый фон при долгой работе с текстом устаёт
+#: читать; бумажный оттенок гасит контраст, не трогая разборчивость.
+SEPIA = Palette(
+    bg_base="#FBF6EC",
+    bg_elevated="#F3EADA",
+    bg_sunken="#EDE1CD",
+    border="#DDCDB2",
+    text_primary="#2A2318",
+    text_muted="#6B5D48",
+    accent="#A6612B",
+    accent_muted="#EAD6BC",
+    success="#4A7C2F",
+    warning="#9A6700",
+    danger="#B3402E",
+    playhead="#C4502F",
+    canvas_a="#E7DCC8",
+    canvas_b="#DFD3BC",
+    guide="#A6612B",
+    wave_fill="#C4B396",
+    wave_rms="#93866D",
+)
+
+#: Высококонтрастная. Для слабого зрения и для работы при ярком свете:
+#: чистый чёрный фон, белый текст, границы видно без вглядывания.
+CONTRAST = Palette(
+    bg_base="#000000",
+    bg_elevated="#0C0C0C",
+    bg_sunken="#000000",
+    border="#6E6E6E",
+    text_primary="#FFFFFF",
+    text_muted="#C8C8C8",
+    accent="#FFD400",
+    accent_muted="#4A3D00",
+    success="#3DF06B",
+    warning="#FFD400",
+    danger="#FF5B5B",
+    playhead="#FF5B5B",
+    canvas_a="#141414",
+    canvas_b="#0A0A0A",
+    guide="#FFD400",
+    wave_fill="#5A5A5A",
+    wave_rms="#B4B4B4",
 )
 
 SPACE = {"1": 4, "2": 8, "3": 12, "4": 16, "5": 24}
@@ -188,17 +235,103 @@ def build_qss(p: Palette) -> str:
     """
 
 
-#: Темы по именам, как они лежат в настройках.
-THEMES: dict[str, str] = {"dark": "Тёмная", "light": "Светлая"}
+#: Встроенные темы по именам, как они лежат в настройках. Темы из файлов
+#: добавляются к ним в :mod:`sfstudio.ui.theme_pack`.
+THEMES: dict[str, str] = {
+    "dark": "Тёмная",
+    "light": "Светлая",
+    "sepia": "Тёплая",
+    "contrast": "Контрастная",
+}
+
+#: Палитры встроенных тем.
+BUILTIN: dict[str, Palette] = {
+    "dark": DARK, "light": LIGHT, "sepia": SEPIA, "contrast": CONTRAST,
+}
 
 
 def palette_by_name(name: str | None) -> Palette:
-    """Палитра по имени темы. Незнакомое имя — тёмная.
+    """Палитра встроенной темы по имени. Незнакомое имя — тёмная.
 
     Незнакомое имя означает либо конфиг от будущей версии, либо правку
     руками: в обоих случаях запуск с обычной темой лучше отказа.
     """
-    return LIGHT if str(name or "").strip().lower() == "light" else DARK
+    return BUILTIN.get(str(name or "").strip().lower(), DARK)
+
+
+# --------------------------------------------------------------------------- #
+# Цвета
+# --------------------------------------------------------------------------- #
+
+#: Готовые акцентные цвета. Названия обычные, а не «Аквамарин №3»:
+#: человек выбирает глазами, подпись нужна лишь чтобы отличить одно от
+#: другого в списке.
+ACCENTS: tuple[tuple[str, str], ...] = (
+    ("Синий", "#4C8DFF"),
+    ("Голубой", "#2BB3C0"),
+    ("Зелёный", "#3FB950"),
+    ("Жёлтый", "#D2A122"),
+    ("Оранжевый", "#E07B39"),
+    ("Красный", "#E05252"),
+    ("Розовый", "#DE5A9B"),
+    ("Фиолетовый", "#8B5CF6"),
+)
+
+
+def mix(first: str, second: str, share: float) -> str:
+    """Смешивает два цвета. ``share`` — доля второго, от 0 до 1."""
+    from sfstudio.core.color import RGBA
+
+    a = RGBA.from_hex(first)
+    b = RGBA.from_hex(second)
+    share = max(0.0, min(1.0, share))
+    return RGBA(
+        round(a.r + (b.r - a.r) * share),
+        round(a.g + (b.g - a.g) * share),
+        round(a.b + (b.b - a.b) * share),
+    ).to_hex()
+
+
+def is_dark(palette: Palette) -> bool:
+    """Тёмная ли тема. Решает яркость основного фона, а не её название."""
+    from sfstudio.core.color import RGBA
+
+    return RGBA.from_hex(palette.bg_base).luminance < 0.5
+
+
+def with_accent(palette: Palette, accent: str | None) -> Palette:
+    """Палитра с другим акцентным цветом.
+
+    Меняется не одно поле: приглушённый акцент (фон выделения) и цвет
+    направляющих выводятся из основного. Задавать их по отдельности значило
+    бы просить человека подобрать три согласованных цвета вместо одного.
+
+    Фон выделения — это акцент, на четыре пятых разбавленный фоном темы.
+    Направление получается само: на тёмной теме выделение выходит темнее
+    акцента, на светлой — светлее. Коэффициент один на все темы; пробовал
+    разные для тёмных и светлых, но разница ни на читаемости, ни на виде
+    не сказалась, а лишнее ветвление осталось бы навсегда.
+    """
+    from dataclasses import replace
+
+    from sfstudio.core.color import RGBA
+
+    if not accent:
+        return palette
+    try:
+        RGBA.from_hex(accent)
+    except (ValueError, IndexError):
+        # Цвет правят руками в settings.json; мусор там не повод не
+        # запуститься с обычной темой.
+        return palette
+
+    share = 0.8
+    return replace(
+        palette,
+        accent=accent,
+        accent_muted=mix(accent, palette.bg_base, share),
+        guide=accent,
+    )
 
 
 #: Пределы масштаба интерфейса. Ниже 70% подписи перестают читаться, выше

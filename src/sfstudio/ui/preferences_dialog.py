@@ -58,12 +58,27 @@ from sfstudio.core.actor_label import (
     template_for,
 )
 from sfstudio.services.qc import PROFILES
+from sfstudio.ui.appearance import themes_for
 from sfstudio.ui.combo import select_data
 from sfstudio.ui.font_box import FontComboBox, font_sample_html
 from sfstudio.ui.layout import LayoutPreset
-from sfstudio.ui.theme import MAX_FONT_SCALE, MIN_FONT_SCALE, THEMES, repolish
+from sfstudio.ui.theme import ACCENTS, MAX_FONT_SCALE, MIN_FONT_SCALE, repolish
+from sfstudio.ui.theme_pack import SUFFIX, example_text
 
 __all__ = ["PreferencesDialog"]
+
+#: Пункт «свой цвет» в списке акцентов. Строка, которой заведомо нет среди
+#: цветов: сравнение идёт по данным пункта, а не по подписи.
+CUSTOM_ACCENT = "__custom__"
+
+
+def swatch(color: str):
+    """Квадратик цвета для пункта списка."""
+    from PySide6.QtGui import QColor, QIcon, QPixmap
+
+    pixmap = QPixmap(14, 14)
+    pixmap.fill(QColor(color))
+    return QIcon(pixmap)
 
 #: Плотность таблицы: подпись и высота строки.
 DENSITIES: tuple[tuple[str, str, int], ...] = (
@@ -588,12 +603,48 @@ class PreferencesDialog(QDialog):
         form.addRow("", self.language_note)
 
         self.theme_box = QComboBox()
-        for key, title in THEMES.items():
-            self.theme_box.addItem(title, key)
-        self.theme_box.currentIndexChanged.connect(
-            lambda i: self._set("ui.theme", self.theme_box.itemData(i))
-        )
+        self.theme_box.currentIndexChanged.connect(self._on_theme)
         form.addRow("Тема", self.theme_box)
+
+        self.theme_note = QLabel("")
+        self.theme_note.setProperty("role", "hint")
+        self.theme_note.setWordWrap(True)
+        form.addRow("", self.theme_note)
+
+        themes_row = QHBoxLayout()
+        open_themes = QPushButton("Папка тем")
+        open_themes.setToolTip("Открыть каталог, куда кладут файлы тем")
+        open_themes.clicked.connect(self._open_themes_folder)
+        themes_row.addWidget(open_themes)
+        make_theme = QPushButton("Создать образец")
+        make_theme.setToolTip(
+            "Положить в каталог тем готовый файл, который можно править"
+        )
+        make_theme.clicked.connect(self._make_theme_example)
+        themes_row.addWidget(make_theme)
+        themes_row.addStretch(1)
+        form.addRow("", themes_row)
+
+        self.accent_box = QComboBox()
+        self.accent_box.addItem("Как в теме", "")
+        for title, value in ACCENTS:
+            self.accent_box.addItem(swatch(value), title, value)
+        self.accent_box.addItem("Свой цвет…", CUSTOM_ACCENT)
+        self.accent_box.currentIndexChanged.connect(self._on_accent)
+        form.addRow("Акцентный цвет", self.accent_box)
+
+        self.motion_box = QComboBox()
+        self.motion_box.addItem("Как в системе", None)
+        self.motion_box.addItem("Включены", True)
+        self.motion_box.addItem("Выключены", False)
+        self.motion_box.setToolTip(
+            "Плавное появление окон, меню и прокрутки. «Как в системе» — "
+            "смотреть настройку анимации Windows"
+        )
+        self.motion_box.currentIndexChanged.connect(
+            lambda i: self._set("ui.animations", self.motion_box.itemData(i))
+        )
+        form.addRow("Анимации", self.motion_box)
 
         self.scale_spin = QSpinBox()
         self.scale_spin.setRange(MIN_FONT_SCALE, MAX_FONT_SCALE)
@@ -669,7 +720,11 @@ class PreferencesDialog(QDialog):
         self.scale_spin.setValue(int(get("ui.font_scale", 100) or 100))
         self._select(self.language_box, get("ui.language", "ru"))
         self._refresh_language_note()
+        self._fill_themes()
         self._select(self.theme_box, get("ui.theme", "dark"))
+        self._refresh_theme_note()
+        self._select_accent(str(get("ui.accent", "") or ""))
+        self._select(self.motion_box, get("ui.animations", None))
         self._select(self.density_box, get("ui.table_density", "comfortable"))
 
         self._select(self.storage_box, get("storage.mode", "beside"))
@@ -692,6 +747,120 @@ class PreferencesDialog(QDialog):
 
     def _select(self, box: QComboBox, value: object) -> None:
         select_data(box, value)
+
+    # -- темы и цвета --------------------------------------------------------- #
+
+    def _fill_themes(self) -> None:
+        """Наполняет список: встроенные темы и файлы из каталога тем.
+
+        Сломанный файл не пропадает из списка, а показывается недоступным с
+        причиной: тема, которая просто исчезла, выглядит как потеря файла, и
+        человек будет искать её, вместо того чтобы исправить опечатку.
+        """
+        self.theme_box.blockSignals(True)
+        self.theme_box.clear()
+        for pack in sorted(
+            themes_for(self._settings).values(),
+            key=lambda p: (not p.builtin, p.title.lower()),
+        ):
+            title = pack.title if pack.builtin else f"{pack.title} (файл)"
+            self.theme_box.addItem(title, pack.name)
+            index = self.theme_box.count() - 1
+            if pack.error:
+                self.theme_box.setItemData(index, False, Qt.UserRole - 1)  # недоступен
+                self.theme_box.setItemData(index, pack.error, Qt.ToolTipRole)
+        self.theme_box.blockSignals(False)
+
+    def _on_theme(self, index: int) -> None:
+        self._set("ui.theme", self.theme_box.itemData(index))
+        self._refresh_theme_note()
+
+    def _refresh_theme_note(self) -> None:
+        packs = themes_for(self._settings)
+        pack = packs.get(str(self.theme_box.currentData() or ""))
+        if pack is None:
+            self.theme_note.setText("")
+            return
+        if pack.error:
+            self.theme_note.setText(f"Тема не читается: {pack.error}")
+            return
+        if pack.builtin:
+            self.theme_note.setText("Встроенная тема.")
+            return
+        author = f", автор {pack.author}" if pack.author else ""
+        self.theme_note.setText(f"Из файла {pack.path.name}{author}.")
+
+    def _themes_folder(self) -> Path:
+        from sfstudio.app.storage import themes_dir
+
+        return themes_dir(self._settings)
+
+    def _open_themes_folder(self) -> None:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        folder = self._themes_folder()
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            QMessageBox.warning(self, "Папка тем", f"Не удалось создать: {exc}")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _make_theme_example(self) -> None:
+        """Кладёт готовый файл темы, который остаётся только поправить.
+
+        Пустой каталог и формат, описанный словами, — не то же самое, что
+        рабочий файл под рукой: с образца тему делают правкой цветов, а не
+        чтением документации.
+        """
+        folder = self._themes_folder()
+        target = folder / ("образец" + SUFFIX)
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                # Второй вызов не должен затирать уже поправленный образец.
+                target = folder / f"образец-{len(list(folder.glob('*' + SUFFIX)))}{SUFFIX}"
+            target.write_text(example_text(), encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.warning(self, "Образец темы", f"Не удалось записать: {exc}")
+            return
+
+        self._fill_themes()
+        self._select(self.theme_box, self._settings.get("ui.theme", "dark"))
+        QMessageBox.information(
+            self, "Образец темы",
+            f"Готово: {target}\n\nПоправьте цвета в файле и выберите тему в списке.",
+        )
+
+    def _select_accent(self, value: str) -> None:
+        self.accent_box.blockSignals(True)
+        if value and select_data(self.accent_box, value) is False:
+            # Свой цвет: показываем его же квадратиком, чтобы выбор был виден.
+            self.accent_box.insertItem(
+                self.accent_box.count() - 1, swatch(value), value, value
+            )
+            select_data(self.accent_box, value)
+        elif not value:
+            select_data(self.accent_box, "")
+        self.accent_box.blockSignals(False)
+
+    def _on_accent(self, index: int) -> None:
+        value = self.accent_box.itemData(index)
+        if value != CUSTOM_ACCENT:
+            self._set("ui.accent", value or "")
+            return
+
+        from PySide6.QtGui import QColor
+        from PySide6.QtWidgets import QColorDialog
+
+        current = str(self._settings.get("ui.accent", "") or "#4C8DFF")
+        chosen = QColorDialog.getColor(QColor(current), self, "Акцентный цвет")
+        if not chosen.isValid():
+            self._select_accent(str(self._settings.get("ui.accent", "") or ""))
+            return
+        self._select_accent(chosen.name())
+        self._set("ui.accent", chosen.name())
 
     def _refresh_font_sample(self) -> None:
         """Образец прямо в окне: подсказка при наведении хороша для перебора,

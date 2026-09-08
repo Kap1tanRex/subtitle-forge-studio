@@ -71,6 +71,7 @@ from sfstudio.ui.event_table import (
 )
 from sfstudio.ui.inspector import Inspector
 from sfstudio.ui.layout import DockSpec, LayoutManager, LayoutPreset
+from sfstudio.ui.motion import flash
 from sfstudio.ui.qc_panel import QcPanel
 from sfstudio.ui.quick_format import QuickFormatPanel
 from sfstudio.ui.timeline import TimelineWidget
@@ -190,22 +191,19 @@ class MainWindow(QMainWindow):
         рисуются кодом по своей палитре. Пока её не раздать, светлая тема
         давала окно, наполовину оставшееся тёмным.
         """
-        from sfstudio.ui.theme import apply_font_scale, build_qss, palette_by_name
-
-        apply_font_scale(
-            QApplication.instance(), self._settings.get("ui.font_scale", 100)
-        )
-        chosen = str(name if name is not None else self._settings.get("ui.theme", "dark"))
-        palette = palette_by_name(chosen)
+        from sfstudio.ui.appearance import apply as apply_appearance
+        from sfstudio.ui.theme import apply_font_scale
 
         app = QApplication.instance()
-        # Таблица стилей ставится, только когда тема действительно другая.
-        # ``setStyleSheet`` пересчитывает стиль каждого существующего виджета,
-        # и вызов «на всякий случай» при открытии окна стоил секунд — прогон
-        # тестов вырос с 14 секунд до двух минут, пока это не всплыло.
-        if app is not None and app.property("sfstudio_theme") != chosen:
-            app.setStyleSheet(build_qss(palette))
-            app.setProperty("sfstudio_theme", chosen)
+        apply_font_scale(app, self._settings.get("ui.font_scale", 100))
+        if name is not None:
+            self._settings.set("ui.theme", str(name))
+        # Вся сборка вида — в одном месте: тема, цвета темы, акцент,
+        # добавка к таблице стилей и анимации.
+        palette = apply_appearance(app, self._settings)
+        # Держим у себя: вспышки и прочая своя отрисовка спрашивают цвет
+        # именно у окна, а собирается он в одном месте и только здесь.
+        self._palette = palette
 
         for widget in (self.timeline, self.transport, self.qc_panel,
                        self.video_pane.canvas, self.video_pane.overlay, self.model):
@@ -1625,6 +1623,9 @@ class MainWindow(QMainWindow):
             self._show_status("Проблем не найдено")
             return
         self._select_eid(eid)
+        # Короткая вспышка по таблице: строка выбрана, но при переходе через
+        # пол-документа глаз не успевает найти, какая именно.
+        flash(self.table.viewport(), self._palette.warning)
         issues = self._qc.issues_for(eid)
         if issues:
             self._show_status(str(issues[0]))
@@ -1700,6 +1701,31 @@ class MainWindow(QMainWindow):
         finally:
             self._syncing = False
 
+    def _reveal_row(self, row: int) -> None:
+        """Показывает строку таблицы, при включённых анимациях — с прокруткой.
+
+        Строку, которая и так на экране, не трогаем: дёргать список при
+        каждом щелчке по соседней реплике незачем.
+        """
+        from sfstudio.ui.motion import animations_enabled, smooth_scroll
+
+        index = self.model.index(row, 0)
+        if not animations_enabled():
+            self.table.scrollTo(index)
+            return
+
+        bar = self.table.verticalScrollBar()
+        top = self.table.rowViewportPosition(row)
+        height = self.table.rowHeight(row) or 22
+        visible = self.table.viewport().height()
+        if top >= 0 and top + height <= visible:
+            return  # уже видна целиком
+
+        # Ведём строку к середине: у края она через мгновение снова уедет
+        # за границу, стоит нажать «следующая».
+        target = bar.value() + top - max(0, (visible - height) // 2)
+        smooth_scroll(self.table, target)
+
     def _select_eid(self, eid: int) -> None:
         if self._syncing:
             return
@@ -1718,7 +1744,13 @@ class MainWindow(QMainWindow):
             return
         self._syncing = True
         try:
+            # Автопрокрутку Qt отключаем на время выбора: она прыгает к
+            # строке мгновенно, а мы хотим доехать — иначе непонятно, куда
+            # уехал список.
+            self.table.setAutoScroll(False)
             self.table.selectRow(row)
+            self.table.setAutoScroll(True)
+            self._reveal_row(row)
             self.preview.set_selected(eid)
             self.timeline.set_selected(eid)
             self._sync_inspector(eid)
@@ -2127,7 +2159,8 @@ class MainWindow(QMainWindow):
             "• проекты со своим форматом: помнят видео, положение и обстановку;<br>"
             "• распознавание речи Whisper — на процессоре или видеокарте;<br>"
             "• акторы с цветами, проверки качества, поиск и замена;<br>"
-            "• плагины: свои проверки, форматы и команды.</p>"
+            "• плагины: свои проверки, форматы и команды;<br>"
+            "• темы оформления, свой акцентный цвет, отключаемые анимации.</p>"
             f"<p><b>Отрисовка:</b> {engine}<br>"
             "<b>Формат субтитров:</b> ASS 4+ (Advanced SubStation Alpha)</p>"
             "<p style='color:gray'>Версии компонентов и пути к библиотекам "
