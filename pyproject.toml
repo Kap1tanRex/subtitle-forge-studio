@@ -10,7 +10,7 @@ readme = "README.md"
 # Проверено 2026-09-07: все зависимости имеют колёса под 3.14
 # (PySide6 cp310-abi3, av cp311-abi3, numpy cp314). Риск R1 закрыт.
 requires-python = ">=3.12,<3.16"
-license = { text = "MIT" }
+license = { text = "GPL-3.0-or-later" }
 dependencies = []
 
 [project.optional-dependencies]
