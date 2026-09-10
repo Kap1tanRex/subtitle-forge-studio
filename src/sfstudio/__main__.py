@@ -12,7 +12,31 @@ import sys
 from pathlib import Path
 
 from sfstudio import __version__
-from sfstudio.app.i18n import tr
+from sfstudio.app.i18n import set_language, tr
+
+
+def _use_saved_language() -> None:
+    """Ставит язык **до** импорта всего остального.
+
+    Часть подписей живёт в константах уровня модуля — списки цветов, названия
+    выравниваний, заголовки таблиц. Они вычисляются один раз, при импорте, и
+    язык, выбранный после этого, до них уже не доберётся: половина окна
+    осталась бы русской.
+
+    Поэтому вызов стоит здесь, в единственной точке входа программы, и до
+    любого ``from sfstudio.core…``. Читаем настройки молча: испорченный файл
+    не должен мешать запуску с ключом ``--version``, которым как раз и
+    выясняют, что сломалось.
+    """
+    try:
+        from sfstudio.app.settings import Settings
+
+        set_language(Settings().get("ui.language", "ru"))
+    except Exception:
+        pass
+
+
+_use_saved_language()
 
 
 def _versions() -> list[tuple[str, str]]:
@@ -321,25 +345,7 @@ def cmd_batch(args) -> int:
     return 0 if all(result.ok for result in results) else 1
 
 
-def _use_saved_language() -> None:
-    """Ставит язык до разбора команд.
-
-    Командные режимы — тоже интерфейс: подсказки ``--help``, отчёт самопроверки
-    и сообщения пакетной обработки читает тот же человек, что и окна. Читаем
-    настройки молча: испорченный файл не должен мешать запуску с ключом
-    ``--version``, которым как раз и выясняют, что сломалось.
-    """
-    try:
-        from sfstudio.app.i18n import set_language
-        from sfstudio.app.settings import Settings
-
-        set_language(Settings().get("ui.language", "ru"))
-    except Exception:
-        pass
-
-
 def main(argv: list[str] | None = None) -> int:
-    _use_saved_language()
     parser = argparse.ArgumentParser(prog="sfstudio", description=tr('Редактор субтитров'))
     parser.add_argument("file", nargs="?", type=Path, help=tr('файл субтитров или видео'))
     parser.add_argument("--version", action="store_true", help=tr('версии компонентов'))

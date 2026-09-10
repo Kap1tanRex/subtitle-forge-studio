@@ -222,3 +222,53 @@ class TestEnglishCatalogue:
         i18n.set_language("en")
         assert i18n.tr("Файл") == "File"
         assert i18n.tr("Маркеры") == "Markers"
+
+
+class TestStartupOrder:
+    """Язык должен встать раньше, чем вычислятся подписи-константы.
+
+    Часть подписей живёт в константах уровня модуля: названия выравниваний,
+    цвета маркеров, имена профилей проверок. Они вычисляются один раз, при
+    импорте, и язык, выбранный после этого, до них уже не доберётся — окно
+    получилось бы наполовину русским. Проверяем в отдельном процессе: в этом
+    модули уже импортированы, и порядок не воспроизвести.
+    """
+
+    def run_probe(self, tmp_path, code: str) -> str:
+        import os
+        import subprocess
+        import sys
+
+        environment = dict(os.environ, SFSTUDIO_HOME=str(tmp_path), PYTHONIOENCODING="utf-8")
+        settings = tmp_path / "config" / "settings.json"
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        # Ключи в файле вложенные: «ui.language» — это ui → language.
+        settings.write_text(
+            json.dumps({"config_version": 1, "ui": {"language": "en"}}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True, text=True, env=environment, encoding="utf-8",
+        )
+        assert result.returncode == 0, result.stderr
+        return result.stdout.strip()
+
+    def test_module_constants_speak_english(self, tmp_path) -> None:
+        output = self.run_probe(tmp_path, (
+            "import sfstudio.__main__\n"
+            "from sfstudio.core.style import ALIGNMENT_NAMES\n"
+            "from sfstudio.core.markers import MARKER_COLORS\n"
+            "print(ALIGNMENT_NAMES[1], '|', MARKER_COLORS[0][1])"
+        ))
+        assert output == "bottom left | Blue"
+
+    def test_command_line_speaks_english(self, tmp_path) -> None:
+        """``--help`` и самопроверку читает тот же человек, что и окна."""
+        output = self.run_probe(tmp_path, (
+            "import sys\n"
+            "sys.argv = ['sfstudio', '--selftest']\n"
+            "from sfstudio.__main__ import main\n"
+            "main(['--selftest'])"
+        ))
+        assert "Checks:" in output
