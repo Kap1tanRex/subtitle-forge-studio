@@ -270,6 +270,56 @@ def cmd_plugins() -> int:
     return 1 if broken else 0
 
 
+def cmd_batch(args) -> int:
+    """Пакетная обработка без графики.
+
+    Возвращает единицу, если хоть один файл не вышел: команду ставят в
+    цепочку, и молчаливый успех при половине упавших файлов хуже отказа.
+    """
+    from sfstudio.services.batch import convert, describe, run_batch, run_checks, shift
+
+    tasks = []
+    if args.shift:
+        tasks.append(shift(args.shift))
+    if args.to:
+        from sfstudio.io.registry import FORMATS
+
+        if args.to not in FORMATS:
+            print(f"неизвестный формат: {args.to}. Есть: {', '.join(FORMATS)}")
+            return 2
+        tasks.append(convert(args.to))
+    if args.check:
+        from sfstudio.services.qc import PROFILES, default_profile
+
+        profile = PROFILES.get(args.check, default_profile())
+        tasks.append(run_checks(profile, args.out or Path.cwd()))
+
+    if not tasks:
+        print("нечего делать: укажите --shift, --to или --check")
+        return 2
+
+    def report(index: int, total: int, path: Path) -> None:
+        print(f"[{index}/{total}] {path.name}", flush=True)
+
+    results = run_batch(
+        args.batch, tasks,
+        output_dir=args.out,
+        suffix=args.suffix,
+        overwrite=args.overwrite,
+        progress=report,
+    )
+
+    for result in results:
+        if result.ok:
+            notes = "; ".join(result.notes)
+            print(f"  готово: {result.written} ({notes})")
+        else:
+            print(f"  не вышло: {result.source.name} — {result.error}")
+
+    print(describe(results))
+    return 0 if all(result.ok for result in results) else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="sfstudio", description="Редактор субтитров")
     parser.add_argument("file", nargs="?", type=Path, help="файл субтитров или видео")
@@ -283,6 +333,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--asr-models-dir", type=Path, help="каталог моделей")
     parser.add_argument("--asr-seconds", type=int, default=30,
                         help="сколько секунд распознать (0 — весь файл)")
+
+    batch = parser.add_argument_group("пакетная обработка")
+    batch.add_argument("--batch", nargs="+", metavar="ФАЙЛ", type=Path,
+                       help="файлы субтитров для обработки без графики")
+    batch.add_argument("--shift", type=int, metavar="МС", default=0,
+                       help="сдвинуть тайминги на столько миллисекунд")
+    batch.add_argument("--to", metavar="ФОРМАТ",
+                       help="перевести в формат: ass, srt, vtt, ttml")
+    batch.add_argument("--check", metavar="ПРОФИЛЬ", nargs="?", const="general",
+                       help="прогнать проверки и положить отчёт рядом")
+    batch.add_argument("--out", type=Path, metavar="ПАПКА",
+                       help="куда класть результат")
+    batch.add_argument("--suffix", default="", metavar="ТЕКСТ",
+                       help="приписка к имени файла")
+    batch.add_argument("--overwrite", action="store_true",
+                       help="разрешить перезапись исходников")
     args = parser.parse_args(argv)
 
     if args.version:
@@ -291,6 +357,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_selftest()
     if args.plugins:
         return cmd_plugins()
+    if args.batch:
+        return cmd_batch(args)
     if args.asr_test is not None:
         return cmd_asr_test(
             args.asr_test, args.asr_model, args.asr_models_dir, args.asr_seconds
