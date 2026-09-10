@@ -168,6 +168,8 @@ ASS→SRT и отчётом о потерях.
 | 51 | **Выравнивание по речи** | `services/alignment.py`, `ui/alignment_dialog.py` | 41–43, 28 | ✅ |
 | 52 | **Импорт текста без таймингов** | `services/script_import.py`, `ui/script_dialog.py` | 6, 16 | ✅ |
 | 53 | **Маркеры** | `core/markers.py`, `core/commands/marker_cmds.py`, `ui/marker_dialog.py`, `ui/markers_dialog.py` | 6, 7, 25 | ✅ |
+| 54 | **Кузница стилей** | `ui/style_forge.py` | 8, 18, 31 | ✅ |
+| 55 | **Колонка панелей** | `ui/inspector.py`, `ui/detached.py`, `ui/layout.py` | 24, 30 | ✅ |
 
 ---
 

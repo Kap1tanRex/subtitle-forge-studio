@@ -35,22 +35,26 @@ def inspector(qapp: QApplication, doc: SubtitleDocument) -> Inspector:
 
 
 class TestTabs:
-    def test_four_tabs(self, inspector: Inspector) -> None:
+    def test_event_tabs_are_there(self, inspector: Inspector) -> None:
         titles = [inspector.tabText(i) for i in range(inspector.count())]
         assert titles == ["Реплика", "Текст", "Кадр", "Проверки"]
 
     def test_disabled_without_selection(self, inspector: Inspector) -> None:
-        """Без выделенной реплики править нечего — панель гасится."""
+        """Без выделенной реплики править нечего — вкладки о ней гаснут.
+
+        Гаснут именно они, а не вся колонка: в ней живут и панели, которым
+        выделение не нужно, — оформление, акторы, замечания.
+        """
         inspector.set_event(None)
-        assert not inspector.isEnabled()
+        assert not inspector.widget_for("event").isEnabled()
 
     def test_enabled_with_selection(self, inspector: Inspector, doc) -> None:
         inspector.set_event(doc.events[0].eid)
-        assert inspector.isEnabled()
+        assert inspector.widget_for("event").isEnabled()
 
     def test_missing_event_is_treated_as_no_selection(self, inspector: Inspector) -> None:
         inspector.set_event(9999)
-        assert not inspector.isEnabled()
+        assert not inspector.widget_for("event").isEnabled()
 
 
 class TestReading:

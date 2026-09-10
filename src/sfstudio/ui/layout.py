@@ -8,6 +8,8 @@
 
 Пресеты — не украшение. У трёх основных занятий разные требования к экрану:
 
+* **Монтажная** — как в программе монтажа: кадр во весь центр, справа одна
+  колонка со всеми свойствами, снизу таймлайн во всю ширину.
 * **Тайминг** — важна волна: таймлайн во всю ширину и повыше.
 * **Перевод** — важен текст: широкая таблица и крупный редактор.
 * **Оформление** — важен кадр: видео занимает почти всё, остальное по краям.
@@ -31,6 +33,7 @@ class LayoutPreset(Enum):
     """Готовые раскладки под разные занятия."""
 
     DEFAULT = "default"
+    STUDIO = "studio"
     TIMING = "timing"
     TRANSLATION = "translation"
     STYLING = "styling"
@@ -39,6 +42,7 @@ class LayoutPreset(Enum):
     def title(self) -> str:
         return {
             LayoutPreset.DEFAULT: "Обычная",
+            LayoutPreset.STUDIO: "Монтажная",
             LayoutPreset.TIMING: "Тайминг",
             LayoutPreset.TRANSLATION: "Перевод",
             LayoutPreset.STYLING: "Оформление",
@@ -110,12 +114,24 @@ class LayoutManager:
         table = self._docks.get("table")
         editor = self._docks.get("editor")
         timeline = self._docks.get("timeline")
-        qc = self._docks.get("qc")
+        inspector = self._docks.get("inspector")
 
-        if qc is not None:
-            qc.hide()  # панель проверок вызывается по F4, не мешает по умолчанию
+        if preset is LayoutPreset.STUDIO:
+            # Кадр в центре, одна колонка свойств справа, таймлайн понизу во
+            # всю ширину — раскладка монтажных программ. Таблица реплик и
+            # редактор текста уезжают в ту же правую колонку вкладками Qt:
+            # спорить за правый край втроём им незачем.
+            self._place(inspector, Qt.RightDockWidgetArea)
+            self._place(table, Qt.RightDockWidgetArea)
+            self._place(editor, Qt.RightDockWidgetArea)
+            if inspector is not None and table is not None:
+                self._window.tabifyDockWidget(table, inspector)
+                inspector.raise_()
+            self._place(timeline, Qt.BottomDockWidgetArea)
+            self._resize_vertical({timeline: 260, editor: 150})
+            self._resize_horizontal({inspector: 460})
 
-        if preset is LayoutPreset.TIMING:
+        elif preset is LayoutPreset.TIMING:
             self._place(timeline, Qt.BottomDockWidgetArea)
             self._place(table, Qt.RightDockWidgetArea)
             self._place(editor, Qt.RightDockWidgetArea)

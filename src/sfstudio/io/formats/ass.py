@@ -35,7 +35,7 @@ from sfstudio.core.tracks import TrackSet
 from sfstudio.core.workflow import INFO_KEY as NOTES_KEY
 from sfstudio.core.workflow import apply_notes, collect_notes
 
-__all__ = ["AssParseError", "read_ass", "write_ass"]
+__all__ = ["AssParseError", "format_style_line", "read_ass", "write_ass"]
 
 DEFAULT_STYLE_FORMAT = (
     "Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
@@ -442,6 +442,17 @@ def _format_style(style: SubtitleStyle, fields: list[str]) -> str:
         "Encoding": str(style.encoding),
     }
     return ",".join(values.get(name, "") for name in fields)
+
+
+def format_style_line(style: SubtitleStyle) -> str:
+    """Строка ``Style:`` в стандартном порядке полей.
+
+    Отдельно от записи документа: окно оформления показывает её человеку,
+    и собирать её там во второй раз значило бы завести второе место, где
+    порядок полей может разойтись с настоящим файлом.
+    """
+    fields = _split_format(DEFAULT_STYLE_FORMAT)
+    return "Style: " + _format_style(style, fields)
 
 
 def _format_event(event: SubtitleEvent, fields: list[str]) -> str:

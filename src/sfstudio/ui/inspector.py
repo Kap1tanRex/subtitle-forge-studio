@@ -13,9 +13,22 @@
 обновлении и пишет через команды. Собственная копия значений неизбежно
 разъезжается с документом при отмене, при правке из таблицы и при правке
 мышью в кадре — а инспектор виден одновременно со всеми тремя.
+
+Сюда же складываются остальные панели — оформление, акторы, проверки, — и
+получается одна боковая колонка вместо пяти отдельных, спорящих за правый
+край экрана. Но вкладку можно **вынести в отдельное окно**: на двух мониторах
+держать проверки и акторы раскрытыми одновременно удобнее, чем переключаться.
+Закрытие вынесенного окна возвращает вкладку на прежнее место — потерять
+панель насовсем нельзя.
+
+Не все вкладки зависят от выделенной реплики: оформление и акторы работают и
+без неё. Поэтому при пустом выделении гаснут только те вкладки, которым
+нечего показать, а не вся колонка.
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
@@ -31,6 +44,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -51,14 +65,34 @@ from sfstudio.core.undo import UndoStack
 from sfstudio.ui.combo import index_of_data
 from sfstudio.ui.font_box import FontComboBox
 
-__all__ = ["Inspector"]
+__all__ = ["Inspector", "PanelSlot"]
+
+
+@dataclass(slots=True)
+class PanelSlot:
+    """Вкладка боковой колонки: чем она была и где стояла.
+
+    Место запоминается, чтобы вынесенная и возвращённая вкладка встала туда
+    же, где была. Иначе после каждого выноса порядок вкладок перемешивался бы.
+    """
+
+    key: str
+    title: str
+    widget: QWidget
+    #: Гаснет ли вкладка, когда ничего не выделено.
+    event_bound: bool
+    #: Порядковый номер среди всех вкладок, включая вынесенные.
+    order: int
+    detached: bool = False
 
 
 class Inspector(QTabWidget):
-    """Свойства выделенной реплики."""
+    """Боковая колонка: свойства реплики и остальные панели."""
 
     document_edited = Signal()
     actors_requested = Signal()
+    #: Просят вынести вкладку с этим ключом в отдельное окно.
+    detach_requested = Signal(str)
 
     def __init__(
         self,
@@ -72,13 +106,119 @@ class Inspector(QTabWidget):
         self._eid: int | None = None
         self._syncing = False
         self._qc_notes: list[str] = []
+        self._panels: dict[str, PanelSlot] = {}
 
-        self.addTab(self._build_event_tab(), "Реплика")
-        self.addTab(self._build_text_tab(), "Текст")
-        self.addTab(self._build_frame_tab(), "Кадр")
-        self.addTab(self._build_checks_tab(), "Проверки")
+        self.add_panel("event", "Реплика", self._build_event_tab(), event_bound=True)
+        self.add_panel("text", "Текст", self._build_text_tab(), event_bound=True)
+        self.add_panel("frame", "Кадр", self._build_frame_tab(), event_bound=True)
+        self.add_panel("checks", "Проверки", self._build_checks_tab(), event_bound=True)
         self.setDocumentMode(True)
+        # Вкладок семь, а колонка узкая. Сокращать подписи нельзя: «Ре…» и
+        # «Т…» не различить, а выбирать приходится именно по ним. Поэтому
+        # подписи целиком, а лишние вкладки уезжают под стрелки прокрутки.
+        self.setElideMode(Qt.ElideNone)
+        self.tabBar().setUsesScrollButtons(True)
+        self.setCornerWidget(self._detach_button(), Qt.TopRightCorner)
         self.set_event(None)
+
+    # -- вкладки как панели --------------------------------------------------- #
+
+    def _detach_button(self) -> QToolButton:
+        button = QToolButton()
+        button.setText("⧉")
+        button.setAutoRaise(True)
+        button.setToolTip(
+            "Вынести эту вкладку в отдельное окно.\n"
+            "Закрытие окна вернёт её сюда"
+        )
+        button.clicked.connect(self._detach_current)
+        return button
+
+    def _detach_current(self) -> None:
+        key = self.current_key()
+        if key is not None:
+            self.detach_requested.emit(key)
+
+    def current_key(self) -> str | None:
+        """Ключ открытой вкладки."""
+        widget = self.currentWidget()
+        for slot in self._panels.values():
+            if slot.widget is widget:
+                return slot.key
+        return None
+
+    def add_panel(
+        self,
+        key: str,
+        title: str,
+        widget: QWidget,
+        *,
+        event_bound: bool = False,
+    ) -> None:
+        """Добавляет вкладку в конец колонки."""
+        slot = PanelSlot(key, title, widget, event_bound, len(self._panels))
+        self._panels[key] = slot
+        self.addTab(widget, title)
+        if event_bound:
+            widget.setEnabled(self._eid is not None)
+
+    def panel_keys(self) -> list[str]:
+        """Ключи всех панелей по порядку — вместе с вынесенными."""
+        return [s.key for s in sorted(self._panels.values(), key=lambda s: s.order)]
+
+    def panel_title(self, key: str) -> str:
+        slot = self._panels.get(key)
+        return slot.title if slot is not None else key
+
+    def widget_for(self, key: str) -> QWidget | None:
+        """Виджет панели по ключу — чтобы открыть её, не зная индекса."""
+        slot = self._panels.get(key)
+        return slot.widget if slot is not None else None
+
+    def is_detached(self, key: str) -> bool:
+        slot = self._panels.get(key)
+        return bool(slot is not None and slot.detached)
+
+    def detached_keys(self) -> list[str]:
+        return [s.key for s in self._panels.values() if s.detached]
+
+    def take_panel(self, key: str) -> QWidget | None:
+        """Убирает вкладку из колонки и отдаёт её виджет.
+
+        Возвращает ``None``, если такой вкладки нет или она уже вынесена:
+        два окна с одним виджетом Qt не поддерживает, и молча отдать его
+        второй раз значило бы забрать его из первого.
+        """
+        slot = self._panels.get(key)
+        if slot is None or slot.detached:
+            return None
+        index = self.indexOf(slot.widget)
+        if index >= 0:
+            self.removeTab(index)
+        slot.detached = True
+        return slot.widget
+
+    def restore_panel(self, key: str) -> bool:
+        """Возвращает вынесенную вкладку на её прежнее место."""
+        slot = self._panels.get(key)
+        if slot is None or not slot.detached:
+            return False
+        slot.detached = False
+        self.insertTab(self._place_for(slot), slot.widget, slot.title)
+        self.setCurrentWidget(slot.widget)
+        return True
+
+    def _place_for(self, slot: PanelSlot) -> int:
+        """Куда вставить вернувшуюся вкладку.
+
+        Считаем, сколько соседей с меньшим порядковым номером сейчас на
+        месте: вынесенные не занимают позиций, и слепая вставка по
+        сохранённому индексу промахнулась бы мимо.
+        """
+        return sum(
+            1 for other in self._panels.values()
+            if not other.detached and other.order < slot.order
+        )
 
     # -- вкладки ------------------------------------------------------------------ #
 
@@ -272,7 +412,14 @@ class Inspector(QTabWidget):
 
     def set_event(self, eid: int | None) -> None:
         self._eid = eid if eid is not None and self._doc.has(eid) else None
-        self.setEnabled(self._eid is not None)
+
+        # Гаснут только вкладки о реплике. Оформление и акторы работают и без
+        # выделения, и гасить их заодно значило бы запирать половину колонки
+        # всякий раз, когда человек снял выделение.
+        for slot in self._panels.values():
+            if slot.event_bound:
+                slot.widget.setEnabled(self._eid is not None)
+
         if self._eid is None:
             self._clear()
             return

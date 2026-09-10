@@ -21,6 +21,7 @@ import contextlib
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
+from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -63,6 +64,7 @@ from sfstudio.plugins import PluginState
 from sfstudio.services.qc import PROFILES, QcRunner, default_profile
 from sfstudio.services.style_presets import PresetLibrary
 from sfstudio.ui.actions import ActionRegistry
+from sfstudio.ui.detached import DetachedPanel
 from sfstudio.ui.event_table import (
     COL_ACTOR,
     COL_STYLE,
@@ -75,6 +77,7 @@ from sfstudio.ui.layout import DockSpec, LayoutManager, LayoutPreset
 from sfstudio.ui.motion import flash
 from sfstudio.ui.qc_panel import QcPanel
 from sfstudio.ui.quick_format import QuickFormatPanel
+from sfstudio.ui.style_forge import StyleForge
 from sfstudio.ui.timeline import TimelineWidget
 from sfstudio.ui.transport import TransportBar
 from sfstudio.ui.video_pane import VideoPane
@@ -181,14 +184,13 @@ class MainWindow(QMainWindow):
         """Возвращает раскладку прошлого сеанса или применяет пресет."""
         if not self._layout.restore():
             preset = LayoutPreset(
-                str(self._settings.get("ui.layout_preset", "default"))
-                if str(self._settings.get("ui.layout_preset", "default"))
+                str(self._settings.get("ui.layout_preset", "studio"))
+                if str(self._settings.get("ui.layout_preset", "studio"))
                 in {p.value for p in LayoutPreset}
-                else "default"
+                else "studio"
             )
             self._layout.apply_preset(preset)
-        if self.qc_dock is not None:
-            self.qc_dock.setVisible(bool(self._settings.get("qc.panel_visible", False)))
+        self._restore_detached()
 
     def apply_theme(self, name: str | None = None) -> None:
         """Применяет тему ко всему окну, включая нарисованное вручную.
@@ -212,7 +214,8 @@ class MainWindow(QMainWindow):
         self._palette = palette
 
         for widget in (self.timeline, self.transport, self.qc_panel,
-                       self.video_pane.canvas, self.video_pane.overlay, self.model):
+                       self.video_pane.canvas, self.video_pane.overlay, self.model,
+                       getattr(self, "style_forge", None)):
             with contextlib.suppress(AttributeError):
                 widget.set_palette(palette)
         if hasattr(self, "_speller"):
@@ -358,6 +361,17 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(center)
         self.setDockNestingEnabled(True)
 
+        # Боковая колонка: свойства реплики, оформление, акторы, проверки —
+        # одной стопкой вкладок вместо четырёх панелей, спорящих за правый
+        # край. Любую вкладку можно вынести в своё окно кнопкой в её углу.
+        self.style_forge = StyleForge(self._default_style())
+        self.style_forge.apply_requested.connect(self._apply_forged_style)
+        self.inspector.add_panel("style", "Оформление", self.style_forge)
+        self.inspector.add_panel("actors", "Акторы", self.actors_panel)
+        self.inspector.add_panel("qc", "Замечания", self.qc_panel)
+        self.inspector.detach_requested.connect(self.detach_panel)
+        self._detached: dict[str, DetachedPanel] = {}
+
         self._layout = LayoutManager(self, self._settings)
         self._layout.add(DockSpec("table", "События", self.table, Qt.RightDockWidgetArea))
         self._layout.add(DockSpec("editor", "Текст", editor_box, Qt.RightDockWidgetArea))
@@ -367,13 +381,7 @@ class MainWindow(QMainWindow):
         self._layout.add(
             DockSpec("timeline", "Таймлайн", self.timeline, Qt.BottomDockWidgetArea)
         )
-        self._layout.add(
-            DockSpec("qc", "Контроль качества", self.qc_panel, Qt.RightDockWidgetArea)
-        )
-        self._layout.add(
-            DockSpec("actors", "Акторы", self.actors_panel, Qt.RightDockWidgetArea)
-        )
-        self.qc_dock = self._layout.dock("qc")
+        self.inspector_dock = self._layout.dock("inspector")
 
         self.progress = QProgressBar()
         self.progress.setMaximumWidth(160)
@@ -629,6 +637,23 @@ class MainWindow(QMainWindow):
         for action in self._layout.toggle_actions():
             panels_menu.addAction(action)
 
+        # Вкладки боковой колонки — там же, где панели: для человека это одно
+        # и то же «показать нужное», а чем оно устроено внутри — вкладкой или
+        # доком — вопрос не его.
+        column_menu = menus["Вид"].addMenu("Колонка свойств")
+        for key in self.inspector.panel_keys():
+            action = QAction(self.inspector.panel_title(key), self)
+            action.triggered.connect(lambda _=False, k=key: self.show_panel(k))
+            column_menu.addAction(action)
+        column_menu.addSeparator()
+        detach = QAction("Вынести открытую вкладку", self)
+        detach.setToolTip("Отдельное окно; его закрытие вернёт вкладку назад")
+        detach.triggered.connect(self._detach_current_panel)
+        column_menu.addAction(detach)
+        collect = QAction("Собрать все вкладки обратно", self)
+        collect.triggered.connect(self.collect_panels)
+        column_menu.addAction(collect)
+
         plugins_menu = menus.get("Плагины")
         if plugins_menu is not None:
             self._plugins_menu = plugins_menu
@@ -716,7 +741,7 @@ class MainWindow(QMainWindow):
         # исчезло, и панель обязана показать это сразу, а не после правки.
         self._qc.run_all(self._doc)
         self.model.refresh_qc()
-        if self.qc_dock is not None and self.qc_dock.isVisible():
+        if self.panel_visible("qc"):
             self.qc_panel.refresh()
 
     def _run_plugin_action(self, spec) -> None:
@@ -1912,15 +1937,23 @@ class MainWindow(QMainWindow):
         else:
             return
         self.model.refresh_qc()
-        if self.qc_dock.isVisible():
+        if self.panel_visible("qc"):
             self.qc_panel.refresh()
 
     def _toggle_qc(self, visible: bool) -> None:
-        self.qc_dock.setVisible(visible)
-        if visible:
-            self._qc.run_all(self._doc)
-            self.qc_panel.refresh()
-            self.model.refresh_qc()
+        """F4: показать проверки или убрать колонку с глаз.
+
+        Панель проверок теперь вкладка, а не отдельный док, поэтому
+        «показать» значит открыть колонку на нужной вкладке.
+        """
+        if not visible:
+            if self.inspector_dock is not None:
+                self.inspector_dock.setVisible(False)
+            return
+        self.show_panel("qc")
+        self._qc.run_all(self._doc)
+        self.qc_panel.refresh()
+        self.model.refresh_qc()
 
     def _on_qc_profile(self, key: str) -> None:
         self._settings.set("qc.profile", key)
@@ -2147,6 +2180,28 @@ class MainWindow(QMainWindow):
         self.inspector.set_event(eid)
         if eid is not None:
             self.inspector.set_qc_notes([str(i) for i in self._qc.issues_for(eid)])
+        self._sync_forge(eid)
+
+    def _sync_forge(self, eid: int | None) -> None:
+        """Показывает во вкладке оформления стиль выделенной реплики.
+
+        Правят оформление той строки, на которую смотрят, и заставлять
+        человека искать её стиль в списке — лишний шаг на каждой правке.
+        Пока правка идёт, стиль не перечитываем: подстановка чужих значений
+        под руками — верный способ потерять начатое.
+        """
+        if eid is None or not self._doc.has(eid):
+            return
+        # Проверяем именно фокус внутри вкладки, а не активность окна:
+        # isActiveWindow() истинно у любого виджета активного окна, и
+        # синхронизация не срабатывала бы никогда.
+        focused = QApplication.focusWidget()
+        if focused is not None and self.style_forge.isAncestorOf(focused):
+            return
+        style = self._doc.styles.get(self._doc.by_eid(eid).style)
+        if style is not None:
+            self.style_forge.set_style(style)
+        self.style_forge.set_preview_text(self._doc.by_eid(eid).text)
 
     # -- транспорт ------------------------------------------------------------- #
 
@@ -2476,6 +2531,155 @@ class MainWindow(QMainWindow):
             f"Импортировано реплик: {len(lines)}. Тайминг — «Выровнять текст по речи»"
         )
 
+    # -- боковая колонка ------------------------------------------------------ #
+
+    def show_panel(self, key: str) -> None:
+        """Показывает панель колонки — вкладкой или её вынесенным окном."""
+        window = self._detached.get(key)
+        if window is not None:
+            window.show()
+            window.raise_()
+            window.activateWindow()
+            return
+        if self.inspector_dock is not None:
+            self.inspector_dock.show()
+            self.inspector_dock.raise_()
+        slot_widget = self.inspector.widget_for(key)
+        if slot_widget is not None:
+            self.inspector.setCurrentWidget(slot_widget)
+
+    def _detach_current_panel(self) -> None:
+        key = self.inspector.current_key()
+        if key is not None:
+            self.detach_panel(key)
+
+    def collect_panels(self) -> None:
+        """Возвращает все вынесенные окна в колонку.
+
+        Нужно после смены монитора или раскладки: окно, уехавшее на экран,
+        которого больше нет, иначе остаётся недосягаемым.
+        """
+        for key in list(self._detached):
+            self.attach_panel(key)
+
+    def panel_visible(self, key: str) -> bool:
+        """Видна ли панель прямо сейчас.
+
+        Проверки пересчитываются только для видимой панели: обход тысячи
+        реплик ради закрытой вкладки — впустую потраченный кадр.
+        """
+        window = self._detached.get(key)
+        if window is not None:
+            return window.isVisible()
+        dock = self.inspector_dock
+        if dock is None or not dock.isVisible():
+            return False
+        return self.inspector.current_key() == key
+
+    def detach_panel(self, key: str) -> None:
+        """Выносит вкладку в отдельное окно."""
+        if key in self._detached:
+            self.show_panel(key)
+            return
+        widget = self.inspector.take_panel(key)
+        if widget is None:
+            return
+
+        window = DetachedPanel(key, self.inspector.panel_title(key), widget, self)
+        window.returning.connect(self.attach_panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, window)
+        window.setFloating(True)
+        window.resize(420, 560)
+        # Окно появляется рядом с курсором, а не в углу экрана: панель
+        # вынесли только что и мышью, и искать её глазами не должно быть
+        # нужно.
+        cursor = QCursor.pos()
+        window.move(cursor.x() - 40, cursor.y() + 10)
+        window.show()
+        self._detached[key] = window
+        self._show_status(f"«{self.inspector.panel_title(key)}» — в отдельном окне")
+
+    def attach_panel(self, key: str) -> None:
+        """Возвращает вынесенную вкладку обратно в колонку."""
+        window = self._detached.pop(key, None)
+        if window is None:
+            return
+        widget = window.take_widget()
+        self.removeDockWidget(window)
+        window.deleteLater()
+        if widget is not None:
+            self.inspector.restore_panel(key)
+        if self.inspector_dock is not None:
+            self.inspector_dock.show()
+
+    def _restore_detached(self) -> None:
+        """Возвращает вынесенные окна из прошлого сеанса.
+
+        Раскладку Qt восстанавливает сам, но только для доков, созданных до
+        ``restoreState``. Вынесенные панели создаются по требованию, поэтому
+        их список запоминается отдельно.
+        """
+        saved = self._settings.get("ui.detached_panels", []) or []
+        if not isinstance(saved, list):
+            return
+        for key in saved:
+            if isinstance(key, str) and key in self.inspector.panel_keys():
+                self.detach_panel(key)
+
+        tab = str(self._settings.get("ui.inspector_tab", "") or "")
+        if tab:
+            widget = self.inspector.widget_for(tab)
+            if widget is not None:
+                self.inspector.setCurrentWidget(widget)
+
+    def _default_style(self):
+        """Стиль, с которого начинает вкладка оформления."""
+        from sfstudio.core.style import SubtitleStyle
+
+        return next(iter(self._doc.styles.values()), SubtitleStyle())
+
+    def _apply_forged_style(self, style, to_all: bool) -> None:
+        """Применяет стиль из вкладки оформления.
+
+        Правится **именованный стиль**, а не каждая реплика по отдельности:
+        так задуман ASS, и правка стиля разом меняет всё, что на него
+        ссылается. Реплики, которым назначен другой стиль, при «ко всем»
+        переводятся на этот.
+        """
+        from dataclasses import replace
+
+        from sfstudio.core.commands import (
+            ApplyStyleToEvents,
+            CreateStyle,
+            UpdateStyle,
+        )
+
+        name = style.name or next(iter(self._doc.styles), "Default")
+        target = replace(style, name=name)
+
+        commands = []
+        if name in self._doc.styles:
+            commands.append(UpdateStyle(name, target))
+        else:
+            commands.append(CreateStyle(target))
+
+        eids = (
+            [event.eid for event in self._doc.events] if to_all
+            else self._editable_selection()
+        )
+        moving = [eid for eid in eids if self._doc.by_eid(eid).style != name]
+        if moving:
+            commands.append(ApplyStyleToEvents(moving, name))
+
+        self._undo.run(
+            CompositeCommand(commands, label=f"Оформление стиля «{name}»")
+        )
+        self._on_widget_edit()
+        self.model.reset_document(self._doc)
+        self.preview.update()
+        where = "ко всем репликам" if to_all else f"к выделенным ({len(moving)})"
+        self._show_status(f"Стиль «{name}» обновлён и применён {where}")
+
     # -- маркеры ------------------------------------------------------------- #
 
     def add_marker(self) -> None:
@@ -2617,7 +2821,8 @@ class MainWindow(QMainWindow):
     def _save_session(self) -> None:
         """Складывает раскладку и предпочтения в настройки перед выходом."""
         self._layout.save()
-        self._settings.set("qc.panel_visible", bool(self.qc_dock and self.qc_dock.isVisible()))
+        self._settings.set("ui.detached_panels", self.inspector.detached_keys())
+        self._settings.set("ui.inspector_tab", self.inspector.current_key() or "")
         for key, profile in PROFILES.items():
             if profile is self._qc.profile:
                 self._settings.set("qc.profile", key)
