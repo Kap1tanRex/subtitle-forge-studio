@@ -34,6 +34,7 @@ __all__ = [
     "libraries_dir",
     "models_dir",
     "plugins_dir",
+    "profiles_dir",
     "resolve_root",
     "themes_dir",
     "writable",
@@ -45,6 +46,7 @@ MODELS_FOLDER = "models"
 LIBRARIES_FOLDER = "cuda"
 PLUGINS_FOLDER = "plugins"
 THEMES_FOLDER = "themes"
+PROFILES_FOLDER = "profiles"
 
 
 class StorageMode(StrEnum):
@@ -167,3 +169,8 @@ def plugins_dir(settings) -> Path:
 def themes_dir(settings) -> Path:
     """Где искать темы оформления."""
     return data_root(settings) / THEMES_FOLDER
+
+
+def profiles_dir(settings) -> Path:
+    """Где искать профили проверок заказчиков."""
+    return data_root(settings) / PROFILES_FOLDER

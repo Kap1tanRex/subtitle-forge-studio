@@ -28,6 +28,7 @@ from enum import IntEnum
 
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
+from sfstudio.core.plural import plural
 from sfstudio.core.time import FpsModel
 
 __all__ = ["PROFILES", "Issue", "QcProfile", "QcRunner", "Severity", "default_profile"]
@@ -82,6 +83,16 @@ class QcProfile:
     check_empty: bool = True
     #: Считать ли пробелы в CPS. Netflix — не считает.
     cps_counts_spaces: bool = False
+    #: Насколько близко к монтажной склейке позволено начинать и кончать
+    #: реплику. Требование вещателей: субтитр, обрывающийся за два-три кадра
+    #: до склейки, читается как подёргивание. ``None`` — не проверять.
+    shot_change_frames: int | None = None
+    #: Самая короткая допустимая строка в многострочной реплике. Одинокое
+    #: слово во второй строке — «висячая» строка, её переносят наверх.
+    min_line_length: int | None = None
+    #: Ловить ли подряд идущие одинаковые реплики: частая ошибка после
+    #: копирования, и заказчик её замечает раньше переводчика.
+    check_repeats: bool = True
 
 
 PROFILES: dict[str, QcProfile] = {
@@ -138,6 +149,8 @@ class _Context:
     #: проверять «переведён ли термин» не по чему, если оригинала нет.
     glossary: object | None = None
     reference: object | None = None
+    #: Ключевые кадры видео: по ним ищутся монтажные склейки.
+    keyframes: object | None = None
 
     @property
     def min_gap_ms(self) -> int:
@@ -311,6 +324,90 @@ def _check_typography(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
         )
 
 
+def _check_shot_change(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
+    """Реплика начинается или кончается слишком близко к монтажной склейке.
+
+    Требование вещателей и крупных платформ. Субтитр, исчезающий за два кадра
+    до смены плана, читается как подёргивание: глаз замечает и склейку, и
+    пропажу текста, и не успевает ни то, ни другое. Правильное решение —
+    придвинуть край вплотную к склейке, и это умеет доводка таймингов.
+    """
+    limit = ctx.profile.shot_change_frames
+    if limit is None or ctx.keyframes is None:
+        return
+
+    rate = float(ctx.fps.rate) if ctx.fps else 23.976
+    window = int(limit * 1000 / max(rate, 1e-6))
+    if window <= 0:
+        return
+
+    for moment, edge in ((event.start, "начало"), (event.end, "конец")):
+        nearest = _nearest_keyframe(ctx.keyframes, moment)
+        if nearest is None:
+            continue
+        distance = abs(nearest - moment)
+        if 0 < distance <= window:
+            yield Issue(
+                event.eid,
+                "shot_change",
+                Severity.WARNING,
+                f"{edge} в {distance} мс от склейки (нужно не ближе {limit} кадров)",
+                float(distance),
+            )
+
+
+def _nearest_keyframe(keyframes: object, ms: int) -> int | None:
+    """Ближайшая склейка к моменту времени. ``None`` — данных нет."""
+    finder = getattr(keyframes, "nearest", None)
+    if not callable(finder):
+        return None
+    try:
+        return finder(ms)
+    except Exception:
+        return None
+
+
+def _check_repeat(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
+    """Две одинаковые реплики подряд — след копирования.
+
+    Сравнивается видимый текст: разница в тегах оформления не делает реплику
+    другой для зрителя.
+    """
+    if not ctx.profile.check_repeats or ctx.previous is None:
+        return
+    text = event.plain.strip()
+    if text and text == ctx.previous.plain.strip():
+        yield Issue(
+            event.eid, "repeat", Severity.WARNING, "Повтор предыдущей реплики"
+        )
+
+
+def _check_short_line(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
+    """Одинокое слово во второй строке — «висячая» строка.
+
+    Только для многострочных реплик: короткая реплика в одну строку — это
+    нормально, а перенос ради одного слова читается как ошибка вёрстки.
+    """
+    limit = ctx.profile.min_line_length
+    if limit is None:
+        return
+    lines = [line.strip() for line in event.plain.split("\n") if line.strip()]
+    if len(lines) < 2:
+        return
+    for line in lines:
+        if len(line) < limit:
+            yield Issue(
+                event.eid,
+                "short_line",
+                Severity.INFO,
+                "Короткая строка ("
+                + plural(len(line), "знак", "знака", "знаков")
+                + ") — перенесите к соседней",
+                float(len(line)),
+            )
+            break
+
+
 def _check_glossary(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     """Термин из глоссария есть в оригинале, но не виден в переводе.
 
@@ -350,6 +447,9 @@ RULES = (
     _check_empty,
     _check_typography,
     _check_glossary,
+    _check_shot_change,
+    _check_repeat,
+    _check_short_line,
 )
 
 #: Правила, добавленные извне — плагинами. Отдельный список, а не дополнение
@@ -404,6 +504,7 @@ class QcRunner:
     #: Глоссарий и оригинал — их ставит окно, когда они появляются.
     glossary: object | None = None
     reference: object | None = None
+    keyframes: object | None = None
     _issues: dict[int, list[Issue]] = field(default_factory=dict)
 
     # -- полный и инкрементальный прогон ------------------------------------- #
@@ -470,6 +571,7 @@ class QcRunner:
             following=doc.get(after_eid) if after_eid is not None else None,
             glossary=self.glossary,
             reference=self.reference,
+            keyframes=self.keyframes,
         )
         for rule in RULES:
             yield from rule(event, ctx)

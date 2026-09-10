@@ -477,6 +477,9 @@ class MainWindow(QMainWindow):
             checked=bool(self._settings.get("qc.panel_visible", False)))
         add("view.next_issue", "Следующая проблема", self.goto_next_issue,
             shortcut="F9", menu="Вид")
+        add("view.qc_report", "Отчёт о проверке…", self.save_qc_report,
+            menu="Вид",
+            tip="Список замечаний и требования профиля — для сдачи работы")
         add("view.next_question", "Следующий вопрос", self.goto_next_question,
             shortcut="Shift+F9", menu="Вид",
             tip="Реплики, помеченные вопросом в контекстном меню")
@@ -782,6 +785,69 @@ class MainWindow(QMainWindow):
         if words != list(self._settings.get("spelling.words", []) or ()):
             self._settings.set("spelling.words", words)
             self._settings.save()
+
+    # -- проверки ------------------------------------------------------------------ #
+
+    def _profile_by_name(self, name: str):
+        """Профиль по имени: встроенный или из файла в каталоге профилей."""
+        from sfstudio.app.storage import profiles_dir
+        from sfstudio.services.qc_profiles import available
+
+        try:
+            packs = available(profiles_dir(self._settings))
+        except Exception:
+            packs = {}
+        pack = packs.get(name)
+        if pack is not None and not pack.error:
+            return pack.profile
+        return PROFILES.get(name, default_profile())
+
+    def save_qc_report(self) -> bool:
+        """Сохраняет отчёт о проверке — то, что прикладывают к сдаче.
+
+        Перед выгрузкой проверки прогоняются заново: отчёт должен описывать
+        то, что в документе сейчас, а не то, что было до последних правок.
+        """
+        from sfstudio.services.qc_report import report_csv, report_html
+
+        self._qc.run_all(self._doc)
+        self.model.refresh_qc()
+        self.qc_panel.refresh()
+        issues = self._qc.all_issues()
+
+        suggested = "проверка.html"
+        if self._doc.source_path is not None:
+            suggested = f"{self._doc.source_path.stem} — проверка.html"
+        elif self._project is not None and self._project.path is not None:
+            suggested = f"{self._project.path.stem} — проверка.html"
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Отчёт о проверке", suggested,
+            "Страница HTML (*.html);;Таблица CSV (*.csv)",
+        )
+        if not path:
+            return False
+
+        target = Path(path)
+        if target.suffix.lower() == ".csv":
+            text = report_csv(self._doc, issues)
+        else:
+            if not target.suffix:
+                target = target.with_suffix(".html")
+            text = report_html(self._doc, issues, profile=self._qc.profile)
+
+        try:
+            # BOM: Excel иначе открывает CSV с кириллицей крякозябрами.
+            target.write_text(text, encoding="utf-8-sig")
+        except OSError as exc:
+            QMessageBox.warning(self, "Отчёт", f"Не удалось записать:\n{exc}")
+            return False
+
+        from sfstudio.ui.safe_text import plural
+
+        found = plural(len(issues), "замечание", "замечания", "замечаний")
+        self._show_status(f"Отчёт сохранён: {target.name} · {found}")
+        return True
 
     # -- глоссарий ----------------------------------------------------------------- #
 
@@ -1419,8 +1485,8 @@ class MainWindow(QMainWindow):
         self._reschedule_autosave()
         self.apply_spelling_settings()
 
-        profile = PROFILES.get(
-            str(self._settings.get("qc.profile", "general")), default_profile()
+        profile = self._profile_by_name(
+            str(self._settings.get("qc.profile", "general"))
         )
         if profile is not self._qc.profile:
             self._qc.profile = profile
