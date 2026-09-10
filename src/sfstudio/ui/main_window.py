@@ -468,6 +468,9 @@ class MainWindow(QMainWindow):
             checked=bool(self._settings.get("qc.panel_visible", False)))
         add("view.next_issue", "Следующая проблема", self.goto_next_issue,
             shortcut="F9", menu="Вид")
+        add("view.next_question", "Следующий вопрос", self.goto_next_question,
+            shortcut="Shift+F9", menu="Вид",
+            tip="Реплики, помеченные вопросом в контекстном меню")
         add("view.reset_layout", "Сбросить раскладку", self.reset_layout, menu="Вид")
 
         add("play.toggle", "Играть / Пауза", self.video_pane.toggle_pause,
@@ -1732,6 +1735,33 @@ class MainWindow(QMainWindow):
         self.model.refresh_qc()
         self._show_status(f"Профиль QC: {PROFILES[key].name} · {self._qc.summary()}")
 
+    def goto_next_question(self) -> None:
+        """К следующей реплике с пометкой «вопрос», по кругу.
+
+        По кругу, а не до конца файла: вопросы разбросаны, и упереться в
+        последний, когда в начале ещё три, — не то, чего ждут от «следующего».
+        """
+        from sfstudio.core.workflow import questions
+
+        marked = questions(self._doc.events)
+        if not marked:
+            self._show_status("Реплик с вопросом нет")
+            return
+
+        current = self._current_eid()
+        order = [e.eid for e in self._doc.events]
+        position = order.index(current) if current in order else -1
+        after = [eid for eid in marked if order.index(eid) > position]
+        target = after[0] if after else marked[0]
+
+        self._select_eid(target)
+        flash(self.table.viewport(), self._palette.warning)
+        note = self._doc.by_eid(target).note
+        place = marked.index(target) + 1
+        self._show_status(
+            f"Вопрос {place} из {len(marked)}" + (f": {note}" if note else "")
+        )
+
     def goto_next_issue(self) -> None:
         eid = self.qc_panel.go_to_next(self._current_eid())
         if eid is None:
@@ -2161,10 +2191,21 @@ class MainWindow(QMainWindow):
     def _show_status(self, text: str) -> None:
         self.statusBar().showMessage(text, 6000)
         self.status_label.setText(
-            f"{len(self._doc)} событий   |   "
+            f"{len(self._doc)} событий{self._progress_note()}   |   "
             f"{self._doc.script_info.play_res_x}×{self._doc.script_info.play_res_y}   |   "
             f"{self._doc.source_format.upper()}"
         )
+
+    def _progress_note(self) -> str:
+        """«готово 120 из 480» — если пометки вообще расставлены.
+
+        Пока не отмечено ни одной реплики, счётчика нет: он мешал бы тем,
+        кто пометками не пользуется.
+        """
+        from sfstudio.core.workflow import progress
+
+        done, total = progress(self._doc.events)
+        return f"   |   готово {done} из {total}" if done else ""
 
     def _timing_selection(self) -> list:
         """Выделенные события, либо пусто."""

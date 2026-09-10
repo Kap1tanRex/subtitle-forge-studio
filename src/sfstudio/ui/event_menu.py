@@ -20,11 +20,22 @@ from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import QInputDialog, QMenu, QWidget
 
 from sfstudio.core.color import RGBA
-from sfstudio.core.commands import AddActor, AssignActor, Command, CompositeCommand
+from sfstudio.core.commands import (
+    AddActor,
+    AssignActor,
+    Command,
+    CompositeCommand,
+    SetNote,
+    SetStatus,
+)
 from sfstudio.core.document import SubtitleDocument
+from sfstudio.core.workflow import STATUSES
 from sfstudio.ui.safe_text import menu_label, plural
 
-__all__ = ["actor_submenu", "color_icon", "editable_eids", "plural_events"]
+__all__ = [
+    "actor_submenu", "color_icon", "editable_eids", "note_action",
+    "plural_events", "status_submenu",
+]
 
 #: Сторона квадратика с цветом актора в меню.
 ICON_PX = 12
@@ -62,6 +73,62 @@ def editable_eids(doc: SubtitleDocument, eids: Sequence[int]) -> list[int]:
             keep.append(eid)
     return keep
 
+
+def status_submenu(
+    parent: QWidget | QMenu,
+    doc: SubtitleDocument,
+    eids: Sequence[int],
+    run: Callable[[Command], object],
+    *,
+    title: str = "Пометка",
+) -> QMenu:
+    """Подменю рабочего состояния: черновик, готово, вопрос.
+
+    Ставится сразу всей выделенной группе одной командой: состояние
+    отмечают пачкой, и двадцать шагов истории за одно действие человека
+    сделали бы отмену бесполезной.
+    """
+    menu = QMenu(title, parent if isinstance(parent, QWidget) else None)
+    targets = [eid for eid in eids if doc.has(eid)]
+    if not targets:
+        menu.setEnabled(False)
+        return menu
+
+    current = {doc.by_eid(eid).status for eid in targets}
+    for key, label in STATUSES:
+        action = menu.addAction(label)
+        action.setCheckable(True)
+        # Галочка — только когда пометка одна на всю группу: при разнобое
+        # любая отметка была бы неправдой.
+        action.setChecked(current == {key})
+        action.triggered.connect(
+            lambda _=False, value=key: run(SetStatus(list(targets), value))
+        )
+    return menu
+
+
+def note_action(
+    parent,
+    doc: SubtitleDocument,
+    eid: int,
+    run: Callable[[Command], object],
+) -> Callable[[], None]:
+    """Обработчик пункта «Заметка…» для одной реплики."""
+
+    def edit() -> None:
+        event = doc.get(eid)
+        if event is None:
+            return
+        widget = parent if isinstance(parent, QWidget) else None
+        text, accepted = QInputDialog.getText(
+            widget, "Заметка к реплике",
+            "О чём помнить (пусто — убрать заметку):",
+            text=event.note,
+        )
+        if accepted and text.strip() != event.note:
+            run(SetNote(eid, text.strip()))
+
+    return edit
 
 def actor_submenu(
     parent: QWidget | QMenu,

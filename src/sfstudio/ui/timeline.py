@@ -69,7 +69,13 @@ from sfstudio.core.time import FpsModel, SnapMode, format_srt
 from sfstudio.core.tracks import Track, TrackKind
 from sfstudio.core.undo import UndoStack
 from sfstudio.media.keyframes import KeyframeIndex, SnapContext, snap_time
-from sfstudio.ui.event_menu import actor_submenu, editable_eids, plural_events
+from sfstudio.ui.event_menu import (
+    actor_submenu,
+    editable_eids,
+    note_action,
+    plural_events,
+    status_submenu,
+)
 from sfstudio.ui.safe_text import menu_label, plain_tooltip
 from sfstudio.ui.theme import DARK, Palette
 
@@ -1237,6 +1243,14 @@ class TimelineWidget(QWidget):
                     actor_command=self.actor_command,
                 )
             )
+            menu.addMenu(status_submenu(self, self._doc, targets, self._run_edit))
+            note = QAction("Заметка…", menu)
+            note.setEnabled(len(targets) == 1)
+            if len(targets) == 1:
+                note.triggered.connect(
+                    note_action(self, self._doc, targets[0], self._run_edit)
+                )
+            menu.addAction(note)
 
             menu.addSeparator()
             what = plural_events(len(targets))

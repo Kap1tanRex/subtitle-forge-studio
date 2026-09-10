@@ -26,7 +26,19 @@ from sfstudio.core import time as timemod
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands import DeleteEvents, DuplicateEvents
 from sfstudio.core.document import SubtitleDocument
-from sfstudio.ui.event_menu import actor_submenu, editable_eids, plural_events
+from sfstudio.core.workflow import (
+    STATUS_DONE,
+    STATUS_DRAFT,
+    STATUS_QUESTION,
+    status_title,
+)
+from sfstudio.ui.event_menu import (
+    actor_submenu,
+    editable_eids,
+    note_action,
+    plural_events,
+    status_submenu,
+)
 from sfstudio.ui.safe_text import plain_tooltip
 from sfstudio.ui.theme import DARK, Palette
 
@@ -41,9 +53,12 @@ COL_TEXT = 7
 #: Оригинал, с которого идёт перевод. Логически последний, а показывается
 #: слева от текста: читают слева направо, и оригинал идёт первым.
 COL_REFERENCE = 8
+#: Рабочая пометка: черновик, готово, вопрос. Показывается кружком слева,
+#: рядом с номером — там же, где взгляд ищет состояние строки.
+COL_STATUS = 9
 
 HEADERS = ("#", "Начало", "Конец", "Длит.", "CPS", "Стиль", "Актёр", "Текст",
-           "Оригинал")
+           "Оригинал", "Пометка")
 
 #: Порог CPS, выше которого строка подсвечивается как «слишком быстрая».
 CPS_WARNING = 17.0
@@ -226,6 +241,9 @@ class EventTableModel(QAbstractTableModel):
                     return QColor(self._palette.warning)
             return None
 
+        if role == _ROLE_DECORATION and col == COL_STATUS:
+            return self._status_marker(event)
+
         if role == _ROLE_DECORATION:
             return self._qc_marker(event.eid) if col == COL_INDEX else None
 
@@ -239,6 +257,8 @@ class EventTableModel(QAbstractTableModel):
             if col == COL_REFERENCE:
                 original = self.reference_for(event)
                 return plain_tooltip(original) if original else None
+            if col == COL_STATUS:
+                return plain_tooltip(self._status_tooltip(event))
 
         return None
 
@@ -379,6 +399,30 @@ class EventTableModel(QAbstractTableModel):
         self._actor_cache[key] = tint
         return tint
 
+    def _status_marker(self, event) -> object | None:
+        """Кружок рабочей пометки. Цвет говорит, что со строкой не так."""
+        status = getattr(event, "status", "")
+        if not status:
+            return None
+        colours = {
+            STATUS_DRAFT: self._palette.text_muted,
+            STATUS_DONE: self._palette.success,
+            STATUS_QUESTION: self._palette.warning,
+        }
+        colour = colours.get(status)
+        return _dot(QColor(colour)) if colour else None
+
+    def _status_tooltip(self, event) -> str:
+        """Подпись пометки и заметка, если она есть."""
+        parts = []
+        status = getattr(event, "status", "")
+        if status:
+            parts.append(status_title(status))
+        note = getattr(event, "note", "")
+        if note:
+            parts.append(note)
+        return "\n".join(parts)
+
     def _qc_marker(self, eid: int) -> object | None:
         """Цветная метка серьёзности в колонке номера.
 
@@ -518,6 +562,7 @@ _DOT_CACHE: dict[str, QIcon] = {}
 #: рабочее место, и каждый лишний пиксель в служебной колонке отнят у текста.
 COLUMN_WIDTHS = {
     COL_INDEX: 40,
+    COL_STATUS: 30,
     COL_START: 78,
     COL_END: 78,
     COL_DURATION: 54,
@@ -529,7 +574,8 @@ COLUMN_WIDTHS = {
 #: Порядок, в котором колонки уступают место при нехватке ширины. Первой
 #: уходит та, без которой обходятся чаще всего. «Начало» и «Текст» не
 #: скрываются никогда: без них таблица перестаёт быть списком реплик.
-HIDE_ORDER = (COL_STYLE, COL_DURATION, COL_CPS, COL_INDEX, COL_ACTOR, COL_END)
+HIDE_ORDER = (COL_STYLE, COL_DURATION, COL_CPS, COL_STATUS, COL_INDEX,
+              COL_ACTOR, COL_END)
 
 #: Сколько оставить тексту, чтобы в нём читалась хотя бы фраза.
 MIN_TEXT_W = 150
@@ -717,6 +763,11 @@ class EventTableView(QTableView):
                     actor_command=getattr(model, "actor_command", None),
                 )
             )
+            menu.addMenu(status_submenu(self, doc, eids, run))
+            note = menu.addAction("Заметка…")
+            note.setEnabled(len(eids) == 1)
+            if len(eids) == 1:
+                note.triggered.connect(note_action(self, doc, eids[0], run))
 
             menu.addSeparator()
             what = plural_events(len(eids))

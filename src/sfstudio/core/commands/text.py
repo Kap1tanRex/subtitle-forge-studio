@@ -11,6 +11,8 @@ from sfstudio.core.document import SubtitleDocument
 __all__ = [
     "SetActor",
     "SetMargins",
+    "SetNote",
+    "SetStatus",
     "SetStyle",
     "SetText",
     "ToggleComment",
@@ -100,6 +102,52 @@ class SetActor(_SetField):
 
     def __init__(self, eid: int, actor: str) -> None:
         super().__init__(eid, actor, label="Смена актёра")
+
+
+class SetNote(_SetField):
+    FIELD = "note"
+
+    def __init__(self, eid: int, note: str) -> None:
+        super().__init__(eid, note, label="Заметка")
+
+
+class SetStatus(Command):
+    """Отмечает рабочее состояние сразу нескольких реплик.
+
+    Сразу нескольких, а не одной: состояние ставят пачкой — «эти двадцать
+    готовы», — и двадцать шагов в истории отмены за одно действие человека
+    сделали бы отмену бесполезной.
+    """
+
+    __slots__ = ("_before", "eids", "label", "status")
+
+    def __init__(self, eids: list[int], status: str) -> None:
+        self.eids = list(eids)
+        self.status = status
+        self._before: list[tuple[int, str]] = []
+        self.label = "Пометка"
+
+    def apply(self, doc: SubtitleDocument) -> ChangeSet:
+        self._before = []
+        for eid in self.eids:
+            event = doc.get(eid)
+            if event is None:
+                continue
+            self._before.append((eid, event.status))
+            event.status = self.status
+        doc.bump_revision()
+        return ChangeSet.changed(*(eid for eid, _ in self._before))
+
+    def revert(self, doc: SubtitleDocument) -> ChangeSet:
+        for eid, status in self._before:
+            event = doc.get(eid)
+            if event is not None:
+                event.status = status
+        doc.bump_revision()
+        return ChangeSet.changed(*(eid for eid, _ in self._before))
+
+    def size_hint(self) -> int:
+        return 64 + 24 * len(self.eids)
 
 
 class ToggleComment(Command):

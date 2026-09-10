@@ -30,6 +30,8 @@ from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.style import SubtitleStyle
 from sfstudio.core.tracks import INFO_KEY as TRACKS_KEY
 from sfstudio.core.tracks import TrackSet
+from sfstudio.core.workflow import INFO_KEY as NOTES_KEY
+from sfstudio.core.workflow import apply_notes, collect_notes
 
 __all__ = ["AssParseError", "read_ass", "write_ass"]
 
@@ -201,6 +203,10 @@ def _read_registries(doc: SubtitleDocument) -> None:
     raw_actors = doc.script_info.extra.pop(ACTORS_KEY, None)
     if raw_actors:
         doc.actors = ActorRegistry.from_json(raw_actors)
+
+    raw_notes = doc.script_info.extra.pop(NOTES_KEY, None)
+    if raw_notes:
+        apply_notes(raw_notes, doc.events)
 
     raw_tracks = doc.script_info.extra.pop(TRACKS_KEY, None)
     if raw_tracks:
@@ -376,6 +382,9 @@ def write_ass(
         out.append(f"{ACTORS_KEY}: {doc.actors.to_json()}")
     if _tracks_worth_saving(doc):
         out.append(f"{TRACKS_KEY}: {doc.tracks.to_json()}")
+    notes = collect_notes(doc.events)
+    if notes != "[]":
+        out.append(f"{NOTES_KEY}: {notes}")
 
     # [V4+ Styles]
     out.append("")
