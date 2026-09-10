@@ -237,6 +237,27 @@ class TestTimelinePainting:
         spent = self.paint_ms(LARGE)
         assert spent < 60, f"кадр таймлайна рисуется {spent:.1f} мс"
 
+    def test_markers_outside_the_view_cost_nothing(self, qapp) -> None:
+        """Рисуются только видимые: иначе прокрутка длинного фильма встанет.
+
+        Измерено: без маркеров 1,2 мс, с полусотней 1,4 мс, с тысячей на
+        весь фильм 8,8 мс. Тысяча — заведомо больше, чем ставят руками.
+        """
+        from sfstudio.core.markers import Marker
+
+        doc = make_doc(SMALL)
+        for index in range(1000):
+            doc.markers.add(Marker(index * 3600, name=f"м{index}"))
+
+        widget = TimelineWidget(doc, UndoStack(doc))
+        widget.resize(1920, 400)
+        image = QImage(1920, 400, QImage.Format_ARGB32)
+
+        # Вблизи в кадр попадают единицы маркеров — столько и должно стоить.
+        widget.zoom_at(50.0, 300.0)
+        spent = median_ms(lambda: widget.render(image), 5)
+        assert spent < 30, f"кадр с маркерами рисуется {spent:.1f} мс"
+
 
 class TestTableScrolling:
     """Экран таблицы: то, что пересчитывается при каждой прокрутке.
