@@ -80,6 +80,7 @@ class MpvPlayer:
     __slots__ = (
         "_duration_ms",
         "_mpv",
+        "_observers",
         "_params",
         "_path",
         "_pending_seek_ms",
@@ -145,6 +146,10 @@ class MpvPlayer:
         self.on_video_params: Callable[[VideoParams], None] | None = None
         self.on_eof: Callable[[], None] | None = None
 
+        #: Наблюдатели свойств. Их надо уметь снять до завершения mpv:
+        #: событие, пришедшее в фоновом потоке уже после разрушения, роняет
+        #: процесс целиком — access violation внутри libmpv.
+        self._observers: list = []
         self._observe()
 
     # -- наблюдение за свойствами ---------------------------------------------- #
@@ -181,6 +186,8 @@ class MpvPlayer:
             self._params = _read_params(value, self._mpv)
             if self.on_video_params:
                 self.on_video_params(self._params)
+
+        self._observers = [_time, _duration, _pause, _params]
 
     # -- файлы ------------------------------------------------------------------ #
 
@@ -354,6 +361,25 @@ class MpvPlayer:
         return self._mpv
 
     def close(self) -> None:
+        """Останавливает mpv, сняв перед этим всё, что может выстрелить.
+
+        Порядок важен. Наблюдатели свойств живут в фоновом потоке mpv, и
+        событие, пришедшее уже после ``terminate``, обращается к разрушенным
+        структурам — процесс падает целиком, с access violation внутри
+        libmpv, и тесты обрываются на середине без единого проваленного.
+        Сначала снимаем наблюдателей и обнуляем обработчики, потом гасим.
+        """
+        for observer in self._observers:
+            with contextlib.suppress(Exception):
+                observer.unobserve_mpv_properties()
+        self._observers.clear()
+
+        self.on_position = None
+        self.on_duration = None
+        self.on_pause = None
+        self.on_video_params = None
+        self.on_eof = None
+
         # terminate() может бросить, если mpv уже завершился сам.
         with contextlib.suppress(Exception):
             self._mpv.terminate()

@@ -58,6 +58,7 @@ from sfstudio.core.actor_label import (
     template_for,
 )
 from sfstudio.services.qc import PROFILES
+from sfstudio.services.spelling import LANGUAGES as SPELL_LANGUAGES
 from sfstudio.ui.appearance import themes_for
 from sfstudio.ui.combo import select_data
 from sfstudio.ui.font_box import FontComboBox, font_sample_html
@@ -394,6 +395,28 @@ class PreferencesDialog(QDialog):
             lambda v: self._set("subtitles.default_size", float(v))
         )
         form.addRow("Кегль по умолчанию", self.font_size_spin)
+
+        self.spelling_box = QComboBox()
+        for code, title in SPELL_LANGUAGES:
+            self.spelling_box.addItem(title, code)
+        self.spelling_box.setToolTip(
+            "Проверка орфографии в поле правки. Замены и «добавить в словарь» "
+            "— по правому щелчку по подчёркнутому слову"
+        )
+        self.spelling_box.currentIndexChanged.connect(
+            lambda i: self._set("spelling.language", self.spelling_box.itemData(i))
+        )
+        form.addRow("Проверять орфографию", self.spelling_box)
+
+        words_row = QHBoxLayout()
+        self.words_note = QLabel("")
+        self.words_note.setProperty("role", "hint")
+        words_row.addWidget(self.words_note, 1)
+        forget = QPushButton("Очистить словарь")
+        forget.setToolTip("Забыть все слова, добавленные вручную")
+        forget.clicked.connect(self._clear_dictionary)
+        words_row.addWidget(forget)
+        form.addRow("", words_row)
 
         self.font_sample = QLabel("")
         self.font_sample.setWordWrap(True)
@@ -745,6 +768,9 @@ class PreferencesDialog(QDialog):
         )
         self._refresh_label_sample()
 
+        self._select(self.spelling_box, get("spelling.language", ""))
+        self._refresh_words_note()
+
         family = str(get("subtitles.default_font", "Arial") or "Arial")
         self.font_box.set_family(family)
         self.font_size_spin.setValue(float(get("subtitles.default_size", 54.0) or 54.0))
@@ -752,6 +778,27 @@ class PreferencesDialog(QDialog):
 
     def _select(self, box: QComboBox, value: object) -> None:
         select_data(box, value)
+
+    def _refresh_words_note(self) -> None:
+        words = list(self._settings.get("spelling.words", []) or ())
+        if not words:
+            self.words_note.setText("Свой словарь пуст.")
+            return
+        shown = ", ".join(sorted(words)[:6])
+        tail = " и ещё…" if len(words) > 6 else ""
+        self.words_note.setText(f"В своём словаре: {shown}{tail}")
+
+    def _clear_dictionary(self) -> None:
+        if not self._settings.get("spelling.words", []):
+            return
+        answer = QMessageBox.question(
+            self, "Свой словарь",
+            "Забыть все слова, добавленные вручную?",
+        )
+        if answer != QMessageBox.Yes:
+            return
+        self._set("spelling.words", [])
+        self._refresh_words_note()
 
     # -- темы и цвета --------------------------------------------------------- #
 

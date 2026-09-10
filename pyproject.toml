@@ -17,7 +17,11 @@ dependencies = []
 gui = ["PySide6-Essentials>=6.7"]
 media = ["av>=12.0", "numpy>=1.26", "python-mpv>=1.0.7"]
 io-extra = ["pysubs2>=1.7", "charset-normalizer>=3.3"]
-dev = ["pytest>=8.0", "pytest-cov", "hypothesis>=6.0", "ruff", "mypy"]
+# Проверка орфографии: порт Hunspell на чистом Python, со словарями
+# русского и английского в комплекте.
+spelling = ["spylls>=0.1.7"]
+dev = ["pytest>=8.0", "pytest-cov", "pytest-xdist>=3.5", "hypothesis>=6.0",
+       "ruff", "mypy"]
 
 [project.scripts]
 sfstudio = "sfstudio.__main__:main"
@@ -27,7 +31,12 @@ packages = ["src/sfstudio"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers"
+# Тесты идут по файлам в отдельных процессах. Это не про скорость (хотя
+# прогон ускорился с двух минут до пятнадцати секунд): в одном процессе
+# полторы тысячи тестов с Qt, libmpv и libass копят состояние, и сессия
+# начала обрываться падением интерпретатора в конце — при том, что все
+# тесты проходили. Изоляция по файлам убирает и это, и взаимные помехи.
+addopts = "-q --strict-markers -n auto --dist loadfile"
 markers = [
     "needs_gui: requires PySide6",
     "needs_media: requires PyAV/numpy",

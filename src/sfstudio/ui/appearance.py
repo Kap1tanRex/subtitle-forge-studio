@@ -105,7 +105,14 @@ def _arrow_files(color: str) -> dict[str, str]:
     from pathlib import Path
 
     from PySide6.QtCore import QPoint, QStandardPaths, Qt
-    from PySide6.QtGui import QColor, QPainter, QPixmap, QPolygon
+    from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPixmap, QPolygon
+
+    # Рисование требует графического приложения. Без него QPixmap роняет
+    # процесс целиком — не исключением, а падением, и разбираться в этом
+    # приходится по кодам возврата. Сборка таблицы стилей обязана работать
+    # и когда рисовать нечем: тесты собирают её без окон.
+    if QGuiApplication.instance() is None:
+        return {}
 
     try:
         root = QStandardPaths.writableLocation(

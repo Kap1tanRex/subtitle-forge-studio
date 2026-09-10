@@ -51,7 +51,10 @@ for _catalog in (SRC / "sfstudio" / "locale").glob("*.json"):
 # рядом с кодом модель определения речи (silero_vad_v6.onnx, около 1,2 МБ), и
 # без неё распознавание падает с «File doesn't exist» — код-то собрался, а
 # файл рядом с ним нет. Собираем такие файлы явно.
-for _package in ("faster_whisper", "ctranslate2", "onnxruntime", "tokenizers"):
+# spylls держит рядом словари русского и английского (около 6 МБ) — без них
+# проверка орфографии в собранной программе молча не работает.
+for _package in ("faster_whisper", "ctranslate2", "onnxruntime", "tokenizers",
+                 "spylls"):
     try:
         datas += collect_data_files(_package)
     except Exception:

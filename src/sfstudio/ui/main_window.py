@@ -212,6 +212,8 @@ class MainWindow(QMainWindow):
                        self.video_pane.canvas, self.video_pane.overlay, self.model):
             with contextlib.suppress(AttributeError):
                 widget.set_palette(palette)
+        if hasattr(self, "_speller"):
+            self._speller.set_colour(palette.danger)
         self.update()
 
     def apply_layout_preset(self, preset: LayoutPreset) -> None:
@@ -289,6 +291,7 @@ class MainWindow(QMainWindow):
         self.editor.setPlaceholderText("Текст реплики (\\N — перевод строки)")
         self.editor.setMaximumHeight(96)
         self.editor.textChanged.connect(self._on_editor_changed)
+        self._setup_spellcheck()
 
         # Подсказка в одну строку, подробности — по наведению. Двух строк она
         # стоила постоянно, а читают её один раз: место под редактором нужнее
@@ -728,6 +731,51 @@ class MainWindow(QMainWindow):
         self.model.refresh_qc()
         self._refresh_title()
         self._select_row(0)
+
+    # -- орфография ---------------------------------------------------------------- #
+
+    def _setup_spellcheck(self) -> None:
+        """Заводит проверку и вешает её на поле правки.
+
+        Словарь при этом не читается: загрузка ленивая, и человек, который
+        проверкой не пользуется, не должен платить за неё полсекунды при
+        каждом запуске.
+        """
+        from sfstudio.services.spelling import SpellChecker
+        from sfstudio.ui.spellcheck import attach_spellcheck
+
+        self.spelling = SpellChecker(
+            str(self._settings.get("spelling.language", "") or ""),
+            set(self._settings.get("spelling.words", []) or ()),
+        )
+        # Цвет берётся из темы позже, в apply_theme: сборка интерфейса идёт
+        # раньше, и палитры окна на этот момент ещё нет.
+        from sfstudio.ui.theme import DARK
+
+        self._speller = attach_spellcheck(self.editor, self.spelling, DARK.danger)
+
+    def apply_spelling_settings(self) -> None:
+        """Перечитывает язык и свой словарь после настроек."""
+        if not hasattr(self, "spelling"):
+            return
+        self.spelling.set_language(
+            str(self._settings.get("spelling.language", "") or "")
+        )
+        self.spelling.set_extra_words(self._settings.get("spelling.words", []) or ())
+        self._speller.rehighlight()
+
+    def remember_spelling_words(self) -> None:
+        """Складывает пополнившийся свой словарь в настройки.
+
+        Слово добавляют из меню поля правки — а живёт оно между проектами:
+        имена персонажей повторяются из серии в серию.
+        """
+        if not hasattr(self, "spelling"):
+            return
+        words = sorted(self.spelling.extra_words)
+        if words != list(self._settings.get("spelling.words", []) or ()):
+            self._settings.set("spelling.words", words)
+            self._settings.save()
 
     # -- оригинал для перевода ---------------------------------------------------- #
 
@@ -1315,6 +1363,7 @@ class MainWindow(QMainWindow):
 
         self.apply_theme()
         self._reschedule_autosave()
+        self.apply_spelling_settings()
 
         profile = PROFILES.get(
             str(self._settings.get("qc.profile", "general")), default_profile()
@@ -2336,6 +2385,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._save_session()
+        # Слова, занесённые в словарь из меню поля правки, живут в настройках:
+        # имена персонажей нужны и в следующей серии.
+        self.remember_spelling_words()
         self.video_pane.close_player()
         if self._undo.is_clean:
             event.accept()
