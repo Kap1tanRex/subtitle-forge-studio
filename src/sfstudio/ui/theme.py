@@ -227,6 +227,15 @@ def build_qss(p: Palette) -> str:
     QStatusBar::item {{ border: none; }}
 
     QLabel[role="hint"] {{ color: {p.text_muted}; }}
+    /* Оригинал для перевода: чужой текст, только для чтения. Приглушён,
+       чтобы не спорить за внимание с тем, что человек пишет сам. */
+    QPlainTextEdit[role="reference"] {{
+        background: {p.bg_base};
+        color: {p.text_muted};
+        border: 1px solid {p.border};
+        /* Обычный шрифт, а не моноширинный: оригинал читают, а не правят. */
+        font-family: "Segoe UI", "Inter", system-ui;
+    }}
     QLabel[role="warning"] {{ color: {p.warning}; }}
 
     QScrollBar:vertical {{ background: {p.bg_base}; width: 12px; margin: 0; }}

@@ -22,7 +22,7 @@ from PySide6.QtWidgets import QInputDialog, QMenu, QWidget
 from sfstudio.core.color import RGBA
 from sfstudio.core.commands import AddActor, AssignActor, Command, CompositeCommand
 from sfstudio.core.document import SubtitleDocument
-from sfstudio.ui.safe_text import menu_label
+from sfstudio.ui.safe_text import menu_label, plural
 
 __all__ = ["actor_submenu", "color_icon", "editable_eids", "plural_events"]
 
@@ -40,13 +40,8 @@ def color_icon(color: RGBA) -> QIcon:
 def plural_events(count: int) -> str:
     """«реплику» / «2 реплики» / «7 реплик» — для подписи пункта меню."""
     if count == 1:
-        return "реплику"
-    tail, hundreds = count % 10, count % 100
-    if tail == 1 and hundreds != 11:
-        return f"{count} реплику"
-    if tail in (2, 3, 4) and hundreds not in (12, 13, 14):
-        return f"{count} реплики"
-    return f"{count} реплик"
+        return "реплику"  # «1 реплику» звучит как счёт, а не как действие
+    return plural(count, "реплику", "реплики", "реплик")
 
 
 def editable_eids(doc: SubtitleDocument, eids: Sequence[int]) -> list[int]:

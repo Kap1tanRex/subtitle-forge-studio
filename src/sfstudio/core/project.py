@@ -27,6 +27,7 @@ __all__ = [
     "FPS_PRESETS",
     "MANIFEST_NAME",
     "PROJECT_SUFFIX",
+    "REFERENCE_NAME",
     "RESOLUTION_PRESETS",
     "SUBTITLES_NAME",
     "Project",
@@ -40,6 +41,9 @@ FORMAT_VERSION = 1
 
 MANIFEST_NAME = "project.json"
 SUBTITLES_NAME = "subtitles.ass"
+#: Оригинал, с которого идёт перевод. Лежит в проекте отдельным
+#: файлом: это чужой текст, и в наши субтитры он попадать не должен.
+REFERENCE_NAME = "reference.ass"
 
 #: Готовые разрешения. Это ``PlayRes`` документа — система координат, в
 #: которой заданы ``\pos``, а не размер видео: они могут не совпадать, и
@@ -121,6 +125,8 @@ class Project:
     media_path: Path | None = None
     fps: Fraction = field(default_factory=lambda: Fraction(25))
     state: ProjectState = field(default_factory=ProjectState)
+    #: Оригинал для перевода: только для чтения, в экспорт не попадает.
+    reference: object | None = None
     created: str = ""
     modified: str = ""
     #: Откуда прочитан или куда записан. Не сохраняется внутрь файла.
@@ -165,6 +171,9 @@ class Project:
             media_path=media_path,
             fps=self.fps,
             state=state,
+            # Оригинал переносится в копию: без него восстановление из
+            # автосохранения молча оставило бы переводчика без исходника.
+            reference=self.reference,
             created=self.created,
             modified=self.modified,
         )

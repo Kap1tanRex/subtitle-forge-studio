@@ -38,8 +38,12 @@ COL_CPS = 4
 COL_STYLE = 5
 COL_ACTOR = 6
 COL_TEXT = 7
+#: Оригинал, с которого идёт перевод. Логически последний, а показывается
+#: слева от текста: читают слева направо, и оригинал идёт первым.
+COL_REFERENCE = 8
 
-HEADERS = ("#", "Начало", "Конец", "Длит.", "CPS", "Стиль", "Актёр", "Текст")
+HEADERS = ("#", "Начало", "Конец", "Длит.", "CPS", "Стиль", "Актёр", "Текст",
+           "Оригинал")
 
 #: Порог CPS, выше которого строка подсвечивается как «слишком быстрая».
 CPS_WARNING = 17.0
@@ -92,6 +96,11 @@ class EventTableModel(QAbstractTableModel):
         self._actor_cache: dict[tuple[str, bool], QColor | None] = {}
         #: Источник вердиктов QC. Необязателен: таблица работает и без него.
         self._qc = qc
+        #: Оригинал для перевода. ``None`` — колонка пуста и скрыта.
+        self._reference = None
+        #: Текст оригинала по eid. Поиск дешёвый, но колонку спрашивают для
+        #: каждой видимой строки при каждой перерисовке — и на каждую роль.
+        self._ref_cache: dict[int, str] = {}
 
     @property
     def document(self) -> SubtitleDocument:
@@ -104,6 +113,29 @@ class EventTableModel(QAbstractTableModel):
     @property
     def actor_command(self):
         return self._actor_command
+
+    @property
+    def reference(self):
+        return self._reference
+
+    def set_reference(self, track) -> None:
+        """Подключает или снимает оригинал. ``None`` — снять."""
+        self._reference = track or None
+        self._ref_cache.clear()
+        if self.rowCount():
+            top = self.index(0, COL_REFERENCE)
+            bottom = self.index(self.rowCount() - 1, COL_REFERENCE)
+            self.dataChanged.emit(top, bottom)
+
+    def reference_for(self, event) -> str:
+        """Текст оригинала для реплики. Пусто — оригинала нет или тишина."""
+        if self._reference is None:
+            return ""
+        cached = self._ref_cache.get(event.eid)
+        if cached is None:
+            cached = self._reference.text_for(event.start, event.end)
+            self._ref_cache[event.eid] = cached
+        return cached
 
     def set_palette(self, palette: Palette) -> None:
         """Меняет тему. Кэш кистей сбрасывается: он построен под прежние цвета."""
@@ -176,6 +208,10 @@ class EventTableModel(QAbstractTableModel):
             return self._actor_background(event, col)
 
         if role == _ROLE_FOREGROUND:
+            if col == COL_REFERENCE:
+                # Приглушённым: это чужой текст, который не правят, и он не
+                # должен спорить за внимание с тем, что человек пишет сам.
+                return QColor(self._palette.text_muted)
             if event.comment:
                 return QColor(self._palette.text_muted)
             if col == COL_ACTOR:
@@ -200,6 +236,9 @@ class EventTableModel(QAbstractTableModel):
             if col == COL_TEXT:
                 # Текст из файла: подсказка не должна принять его за разметку.
                 return plain_tooltip(event.plain)
+            if col == COL_REFERENCE:
+                original = self.reference_for(event)
+                return plain_tooltip(original) if original else None
 
         return None
 
@@ -310,6 +349,8 @@ class EventTableModel(QAbstractTableModel):
         if col == COL_TEXT:
             # Одна строка: переводы показываем символом, чтобы не растягивать ряд.
             return event.plain.replace("\n", " ⏎ ")
+        if col == COL_REFERENCE:
+            return self.reference_for(event).replace("\n", " ⏎ ")
         return ""
 
     def _actor_background(self, event, col: int) -> QColor | None:
@@ -417,6 +458,10 @@ class EventTableModel(QAbstractTableModel):
         if not changes.changed_eids:
             return
 
+        # Тайминги могли сдвинуться — значит оригинал под репликой уже другой.
+        for eid in changes.changed_eids:
+            self._ref_cache.pop(eid, None)
+
         rows = [
             i for i, event in enumerate(self._doc.events) if event.eid in changes.changed_eids
         ]
@@ -433,6 +478,7 @@ class EventTableModel(QAbstractTableModel):
         self._doc = doc
         self._tc_cache.clear()
         self._actor_cache.clear()
+        self._ref_cache.clear()
         self.endResetModel()
 
     def row_of_eid(self, eid: int) -> int:
@@ -529,10 +575,41 @@ class EventTableView(QTableView):
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setSectionResizeMode(COL_TEXT, QHeaderView.Stretch)
+        header.setSectionResizeMode(COL_REFERENCE, QHeaderView.Stretch)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._column_menu)
         for column, width in COLUMN_WIDTHS.items():
             self.setColumnWidth(column, width)
+
+    def setModel(self, model) -> None:  # noqa: N802
+        """Ставит модель и заново раскладывает колонки.
+
+        Порядок и скрытие приходится задавать здесь, а не в конструкторе:
+        до появления модели колонок ещё нет, и всё, что им назначили,
+        пропадает молча — колонка оригинала оставалась видимой и стояла
+        последней.
+        """
+        super().setModel(model)
+        if model is None:
+            return
+
+        header = self.horizontalHeader()
+        # Оригинал показывается слева от перевода: читают слева направо, и
+        # смотреть на исходник после результата неудобно. Логический номер
+        # при этом остаётся последним — так новая колонка ничего не сдвинула.
+        header.moveSection(
+            header.visualIndex(COL_REFERENCE), header.visualIndex(COL_TEXT)
+        )
+        self.show_reference(bool(getattr(model, "reference", None)))
+
+    def show_reference(self, on: bool) -> None:
+        """Показывает или прячет колонку оригинала.
+
+        Прячется именно колонка, а не её содержимое: пустой столбец на
+        четверть ширины таблицы отнимал бы место у текста без всякой пользы.
+        """
+        self.setColumnHidden(COL_REFERENCE, not on)
+        self.adapt_columns()
 
     # -- подбор колонок под ширину ----------------------------------------- #
 
@@ -546,6 +623,9 @@ class EventTableView(QTableView):
         if available <= 0:
             return
 
+        # С оригиналом текст делит место пополам, и служебным колонкам надо
+        # уступить раньше: иначе обе текстовые превращаются в полоски.
+        needed = MIN_TEXT_W * (2 if not self.isColumnHidden(COL_REFERENCE) else 1)
         visible = [c for c in HIDE_ORDER if self._pinned.get(c, True)]
         # Считаем от полного набора и убираем по одной, а не наоборот:
         # иначе колонка, спрятанная при сужении, не вернулась бы при
@@ -553,7 +633,7 @@ class EventTableView(QTableView):
         used = sum(COLUMN_WIDTHS.get(c, 0) for c in visible)
         hidden: set[int] = set()
         for column in HIDE_ORDER:
-            if available - used >= MIN_TEXT_W:
+            if available - used >= needed:
                 break
             if column not in visible:
                 continue

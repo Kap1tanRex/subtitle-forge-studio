@@ -32,6 +32,7 @@ from sfstudio.core.project import (
     FORMAT_VERSION,
     MANIFEST_NAME,
     PROJECT_SUFFIX,
+    REFERENCE_NAME,
     SUBTITLES_NAME,
     Project,
     ProjectError,
@@ -80,6 +81,7 @@ def save_project(project: Project, path: Path) -> Path:
         "media": _media_entry(project, path),
         "state": project.state.to_dict(),
         "subtitles": SUBTITLES_NAME,
+        "reference": _reference_entry(project),
     }
 
     temporary = path.with_name(path.name + ".tmp")
@@ -89,6 +91,8 @@ def save_project(project: Project, path: Path) -> Path:
                 MANIFEST_NAME, json.dumps(manifest, ensure_ascii=False, indent=2)
             )
             archive.writestr(SUBTITLES_NAME, write_ass(project.document))
+            if project.reference:
+                archive.writestr(REFERENCE_NAME, _reference_ass(project.reference))
         temporary.replace(path)
     except OSError as exc:
         temporary.unlink(missing_ok=True)
@@ -96,6 +100,35 @@ def save_project(project: Project, path: Path) -> Path:
 
     project.path = path
     return path
+
+
+def _reference_entry(project: Project) -> dict | None:
+    """Сведения об оригинале для манифеста."""
+    reference = project.reference
+    if not reference:
+        return None
+    return {
+        "file": REFERENCE_NAME,
+        "source": getattr(reference, "source", ""),
+        "language": getattr(reference, "language", ""),
+        "lines": len(reference),
+    }
+
+
+def _reference_ass(reference) -> str:
+    """Складывает оригинал в обычный ASS.
+
+    Свой формат заводить незачем: строки оригинала — это те же тайминги и
+    текст. Заодно такой файл можно достать из проекта и открыть чем угодно.
+    """
+    from sfstudio.core.document import SubtitleDocument
+
+    holder = SubtitleDocument.blank()
+    for event in list(holder.events):
+        holder.remove_event(event.eid)
+    for line in reference:
+        holder.create_event(line.start, line.end, line.text, name=line.name)
+    return write_ass(holder)
 
 
 def _media_entry(project: Project, project_path: Path) -> dict | None:
@@ -128,6 +161,10 @@ def load_project(path: Path) -> Project:
             names = set(archive.namelist())
             subtitles_name = _subtitles_name(manifest_raw, names)
             subtitles = archive.read(subtitles_name).decode("utf-8-sig")
+            reference_raw = (
+                archive.read(REFERENCE_NAME).decode("utf-8-sig")
+                if REFERENCE_NAME in names else ""
+            )
     except KeyError as exc:
         raise ProjectError(f"в проекте нет обязательной части: {exc}") from exc
     except (zipfile.BadZipFile, OSError, UnicodeDecodeError) as exc:
@@ -166,7 +203,32 @@ def load_project(path: Path) -> Project:
             project.set_resolution(width, height)
 
     project.media_path = _resolve_media(manifest.get("media"), path)
+    project.reference = _read_reference(reference_raw, manifest.get("reference"))
     return project
+
+
+def _read_reference(raw: str, entry: object):
+    """Восстанавливает оригинал из проекта. Испорченный — не повод падать.
+
+    Оригинал вспомогателен: без него работать можно, а вот отказ открыть
+    проект из-за него был бы потерей всей работы разом.
+    """
+    if not raw:
+        return None
+    from sfstudio.core.reference import ReferenceTrack
+
+    try:
+        document = read_ass(raw)
+    except Exception:
+        return None
+
+    source = language = ""
+    if isinstance(entry, dict):
+        source = str(entry.get("source") or "")
+        language = str(entry.get("language") or "")
+    return ReferenceTrack.from_events(
+        document.events, source=source, language=language
+    )
 
 
 def _subtitles_name(manifest_raw: str, names: set[str]) -> str:

@@ -55,6 +55,7 @@ from sfstudio.core.project import (
     ProjectError,
     ProjectState,
 )
+from sfstudio.core.reference import ReferenceTrack
 from sfstudio.core.undo import UndoStack
 from sfstudio.io import registry
 from sfstudio.io.project_file import load_project, save_project
@@ -115,6 +116,8 @@ class MainWindow(QMainWindow):
         #: это законный режим, и заставлять заводить проект ради правки
         #: одного .srt было бы навязчиво.
         self._project: Project | None = None
+        #: Оригинал, с которого идёт перевод. ``None`` — режим обычный.
+        self._reference = None
 
         # Движки распознавания ищут скачанное сами — им нужен только путь.
         from sfstudio.app.storage import data_root
@@ -307,10 +310,21 @@ class MainWindow(QMainWindow):
             "исключить её. Выделенную группу двигают как одну."
         )
 
+        # Оригинал над переводом: взгляд идёт сверху вниз, и читать исходник
+        # после собственного текста неудобно. Только для чтения — это чужой
+        # текст, и править его здесь нечего.
+        self.original = QPlainTextEdit()
+        self.original.setReadOnly(True)
+        self.original.setMaximumHeight(64)
+        self.original.setPlaceholderText("Оригинал")
+        self.original.setProperty("role", "reference")
+        self.original.setVisible(False)
+
         editor_box = QWidget()
         editor_layout = QVBoxLayout(editor_box)
         editor_layout.setContentsMargins(6, 4, 6, 4)
         editor_layout.setSpacing(4)
+        editor_layout.addWidget(self.original)
         editor_layout.addWidget(self.editor)
         editor_layout.addWidget(self.hint)
 
@@ -384,6 +398,12 @@ class MainWindow(QMainWindow):
 
         add("file.open_subtitles", "Импорт субтитров…", self.open_subtitles,
             shortcut="Ctrl+I", menu="Файл")
+        add("file.open_reference", "Открыть оригинал…", self.open_reference,
+            menu="Файл",
+            tip="Второй файл субтитров, с которого идёт перевод. "
+                "Он показывается рядом и не меняется")
+        add("file.close_reference", "Убрать оригинал", self.close_reference,
+            menu="Файл")
         add("file.open_media", "Открыть видео…", self.open_media,
             shortcut="Ctrl+Shift+O", menu="Файл")
         add("file.save", "Экспорт субтитров", self.save_file,
@@ -510,6 +530,10 @@ class MainWindow(QMainWindow):
         self.mux_action.setEnabled(False)
         self.undo_action = actions["edit.undo"]
         self.redo_action = actions["edit.redo"]
+        # «Убрать оригинал» недоступно, пока оригинала нет: пункт, который
+        # ничего не делает, только заставляет гадать, сработал ли он.
+        self.reference_close_action = actions["file.close_reference"]
+        self.reference_close_action.setEnabled(self._reference is not None)
         self._sync_undo_actions()
 
     def _add_plugin_actions(self, add) -> None:
@@ -702,6 +726,93 @@ class MainWindow(QMainWindow):
         self._refresh_title()
         self._select_row(0)
 
+    # -- оригинал для перевода ---------------------------------------------------- #
+
+    @property
+    def reference(self):
+        return self._reference
+
+    def open_reference(self) -> bool:
+        """Подключает файл оригинала, с которого идёт перевод."""
+        from sfstudio.io import registry
+
+        start = str(self._doc.source_path or self._settings.get("project.folder", "") or "")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Открыть оригинал", start,
+            "Субтитры (*.ass *.ssa *.srt *.vtt);;Все файлы (*)",
+        )
+        if not path:
+            return False
+
+        target = Path(path)
+        try:
+            document = registry.load(target)
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Не удалось открыть оригинал",
+                f"{target}\n\n{exc}",
+            )
+            return False
+
+        if not document.events:
+            QMessageBox.warning(
+                self, "Оригинал", f"В файле нет ни одной реплики:\n{target}"
+            )
+            return False
+
+        track = ReferenceTrack.from_events(document.events, source=target.name)
+        self.set_reference(track)
+        self._warn_if_mismatched(track)
+        return True
+
+    def _warn_if_mismatched(self, track) -> None:
+        """Предупреждает, если подключён явно не тот файл.
+
+        Совпадений почти нет — значит открыли оригинал от другой серии или
+        со сдвинутыми таймингами. Сказать об этом надо сразу: иначе человек
+        переведёт полсерии, сверяясь с пустой колонкой.
+        """
+        if not self._doc.events:
+            return
+        share = track.coverage(self._doc.events)
+        if share >= 0.25:
+            return
+        QMessageBox.warning(
+            self, "Оригинал почти не совпадает",
+            f"Совпадений по времени: {share * 100:.0f} %.\n\n"
+            "Похоже, это оригинал от другой серии или с другими таймингами. "
+            "Файл подключён — проверьте, тот ли он.",
+        )
+
+    def close_reference(self) -> None:
+        self.set_reference(None)
+
+    def set_reference(self, track, *, announce: bool = True) -> None:
+        """Подключает или снимает оригинал и раздаёт его тем, кто показывает."""
+        self._reference = track or None
+        self.model.set_reference(self._reference)
+        self.table.show_reference(self._reference is not None)
+        self.original.setVisible(self._reference is not None)
+        self.original.clear()
+
+        current = self._current_eid()
+        if current is not None and self._doc.has(current):
+            self._load_original(self._doc.by_eid(current))
+
+        if hasattr(self, "reference_close_action"):
+            self.reference_close_action.setEnabled(self._reference is not None)
+
+        if not announce:
+            return
+        if self._reference is None:
+            self._show_status("Оригинал отключён")
+        else:
+            from sfstudio.ui.safe_text import plural
+
+            source = self._reference.source or "оригинал"
+            count = plural(len(self._reference), "строка", "строки", "строк")
+            self._show_status(f"Оригинал: {source} · {count}")
+
     # -- проект ------------------------------------------------------------------ #
 
     @property
@@ -724,6 +835,8 @@ class MainWindow(QMainWindow):
         self._doc.source_path = None
         self._settings.push_recent("projects", path)
         self._settings.save()
+
+        self.set_reference(project.reference, announce=False)
 
         if project.media_path is not None:
             if project.media_path.is_file():
@@ -815,6 +928,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            self._project.reference = self._reference
             snapshot = self._project.snapshot(
                 self._doc, self._media_path, self._capture_state()
             )
@@ -844,6 +958,7 @@ class MainWindow(QMainWindow):
         self._project.document = self._doc
         self._project.media_path = self._media_path
         self._project.state = self._capture_state()
+        self._project.reference = self._reference
 
         try:
             written = save_project(self._project, path)
@@ -1977,7 +2092,18 @@ class MainWindow(QMainWindow):
             self._undo.run(SetText(eid, text))
 
     def _load_editor(self, eid: int) -> None:
-        self._set_editor_text(self._doc.by_eid(eid).text.replace("\\N", "\n"))
+        event = self._doc.by_eid(eid)
+        self._set_editor_text(event.text.replace("\\N", "\n"))
+        self._load_original(event)
+
+    def _load_original(self, event) -> None:
+        """Показывает оригинал этой реплики над полем перевода."""
+        if self._reference is None:
+            return
+        lines = self._reference.overlapping(event.start, event.end)
+        # Каждая строка со своей: в диалоге сразу видно, что реплика накрыла
+        # две фразы оригинала и переводить надо обе.
+        self.original.setPlainText("\n".join(line.text for line in lines))
 
     def _set_editor_text(self, text: str) -> None:
         if self.editor.toPlainText() == text:
