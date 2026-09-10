@@ -36,7 +36,7 @@ def inspector(qapp: QApplication, doc: SubtitleDocument) -> Inspector:
 
 class TestPanelHost:
     def test_builtin_tabs_are_registered(self, inspector: Inspector) -> None:
-        assert inspector.panel_keys() == ["event", "text", "frame", "checks"]
+        assert inspector.panel_keys() == ["event", "format", "frame", "checks"]
 
     def test_added_panel_becomes_a_tab(self, inspector: Inspector) -> None:
         before = inspector.count()
@@ -55,6 +55,35 @@ class TestPanelHost:
 
     def test_unknown_key_gives_nothing(self, inspector: Inspector) -> None:
         assert inspector.widget_for("такого нет") is None
+
+
+class TestNarrowing:
+    """Колонку должно быть можно ужать: не у всех она — рабочее место."""
+
+    def test_column_has_a_modest_minimum(self, inspector: Inspector) -> None:
+        from sfstudio.ui.inspector import MIN_COLUMN_W
+
+        assert inspector.minimumWidth() == MIN_COLUMN_W
+
+    def test_a_wide_panel_does_not_hold_the_column(self, inspector) -> None:
+        """QTabWidget берёт минимум как максимум по всем вкладкам, включая
+        закрытые: одна широкая панель запирала ширину всей колонки."""
+        wide = QLabel("очень длинная строка, задающая ширину " * 4)
+        inspector.add_panel("wide", "Широкая", wide)
+        assert inspector.minimumSizeHint().width() < 400
+
+    def test_forms_get_a_scroll_area(self, inspector: Inspector) -> None:
+        from PySide6.QtWidgets import QScrollArea
+
+        assert isinstance(inspector.holder_for("event"), QScrollArea)
+
+    def test_self_scrolling_widgets_are_left_alone(self, inspector) -> None:
+        """Две полосы прокрутки одна над другой — не то, чего ждут."""
+        from PySide6.QtWidgets import QPlainTextEdit
+
+        editor = QPlainTextEdit()
+        inspector.add_panel("editor", "Текст", editor)
+        assert inspector.holder_for("editor") is editor
 
 
 class TestEnabling:
@@ -99,20 +128,20 @@ class TestDetaching:
         assert inspector.take_panel("такого нет") is None
 
     def test_returned_panel_lands_in_its_old_place(self, inspector: Inspector) -> None:
-        inspector.take_panel("text")
-        inspector.restore_panel("text")
+        inspector.take_panel("format")
+        inspector.restore_panel("format")
         assert [inspector.tabText(i) for i in range(inspector.count())] == [
-            "Реплика", "Текст", "Кадр", "Проверки"
+            "Реплика", "Формат", "Кадр", "Проверки"
         ]
 
     def test_several_detached_return_in_order(self, inspector: Inspector) -> None:
         """Вынесенные не занимают мест, и слепой индекс промахнулся бы."""
-        inspector.take_panel("text")
+        inspector.take_panel("format")
         inspector.take_panel("frame")
         inspector.restore_panel("frame")
-        inspector.restore_panel("text")
+        inspector.restore_panel("format")
         assert [inspector.tabText(i) for i in range(inspector.count())] == [
-            "Реплика", "Текст", "Кадр", "Проверки"
+            "Реплика", "Формат", "Кадр", "Проверки"
         ]
 
     def test_returning_what_is_not_out_changes_nothing(self, inspector) -> None:
@@ -123,7 +152,7 @@ class TestDetaching:
         inspector.detach_requested.connect(asked.append)
         inspector.setCurrentIndex(1)
         inspector._detach_current()
-        assert asked == ["text"]
+        assert asked == ["format"]
 
 
 class TestDetachedWindow:
@@ -173,7 +202,8 @@ class TestInMainWindow:
 
     def test_all_panels_live_in_the_column(self, window) -> None:
         assert window.inspector.panel_keys() == [
-            "event", "text", "frame", "checks", "style", "actors", "qc",
+            "table", "editor", "event", "format", "frame", "checks",
+            "style", "actors", "qc",
         ]
 
     def test_every_panel_is_reachable_by_name(self, window) -> None:
@@ -217,6 +247,28 @@ class TestInMainWindow:
         window.show_panel("style")
         window._save_session()
         assert window._settings.get("ui.inspector_tab") == "style"
+
+    def test_events_and_text_are_tabs_now(self, window) -> None:
+        """Список реплик и их текст — там же, где остальное, и выносятся так же."""
+        assert window.inspector.widget_for("table") is window.table
+        window.detach_panel("editor")
+        assert window.inspector.is_detached("editor")
+        window.attach_panel("editor")
+        assert window.inspector.current_key() == "editor"
+
+    def test_only_two_docks_are_left(self, window) -> None:
+        """Колонка и таймлайн: остальное живёт вкладками внутри колонки."""
+        assert set(window._layout._docks) == {"inspector", "timeline"}
+
+    def test_column_can_be_squeezed(self, window) -> None:
+        """Проверяем сам предел, а не результат перетаскивания.
+
+        Фактическая ширина после ``resizeDocks`` зависит от того, успело ли
+        окно разложиться, и от оконного менеджера — на общем прогоне это
+        давало то успех, то провал. Сломано было именно ограничение: колонка
+        не пускала себя уже 471 пикселя.
+        """
+        assert window.inspector_dock.minimumSizeHint().width() <= 300
 
 
 class TestStudioLayout:

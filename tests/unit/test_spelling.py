@@ -183,7 +183,17 @@ def field(qapp):
     made.clear()
 
 
+@pytest.mark.serial
 class TestEditorHighlight:
+    """Подсветка в поле правки — отдельным проходом, в чистом процессе.
+
+    ``QSyntaxHighlighter`` роняет процесс, когда в нём уже пожили сотни
+    других виджетов Qt: падение приходит из библиотеки, воспроизводится
+    только на полном прогоне и не зависит от того, что делает наш код —
+    голый подсветчик на голом поле падает так же. Изоляция здесь такая же,
+    как у тестов libmpv и libass, и по той же причине.
+    """
+
     def underlines(self, editor: QPlainTextEdit) -> list[tuple[int, int]]:
         block = editor.document().firstBlock()
         return [(r.start, r.length) for r in block.layout().formats()]

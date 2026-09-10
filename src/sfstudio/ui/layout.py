@@ -10,9 +10,13 @@
 
 * **Монтажная** — как в программе монтажа: кадр во весь центр, справа одна
   колонка со всеми свойствами, снизу таймлайн во всю ширину.
-* **Тайминг** — важна волна: таймлайн во всю ширину и повыше.
-* **Перевод** — важен текст: широкая таблица и крупный редактор.
-* **Оформление** — важен кадр: видео занимает почти всё, остальное по краям.
+* **Тайминг** — важна волна: таймлайн повыше, колонка поуже.
+* **Перевод** — важен текст: широкая колонка, таймлайн только для ориентира.
+* **Оформление** — важен кадр: и колонка, и таймлайн уступают ему место.
+
+Панелей всего две — колонка и таймлайн, — поэтому пресет задаёт им не место,
+а размер. Всё остальное живёт вкладками внутри колонки и переставляется её
+собственными средствами: вкладку можно вынести в отдельное окно.
 
 Переключение между ними одним пунктом меню избавляет от перетаскивания
 границ по десять раз за сеанс.
@@ -111,53 +115,33 @@ class LayoutManager:
             dock.setFloating(False)
             dock.show()
 
-        table = self._docks.get("table")
-        editor = self._docks.get("editor")
         timeline = self._docks.get("timeline")
         inspector = self._docks.get("inspector")
 
-        if preset is LayoutPreset.STUDIO:
-            # Кадр в центре, одна колонка свойств справа, таймлайн понизу во
-            # всю ширину — раскладка монтажных программ. Таблица реплик и
-            # редактор текста уезжают в ту же правую колонку вкладками Qt:
-            # спорить за правый край втроём им незачем.
-            self._place(inspector, Qt.RightDockWidgetArea)
-            self._place(table, Qt.RightDockWidgetArea)
-            self._place(editor, Qt.RightDockWidgetArea)
-            if inspector is not None and table is not None:
-                self._window.tabifyDockWidget(table, inspector)
-                inspector.raise_()
-            self._place(timeline, Qt.BottomDockWidgetArea)
-            self._resize_vertical({timeline: 260, editor: 150})
-            self._resize_horizontal({inspector: 460})
+        # Панели теперь две: колонка свойств справа и таймлайн снизу. Всё
+        # остальное — вкладки внутри колонки, и раскладка задаёт им не место,
+        # а размер: сколько отдать колонке и сколько таймлайну.
+        self._place(inspector, Qt.RightDockWidgetArea)
+        self._place(timeline, Qt.BottomDockWidgetArea)
 
-        elif preset is LayoutPreset.TIMING:
-            self._place(timeline, Qt.BottomDockWidgetArea)
-            self._place(table, Qt.RightDockWidgetArea)
-            self._place(editor, Qt.RightDockWidgetArea)
-            self._resize_vertical({timeline: 380})
-            self._resize_horizontal({table: 380})
+        if preset is LayoutPreset.TIMING:
+            # Важна волна: таймлайн повыше, колонка поуже.
+            self._resize_vertical({timeline: 420})
+            self._resize_horizontal({inspector: 380})
 
         elif preset is LayoutPreset.TRANSLATION:
-            self._place(table, Qt.RightDockWidgetArea)
-            self._place(editor, Qt.RightDockWidgetArea)
-            self._place(timeline, Qt.BottomDockWidgetArea)
+            # Важен текст: широкая колонка, таймлайн только для ориентира.
             self._resize_vertical({timeline: 150})
-            self._resize_horizontal({table: 720})
+            self._resize_horizontal({inspector: 720})
 
         elif preset is LayoutPreset.STYLING:
-            self._place(table, Qt.RightDockWidgetArea)
-            self._place(editor, Qt.BottomDockWidgetArea)
-            self._place(timeline, Qt.BottomDockWidgetArea)
-            self._resize_vertical({timeline: 160, editor: 120})
-            self._resize_horizontal({table: 300})
+            # Важен кадр: и колонка, и таймлайн уступают ему место.
+            self._resize_vertical({timeline: 160})
+            self._resize_horizontal({inspector: 400})
 
-        else:  # DEFAULT
-            self._place(table, Qt.RightDockWidgetArea)
-            self._place(editor, Qt.RightDockWidgetArea)
-            self._place(timeline, Qt.BottomDockWidgetArea)
-            self._resize_vertical({timeline: 240})
-            self._resize_horizontal({table: 560})
+        else:  # DEFAULT и STUDIO
+            self._resize_vertical({timeline: 260})
+            self._resize_horizontal({inspector: 460})
 
         if self._settings is not None:
             self._settings.set("ui.layout_preset", preset.value)

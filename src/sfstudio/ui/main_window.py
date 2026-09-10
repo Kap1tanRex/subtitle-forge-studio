@@ -307,6 +307,10 @@ class MainWindow(QMainWindow):
             "Кадр: тяните субтитр · Таймлайн: края реплики, Ctrl+колесо — зум"
         )
         self.hint.setProperty("role", "hint")
+        # Перенос по словам обязателен: без него подсказка в одну длинную
+        # строку задавала наименьшую ширину всей колонке, и ужать её было
+        # нельзя.
+        self.hint.setWordWrap(True)
         self.hint.setToolTip(
             "Кадр: тяните субтитр мышью, Shift — вдоль оси, Alt — без "
             "магнитов, Esc — отмена жеста.\n"
@@ -366,6 +370,13 @@ class MainWindow(QMainWindow):
         # край. Любую вкладку можно вынести в своё окно кнопкой в её углу.
         self.style_forge = StyleForge(self._default_style())
         self.style_forge.apply_requested.connect(self._apply_forged_style)
+
+        # Порядок вкладок — порядок работы: список реплик, их текст, потом
+        # свойства от общего к частному. Список и текст встают в начало,
+        # хотя добавляются последними: инспектор заводит свои вкладки в
+        # конструкторе, до того как главное окно соберёт остальные панели.
+        self.inspector.add_panel("table", "События", self.table, at=0)
+        self.inspector.add_panel("editor", "Текст", editor_box, at=1)
         self.inspector.add_panel("style", "Оформление", self.style_forge)
         self.inspector.add_panel("actors", "Акторы", self.actors_panel)
         self.inspector.add_panel("qc", "Замечания", self.qc_panel)
@@ -373,8 +384,6 @@ class MainWindow(QMainWindow):
         self._detached: dict[str, DetachedPanel] = {}
 
         self._layout = LayoutManager(self, self._settings)
-        self._layout.add(DockSpec("table", "События", self.table, Qt.RightDockWidgetArea))
-        self._layout.add(DockSpec("editor", "Текст", editor_box, Qt.RightDockWidgetArea))
         self._layout.add(
             DockSpec("inspector", "Инспектор", self.inspector, Qt.RightDockWidgetArea)
         )
@@ -2544,9 +2553,10 @@ class MainWindow(QMainWindow):
         if self.inspector_dock is not None:
             self.inspector_dock.show()
             self.inspector_dock.raise_()
-        slot_widget = self.inspector.widget_for(key)
-        if slot_widget is not None:
-            self.inspector.setCurrentWidget(slot_widget)
+        # Переключаемся по обёртке: во вкладке лежит она, а не содержимое.
+        holder = self.inspector.holder_for(key)
+        if holder is not None:
+            self.inspector.setCurrentWidget(holder)
 
     def _detach_current_panel(self) -> None:
         key = self.inspector.current_key()
@@ -2628,9 +2638,7 @@ class MainWindow(QMainWindow):
 
         tab = str(self._settings.get("ui.inspector_tab", "") or "")
         if tab:
-            widget = self.inspector.widget_for(tab)
-            if widget is not None:
-                self.inspector.setCurrentWidget(widget)
+            self.show_panel(tab)
 
     def _default_style(self):
         """Стиль, с которого начинает вкладка оформления."""
@@ -2879,6 +2887,13 @@ class MainWindow(QMainWindow):
         # Слова, занесённые в словарь из меню поля правки, живут в настройках:
         # имена персонажей нужны и в следующей серии.
         self.remember_spelling_words()
+        # Подсветку отвязываем от документа поля вручную. Она принадлежит
+        # документу, а поле — своему родителю, и разбирает их сборщик мусора
+        # в произвольном порядке: если документ уйдёт первым, подсветка
+        # обратится к удалённому объекту и уронит процесс целиком.
+        speller = getattr(self, "_speller", None)
+        if speller is not None:
+            speller.setDocument(None)
         self.video_pane.close_player()
         if self._undo.is_clean:
             event.accept()

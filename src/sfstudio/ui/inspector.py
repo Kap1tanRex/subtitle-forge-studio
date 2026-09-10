@@ -33,15 +33,18 @@ from dataclasses import dataclass
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QAbstractScrollArea,
     QCheckBox,
     QColorDialog,
     QComboBox,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QToolButton,
@@ -65,7 +68,36 @@ from sfstudio.core.undo import UndoStack
 from sfstudio.ui.combo import index_of_data
 from sfstudio.ui.font_box import FontComboBox
 
-__all__ = ["Inspector", "PanelSlot"]
+__all__ = ["MIN_COLUMN_W", "Inspector", "PanelSlot"]
+
+
+#: Ниже этой ширины колонка бесполезна: подписи полей начинают
+#: переноситься по слогам, а таблица показывает одну колонку из семи.
+MIN_COLUMN_W = 240
+
+
+def _scrollable(widget: QWidget) -> QWidget:
+    """Заворачивает панель в прокручиваемую область, если ей это нужно.
+
+    Зачем вообще. Колонку иначе нельзя ужать: ``QTabWidget`` берёт свою
+    наименьшую ширину как максимум по **всем** вкладкам, включая закрытые, и
+    одна широкая панель — список акторов с рядом кнопок — не давала сузить
+    колонку до разумного. Область прокрутки разрывает эту связь: содержимое
+    растягивается, пока места хватает, а дальше появляется полоса.
+
+    Кому не нужно. Таблица реплик и прочие наследники
+    ``QAbstractScrollArea`` прокручиваются сами. Вложить их во вторую
+    прокрутку значит получить две полосы, одна над другой, и таблицу
+    высотой во все свои строки.
+    """
+    if isinstance(widget, QAbstractScrollArea):
+        return widget
+
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setFrameShape(QFrame.NoFrame)
+    area.setWidget(widget)
+    return area
 
 
 @dataclass(slots=True)
@@ -78,7 +110,10 @@ class PanelSlot:
 
     key: str
     title: str
+    #: Само содержимое панели.
     widget: QWidget
+    #: То, что лежит во вкладке: прокручиваемая обёртка вокруг содержимого.
+    holder: QWidget
     #: Гаснет ли вкладка, когда ничего не выделено.
     event_bound: bool
     #: Порядковый номер среди всех вкладок, включая вынесенные.
@@ -109,7 +144,7 @@ class Inspector(QTabWidget):
         self._panels: dict[str, PanelSlot] = {}
 
         self.add_panel("event", "Реплика", self._build_event_tab(), event_bound=True)
-        self.add_panel("text", "Текст", self._build_text_tab(), event_bound=True)
+        self.add_panel("format", "Формат", self._build_text_tab(), event_bound=True)
         self.add_panel("frame", "Кадр", self._build_frame_tab(), event_bound=True)
         self.add_panel("checks", "Проверки", self._build_checks_tab(), event_bound=True)
         self.setDocumentMode(True)
@@ -118,6 +153,9 @@ class Inspector(QTabWidget):
         # подписи целиком, а лишние вкладки уезжают под стрелки прокрутки.
         self.setElideMode(Qt.ElideNone)
         self.tabBar().setUsesScrollButtons(True)
+        # Колонку должно быть можно ужать: у кого-то она справочная и стоит
+        # узкой полосой, у кого-то в ней идёт вся работа.
+        self.setMinimumWidth(MIN_COLUMN_W)
         self.setCornerWidget(self._detach_button(), Qt.TopRightCorner)
         self.set_event(None)
 
@@ -141,9 +179,9 @@ class Inspector(QTabWidget):
 
     def current_key(self) -> str | None:
         """Ключ открытой вкладки."""
-        widget = self.currentWidget()
+        holder = self.currentWidget()
         for slot in self._panels.values():
-            if slot.widget is widget:
+            if slot.holder is holder:
                 return slot.key
         return None
 
@@ -154,11 +192,22 @@ class Inspector(QTabWidget):
         widget: QWidget,
         *,
         event_bound: bool = False,
+        at: int | None = None,
     ) -> None:
-        """Добавляет вкладку в конец колонки."""
-        slot = PanelSlot(key, title, widget, event_bound, len(self._panels))
+        """Добавляет вкладку. ``at`` — куда именно, иначе в конец.
+
+        Место нужно, потому что порядок вкладок — это порядок работы: список
+        реплик и их текст идут раньше тонких свойств, а собираются они позже,
+        когда главное окно уже построено.
+        """
+        order = len(self._panels) if at is None else at
+        for slot in self._panels.values():
+            if slot.order >= order:
+                slot.order += 1
+
+        slot = PanelSlot(key, title, widget, _scrollable(widget), event_bound, order)
         self._panels[key] = slot
-        self.addTab(widget, title)
+        self.insertTab(self._place_for(slot), slot.holder, title)
         if event_bound:
             widget.setEnabled(self._eid is not None)
 
@@ -171,9 +220,14 @@ class Inspector(QTabWidget):
         return slot.title if slot is not None else key
 
     def widget_for(self, key: str) -> QWidget | None:
-        """Виджет панели по ключу — чтобы открыть её, не зная индекса."""
+        """Содержимое панели по ключу."""
         slot = self._panels.get(key)
         return slot.widget if slot is not None else None
+
+    def holder_for(self, key: str) -> QWidget | None:
+        """Обёртка панели — то, что лежит во вкладке или уехало в окно."""
+        slot = self._panels.get(key)
+        return slot.holder if slot is not None else None
 
     def is_detached(self, key: str) -> bool:
         slot = self._panels.get(key)
@@ -192,11 +246,13 @@ class Inspector(QTabWidget):
         slot = self._panels.get(key)
         if slot is None or slot.detached:
             return None
-        index = self.indexOf(slot.widget)
+        index = self.indexOf(slot.holder)
         if index >= 0:
             self.removeTab(index)
         slot.detached = True
-        return slot.widget
+        # Наружу уезжает обёртка целиком: в отдельном окне прокрутка нужна
+        # ровно так же, как во вкладке.
+        return slot.holder
 
     def restore_panel(self, key: str) -> bool:
         """Возвращает вынесенную вкладку на её прежнее место."""
@@ -204,8 +260,8 @@ class Inspector(QTabWidget):
         if slot is None or not slot.detached:
             return False
         slot.detached = False
-        self.insertTab(self._place_for(slot), slot.widget, slot.title)
-        self.setCurrentWidget(slot.widget)
+        self.insertTab(self._place_for(slot), slot.holder, slot.title)
+        self.setCurrentWidget(slot.holder)
         return True
 
     def _place_for(self, slot: PanelSlot) -> int:

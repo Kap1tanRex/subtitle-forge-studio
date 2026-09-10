@@ -37,7 +37,7 @@ def inspector(qapp: QApplication, doc: SubtitleDocument) -> Inspector:
 class TestTabs:
     def test_event_tabs_are_there(self, inspector: Inspector) -> None:
         titles = [inspector.tabText(i) for i in range(inspector.count())]
-        assert titles == ["Реплика", "Текст", "Кадр", "Проверки"]
+        assert titles == ["Реплика", "Формат", "Кадр", "Проверки"]
 
     def test_disabled_without_selection(self, inspector: Inspector) -> None:
         """Без выделенной реплики править нечего — вкладки о ней гаснут.
