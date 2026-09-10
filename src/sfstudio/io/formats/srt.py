@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
 from sfstudio.core import tags as tagmod
 from sfstudio.core import time as timemod
 from sfstudio.core.document import SubtitleDocument
@@ -125,7 +126,7 @@ def lossy_report(doc: SubtitleDocument) -> list[LossWarning]:
     warnings: list[LossWarning] = []
     for event in doc.events:
         if event.comment:
-            warnings.append(LossWarning(event.eid, "comment", "закомментированные строки"))
+            warnings.append(LossWarning(event.eid, "comment", tr('закомментированные строки')))
             continue
         for block in event.parsed.blocks:
             for tag in block.tags:
@@ -136,7 +137,7 @@ def lossy_report(doc: SubtitleDocument) -> list[LossWarning]:
                     continue  # переносится как {\anN}
                 warnings.append(LossWarning(event.eid, "tag", f"\\{name}"))
         if event.layer:
-            warnings.append(LossWarning(event.eid, "layer", f"слой {event.layer}"))
+            warnings.append(LossWarning(event.eid, "layer", tr('слой {0}').format(event.layer)))
         if event.effect:
             warnings.append(LossWarning(event.eid, "effect", event.effect))
     return warnings

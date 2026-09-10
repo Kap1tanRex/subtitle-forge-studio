@@ -27,11 +27,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.glossary import Glossary, Term
 
 __all__ = ["GlossaryDialog"]
 
-CSV_FILTER = "Таблица CSV (*.csv);;Все файлы (*)"
+CSV_FILTER = tr('Таблица CSV (*.csv);;Все файлы (*)')
 
 
 class GlossaryDialog(QDialog):
@@ -42,15 +43,15 @@ class GlossaryDialog(QDialog):
 
     def __init__(self, glossary: Glossary | None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Глоссарий")
+        self.setWindowTitle(tr('Глоссарий'))
         self.resize(640, 460)
 
         layout = QVBoxLayout(self)
 
         hint = QLabel(
-            "Термины проверяются по оригиналу: если он подключён и в нём есть "
-            "слово из левой колонки, а в переводе нет соответствия — реплика "
-            "попадёт в панель проверок."
+            tr('Термины проверяются по оригиналу: если он подключён и в нём есть слово из '
+                   'левой колонки, а в переводе нет соответствия — реплика попадёт в '
+                       'панель проверок.')
         )
         hint.setProperty("role", "hint")
         hint.setWordWrap(True)
@@ -58,7 +59,7 @@ class GlossaryDialog(QDialog):
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(
-            ["В оригинале", "Перевод", "Обязательно", "Заметка"]
+            [tr('В оригинале'), tr('Перевод'), tr('Обязательно'), tr('Заметка')]
         )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setColumnWidth(0, 160)
@@ -67,28 +68,28 @@ class GlossaryDialog(QDialog):
         layout.addWidget(self.table, 1)
 
         buttons_row = QHBoxLayout()
-        add = QPushButton("Добавить")
+        add = QPushButton(tr('Добавить'))
         add.clicked.connect(self._add_row)
         buttons_row.addWidget(add)
 
-        remove = QPushButton("Удалить")
+        remove = QPushButton(tr('Удалить'))
         remove.clicked.connect(self._remove_rows)
         buttons_row.addWidget(remove)
 
         buttons_row.addStretch(1)
 
-        load = QPushButton("Импорт CSV…")
+        load = QPushButton(tr('Импорт CSV…'))
         load.clicked.connect(self._import_csv)
         buttons_row.addWidget(load)
 
-        save = QPushButton("Экспорт CSV…")
+        save = QPushButton(tr('Экспорт CSV…'))
         save.clicked.connect(self._export_csv)
         buttons_row.addWidget(save)
         layout.addLayout(buttons_row)
 
         box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        box.button(QDialogButtonBox.Save).setText("Применить")
-        box.button(QDialogButtonBox.Cancel).setText("Отмена")
+        box.button(QDialogButtonBox.Save).setText(tr('Применить'))
+        box.button(QDialogButtonBox.Cancel).setText(tr('Отмена'))
         box.accepted.connect(self._apply)
         box.rejected.connect(self.reject)
         layout.addWidget(box)
@@ -150,20 +151,20 @@ class GlossaryDialog(QDialog):
     # -- обмен ---------------------------------------------------------------- #
 
     def _import_csv(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Импорт глоссария", "", CSV_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, tr('Импорт глоссария'), "", CSV_FILTER)
         if not path:
             return
         try:
             raw = Path(path).read_text(encoding="utf-8-sig")
         except OSError as exc:
-            QMessageBox.warning(self, "Импорт", f"Не удалось прочитать:\n{exc}")
+            QMessageBox.warning(self, tr('Импорт'), f"Не удалось прочитать:\n{exc}")
             return
 
         imported = Glossary.from_csv(raw)
         if not imported:
             QMessageBox.warning(
-                self, "Импорт",
-                "В файле не нашлось ни одной пары «оригинал — перевод».",
+                self, tr('Импорт'),
+                tr('В файле не нашлось ни одной пары «оригинал — перевод».'),
             )
             return
 
@@ -173,7 +174,7 @@ class GlossaryDialog(QDialog):
             self._add_row(term)
 
     def _export_csv(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Экспорт глоссария", "", CSV_FILTER)
+        path, _ = QFileDialog.getSaveFileName(self, tr('Экспорт глоссария'), "", CSV_FILTER)
         if not path:
             return
         target = Path(path)
@@ -182,7 +183,7 @@ class GlossaryDialog(QDialog):
         try:
             target.write_text(self.glossary().to_csv(), encoding="utf-8-sig")
         except OSError as exc:
-            QMessageBox.warning(self, "Экспорт", f"Не удалось записать:\n{exc}")
+            QMessageBox.warning(self, tr('Экспорт'), f"Не удалось записать:\n{exc}")
 
     def _apply(self) -> None:
         self.changed.emit(self.glossary())

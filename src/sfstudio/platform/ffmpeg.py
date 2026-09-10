@@ -21,6 +21,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.platform.native import vendor_dir
 
 __all__ = [
@@ -72,7 +73,7 @@ def version_of(path: Path | None = None) -> str:
     """Первая строка ``ffmpeg -version`` или пояснение, почему её нет."""
     binary = path or find_ffmpeg()
     if binary is None:
-        return "не найден"
+        return tr('не найден')
     try:
         result = subprocess.run(
             [str(binary), "-version"],
@@ -80,8 +81,8 @@ def version_of(path: Path | None = None) -> str:
             creationflags=_NO_WINDOW,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        return f"не запускается: {exc}"
-    return result.stdout.splitlines()[0] if result.stdout else "неизвестно"
+        return tr('не запускается: {0}').format(exc)
+    return result.stdout.splitlines()[0] if result.stdout else tr('неизвестно')
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,8 +112,8 @@ def run_ffmpeg(
     binary = find_ffmpeg()
     if binary is None:
         raise FfmpegNotFoundError(
-            "ffmpeg не найден. Установите его или положите рядом с нативными "
-            f"библиотеками: {vendor_dir()}"
+            tr('ffmpeg не найден. Установите его или положите рядом с нативными библиотеками: {0}')
+                .format(vendor_dir())
         )
 
     command = [str(binary), "-hide_banner", "-nostdin", "-y", *args]
@@ -135,7 +136,7 @@ def run_ffmpeg(
             for line in process.stdout:
                 if cancel is not None and cancel():
                     process.terminate()
-                    raise FfmpegError("операция отменена")
+                    raise FfmpegError(tr('операция отменена'))
                 match = _PROGRESS_TIME.search(line)
                 if match and total_ms > 0:
                     done = int(match.group(1)) / 1000.0
@@ -143,7 +144,7 @@ def run_ffmpeg(
         process.wait(timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         process.kill()
-        raise FfmpegError(f"ffmpeg не завершился за {timeout:.0f} с") from exc
+        raise FfmpegError(tr('ffmpeg не завершился за {0:.0f} с').format(timeout)) from exc
     finally:
         if process.stderr is not None:
             stderr_tail = process.stderr.read().splitlines()[-20:]
@@ -165,7 +166,7 @@ def iter_scene_changes(
     """
     binary = find_ffmpeg()
     if binary is None:
-        raise FfmpegNotFoundError("ffmpeg не найден")
+        raise FfmpegNotFoundError(tr('ffmpeg не найден'))
 
     command = [
         str(binary), "-hide_banner", "-nostdin", "-i", str(media),

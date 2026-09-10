@@ -22,6 +22,7 @@ from typing import Protocol
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen
 
+from sfstudio.app.i18n import tr
 from sfstudio.core import tags as tagmod
 from sfstudio.core.commands import ClearPosition, SetOverrideTags, SetPosition
 from sfstudio.core.document import SubtitleDocument
@@ -335,10 +336,10 @@ class OverlayController:
         info = self._doc.script_info
         note = f"{info.play_res_x}×{info.play_res_y}"
         if info.play_res_inferred:
-            note += "  (PlayRes не задан в файле)"
-        note += f"   активных: {len(self._doc.active_at(self._time_ms))}"
+            note += tr('  (PlayRes не задан в файле)')
+        note += tr('   активных: {0}').format(len(self._doc.active_at(self._time_ms)))
         if self._backend != "libass":
-            note += "   ·  libass недоступна"
+            note += tr('   ·  libass недоступна')
 
         width, _ = self._host.overlay_size()
         font = QFont("Segoe UI")
@@ -570,12 +571,12 @@ class OverlayController:
             SetOverrideTags(
                 self._drag_eid,
                 {"fscx": round(scale_x), "fscy": round(scale_y)},
-                label="Размер субтитра",
+                label=tr('Размер субтитра'),
             )
         )
         self._host.notify_edited()
         self._host.notify_status(
-            f"Размер: {scale_x:.0f} % × {scale_y:.0f} %"
+            tr('Размер: {0:.0f} % × {1:.0f} %').format(scale_x, scale_y)
         )
         self._host.request_update()
 
@@ -593,7 +594,7 @@ class OverlayController:
             self._undo.undo()  # жест — одна команда благодаря coalescing
             self._host.notify_edited()
         self._end_drag()
-        self._host.notify_status("Перетаскивание отменено")
+        self._host.notify_status(tr('Перетаскивание отменено'))
 
 
 def _qrect(rect: Rect) -> QRectF:

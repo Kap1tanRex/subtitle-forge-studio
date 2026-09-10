@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "ACCENTS", "BUILTIN", "CONTRAST", "DARK", "LIGHT", "SEPIA", "THEMES", "Palette",
     "build_qss", "is_dark", "mix", "palette_by_name", "repolish", "with_accent",
@@ -381,10 +383,10 @@ def build_qss(p: Palette) -> str:
 #: Встроенные темы по именам, как они лежат в настройках. Темы из файлов
 #: добавляются к ним в :mod:`sfstudio.ui.theme_pack`.
 THEMES: dict[str, str] = {
-    "dark": "Тёмная",
-    "light": "Светлая",
-    "sepia": "Тёплая",
-    "contrast": "Контрастная",
+    "dark": tr('Тёмная'),
+    "light": tr('Светлая'),
+    "sepia": tr('Тёплая'),
+    "contrast": tr('Контрастная'),
 }
 
 #: Палитры встроенных тем.
@@ -410,14 +412,14 @@ def palette_by_name(name: str | None) -> Palette:
 #: человек выбирает глазами, подпись нужна лишь чтобы отличить одно от
 #: другого в списке.
 ACCENTS: tuple[tuple[str, str], ...] = (
-    ("Синий", "#4C8DFF"),
-    ("Голубой", "#2BB3C0"),
-    ("Зелёный", "#3FB950"),
-    ("Жёлтый", "#D2A122"),
-    ("Оранжевый", "#E07B39"),
-    ("Красный", "#E05252"),
-    ("Розовый", "#DE5A9B"),
-    ("Фиолетовый", "#8B5CF6"),
+    (tr('Синий'), "#4C8DFF"),
+    (tr('Голубой'), "#2BB3C0"),
+    (tr('Зелёный'), "#3FB950"),
+    (tr('Жёлтый'), "#D2A122"),
+    (tr('Оранжевый'), "#E07B39"),
+    (tr('Красный'), "#E05252"),
+    (tr('Розовый'), "#DE5A9B"),
+    (tr('Фиолетовый'), "#8B5CF6"),
 )
 
 

@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.script_import import (
     ScriptLine,
     guess_paragraphs,
@@ -67,7 +68,7 @@ class ScriptImportDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Импорт текста без таймингов")
+        self.setWindowTitle(tr('Импорт текста без таймингов'))
         self.resize(820, 640)
         self._text = ""
         self._lines: list[ScriptLine] = []
@@ -82,8 +83,8 @@ class ScriptImportDialog(QDialog):
         self.buttons = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
-        self.buttons.button(QDialogButtonBox.Ok).setText("Импортировать")
-        self.buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        self.buttons.button(QDialogButtonBox.Ok).setText(tr('Импортировать'))
+        self.buttons.button(QDialogButtonBox.Cancel).setText(tr('Отмена'))
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         root.addWidget(self.buttons)
@@ -98,32 +99,32 @@ class ScriptImportDialog(QDialog):
 
     def _explain(self) -> QLabel:
         label = QLabel(
-            "Реплики лягут подряд с условной длительностью. Настоящий тайминг "
-            "делается потом: Тайминг → «Выровнять текст по речи»."
+            tr('Реплики лягут подряд с условной длительностью. Настоящий тайминг делается '
+                   'потом: Тайминг → «Выровнять текст по речи».')
         )
         label.setWordWrap(True)
         label.setProperty("role", "hint")
         return label
 
     def _file_row(self) -> QWidget:
-        box = QGroupBox("Файл")
+        box = QGroupBox(tr('Файл'))
         row = QHBoxLayout(box)
         self.path_edit = QLineEdit()
         self.path_edit.setReadOnly(True)
-        self.path_edit.setPlaceholderText("текстовый файл со сценарием или переводом")
+        self.path_edit.setPlaceholderText(tr('текстовый файл со сценарием или переводом'))
         row.addWidget(self.path_edit, 1)
-        browse = QPushButton("Обзор…")
+        browse = QPushButton(tr('Обзор…'))
         browse.clicked.connect(self._choose)
         row.addWidget(browse)
         return box
 
     def _options(self) -> QWidget:
-        box = QGroupBox("Как делить на реплики")
+        box = QGroupBox(tr('Как делить на реплики'))
         layout = QVBoxLayout(box)
 
         row = QHBoxLayout()
-        self.by_lines = QRadioButton("Каждая строка — реплика")
-        self.by_paragraphs = QRadioButton("Каждый абзац — реплика")
+        self.by_lines = QRadioButton(tr('Каждая строка — реплика'))
+        self.by_paragraphs = QRadioButton(tr('Каждый абзац — реплика'))
         self.by_lines.setChecked(True)
         for button in (self.by_lines, self.by_paragraphs):
             button.toggled.connect(self._refresh)
@@ -131,33 +132,33 @@ class ScriptImportDialog(QDialog):
         row.addStretch(1)
         layout.addLayout(row)
 
-        self.speakers_check = QCheckBox("Имя перед двоеточием — это актор")
+        self.speakers_check = QCheckBox(tr('Имя перед двоеточием — это актор'))
         self.speakers_check.setToolTip(
-            "«ИВАН: Ты слушаешь?» станет репликой «Ты слушаешь?» актора ИВАН"
+            tr('«ИВАН: Ты слушаешь?» станет репликой «Ты слушаешь?» актора ИВАН')
         )
         self.speakers_check.toggled.connect(self._refresh)
         layout.addWidget(self.speakers_check)
 
-        self.noise_check = QCheckBox("Убрать номера страниц и ремарки в скобках")
+        self.noise_check = QCheckBox(tr('Убрать номера страниц и ремарки в скобках'))
         self.noise_check.setChecked(True)
         self.noise_check.setToolTip(
-            "Строки вида «12» или «(смеётся)» целиком — в субтитры они не идут"
+            tr('Строки вида «12» или «(смеётся)» целиком — в субтитры они не идут')
         )
         self.noise_check.toggled.connect(self._refresh)
         layout.addWidget(self.noise_check)
         return box
 
     def _preview_group(self) -> QWidget:
-        box = QGroupBox("Что получится")
+        box = QGroupBox(tr('Что получится'))
         layout = QVBoxLayout(box)
 
-        self.summary = QLabel("Выберите файл.")
+        self.summary = QLabel(tr('Выберите файл.'))
         self.summary.setWordWrap(True)
         layout.addWidget(self.summary)
 
         self.preview = QTreeWidget()
         self.preview.setColumnCount(3)
-        self.preview.setHeaderLabels(["№", "Актор", "Текст"])
+        self.preview.setHeaderLabels(["№", tr('Актор'), tr('Текст')])
         self.preview.setRootIsDecorated(False)
         self.preview.setUniformRowHeights(True)
         self.preview.setAlternatingRowColors(True)
@@ -172,9 +173,9 @@ class ScriptImportDialog(QDialog):
     def _choose(self) -> None:
         chosen, _filter = QFileDialog.getOpenFileName(
             self,
-            "Текст без таймингов",
+            tr('Текст без таймингов'),
             "",
-            "Текстовые файлы (*.txt *.text *.md);;Все файлы (*)",
+            tr('Текстовые файлы (*.txt *.text *.md);;Все файлы (*)'),
         )
         if chosen:
             self.load(Path(chosen))
@@ -185,7 +186,7 @@ class ScriptImportDialog(QDialog):
             self._text = read_text_file(path)
         except OSError as exc:
             self._text = ""
-            self.summary.setText(f"Файл не прочитался: {exc}")
+            self.summary.setText(tr('Файл не прочитался: {0}').format(exc))
             self._refresh()
             return
 
@@ -210,24 +211,24 @@ class ScriptImportDialog(QDialog):
         ok = self.buttons.button(QDialogButtonBox.Ok)
         ok.setEnabled(bool(self._lines))
         if not self._text:
-            self.summary.setText("Выберите файл.")
+            self.summary.setText(tr('Выберите файл.'))
             return
         if not self._lines:
             self.summary.setText(
-                "В файле не нашлось ни одной реплики. Попробуйте другое "
-                "разбиение или снимите отбрасывание служебных строк."
+                tr('В файле не нашлось ни одной реплики. Попробуйте другое разбиение или '
+                       'снимите отбрасывание служебных строк.')
             )
             return
 
         from sfstudio.core.plural import plural
 
-        note = plural(len(self._lines), "реплика", "реплики", "реплик")
+        note = plural(len(self._lines), tr('реплика'), tr('реплики'), tr('реплик'))
         actors = {line.actor for line in self._lines if line.actor}
         if actors:
-            note += f", акторов: {len(actors)}"
+            note += tr(', акторов: {0}').format(len(actors))
         if len(self._lines) > PREVIEW_ROWS:
-            note += f" · показаны первые {PREVIEW_ROWS}"
-        self.summary.setText(f"Получится {note}.")
+            note += tr(' · показаны первые {0}').format(PREVIEW_ROWS)
+        self.summary.setText(tr('Получится {0}.').format(note))
 
     def _fill_preview(self) -> None:
         self.preview.setUpdatesEnabled(False)

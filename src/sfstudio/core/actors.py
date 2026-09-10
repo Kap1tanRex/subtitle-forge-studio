@@ -27,6 +27,7 @@ import json
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 
 __all__ = ["ACTOR_PALETTE", "Actor", "ActorRegistry"]
@@ -109,9 +110,9 @@ class ActorRegistry:
         """Добавляет актора. Цвет по умолчанию — следующий из палитры."""
         name = name.strip()
         if not name:
-            raise ValueError("имя актора не может быть пустым")
+            raise ValueError(tr('имя актора не может быть пустым'))
         if name in self._actors:
-            raise ValueError(f"актор {name!r} уже есть")
+            raise ValueError(tr('актор {0!r} уже есть').format(name))
         actor = Actor(name=name, color=color or self.suggest_color(), note=note)
         self._actors[name] = actor
         return actor
@@ -131,11 +132,11 @@ class ActorRegistry:
         """
         new = new.strip()
         if not new:
-            raise ValueError("имя актора не может быть пустым")
+            raise ValueError(tr('имя актора не может быть пустым'))
         if old not in self._actors:
             raise KeyError(old)
         if new != old and new in self._actors:
-            raise ValueError(f"актор {new!r} уже есть")
+            raise ValueError(tr('актор {0!r} уже есть').format(new))
 
         rebuilt: dict[str, Actor] = {}
         for key, actor in self._actors.items():

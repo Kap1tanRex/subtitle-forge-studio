@@ -27,6 +27,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QOpenGLContext, QPainter, QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.undo import UndoStack
 from sfstudio.media.player import MpvPlayer
@@ -114,7 +115,7 @@ class VideoWidget(QOpenGLWidget):
         try:
             import mpv
         except (ImportError, OSError) as exc:
-            self._fail(f"python-mpv недоступен: {exc}")
+            self._fail(tr('python-mpv недоступен: {0}').format(exc))
             return
 
         proc = mpv.MpvGlGetProcAddressFn(_make_proc_address())
@@ -127,7 +128,7 @@ class VideoWidget(QOpenGLWidget):
                 opengl_init_params={"get_proc_address": proc},
             )
         except Exception as exc:
-            self._fail(f"не удалось создать render-контекст mpv: {exc}")
+            self._fail(tr('не удалось создать render-контекст mpv: {0}').format(exc))
             return
 
         self._update_fn = self._frame_ready.emit
@@ -162,7 +163,7 @@ class VideoWidget(QOpenGLWidget):
                         },
                     )
                 except Exception as exc:
-                    self._fail(f"сбой рендера кадра: {exc}")
+                    self._fail(tr('сбой рендера кадра: {0}').format(exc))
                 finally:
                     painter.endNativePainting()
 

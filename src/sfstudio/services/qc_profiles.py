@@ -20,6 +20,7 @@ import json
 from dataclasses import dataclass, fields
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.qc import PROFILES, QcProfile
 
 __all__ = [
@@ -73,13 +74,13 @@ def read_pack(path: Path) -> ProfilePack:
         raw = path.read_text(encoding="utf-8-sig")
     except OSError as exc:
         return ProfilePack(stem, QcProfile(name=stem), path,
-                           f"файл не читается: {exc.strerror or exc}")
+                           tr('файл не читается: {0}').format(exc.strerror or exc))
     try:
         data = json.loads(raw)
     except ValueError as exc:
-        return ProfilePack(stem, QcProfile(name=stem), path, f"ошибка в json: {exc}")
+        return ProfilePack(stem, QcProfile(name=stem), path, tr('ошибка в json: {0}').format(exc))
     if not isinstance(data, dict):
-        return ProfilePack(stem, QcProfile(name=stem), path, "ожидался объект json")
+        return ProfilePack(stem, QcProfile(name=stem), path, tr('ожидался объект json'))
 
     name = str(data.get("name") or stem).strip() or stem
     title = str(data.get("title") or name)
@@ -103,7 +104,7 @@ def read_pack(path: Path) -> ProfilePack:
     pack = ProfilePack(name, QcProfile(**values), path)
     if bad:
         return ProfilePack(name, pack.profile, path,
-                           "не числа: " + ", ".join(sorted(bad)))
+                           tr('не числа: ') + ", ".join(sorted(bad)))
     return pack
 
 
@@ -128,8 +129,8 @@ def available(folder: Path | None) -> dict[str, ProfilePack]:
 def example_text() -> str:
     """Образец файла профиля — его кладут человеку по кнопке в настройках."""
     sample = {
-        "name": "мой-заказчик",
-        "title": "Требования заказчика",
+        "name": tr('мой-заказчик'),
+        "title": tr('Требования заказчика'),
         "max_cps": 17,
         "max_line_length": 42,
         "max_lines": 2,
@@ -140,9 +141,9 @@ def example_text() -> str:
         "min_line_length": 8,
         "cps_counts_spaces": False,
         "check_repeats": True,
-        "_подсказка": (
-            "null вместо числа выключает правило; "
-            "shot_change_frames требует ключевых кадров видео"
+        tr('_подсказка'): (
+            tr('null вместо числа выключает правило; shot_change_frames требует ключевых '
+                   'кадров видео')
         ),
     }
     return json.dumps(sample, ensure_ascii=False, indent=2) + "\n"

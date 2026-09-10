@@ -170,6 +170,7 @@ ASS→SRT и отчётом о потерях.
 | 53 | **Маркеры** | `core/markers.py`, `core/commands/marker_cmds.py`, `ui/marker_dialog.py`, `ui/markers_dialog.py` | 6, 7, 25 | ✅ |
 | 54 | **Кузница стилей** | `ui/style_forge.py` | 8, 18, 31 | ✅ |
 | 55 | **Колонка панелей** | `ui/inspector.py`, `ui/detached.py`, `ui/layout.py` | 24, 30 | ✅ |
+| 56 | **Перевод интерфейса** | `app/i18n.py`, `locale/en.json`, `tools/wrap_tr.py` | — | ✅ |
 
 ---
 

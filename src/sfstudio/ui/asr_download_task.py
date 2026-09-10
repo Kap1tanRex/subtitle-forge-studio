@@ -11,6 +11,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr import CancelToken, RecognitionCancelled, RecognitionError
 from sfstudio.services.asr.models import download_model
 
@@ -48,7 +49,7 @@ class DownloadTask(QRunnable):
                 cancel=self._cancel,
             )
         except RecognitionCancelled:
-            self.signals.failed.emit("Загрузка прервана.")
+            self.signals.failed.emit(tr('Загрузка прервана.'))
         except RecognitionError as exc:
             self.signals.failed.emit(str(exc))
         except Exception as exc:
@@ -90,7 +91,7 @@ class LibrariesTask(QRunnable):
                 cancel=self._cancel,
             )
         except RecognitionCancelled:
-            self.signals.failed.emit("Загрузка прервана.")
+            self.signals.failed.emit(tr('Загрузка прервана.'))
         except RecognitionError as exc:
             self.signals.failed.emit(str(exc))
         except Exception as exc:
@@ -131,7 +132,7 @@ class EngineTask(QRunnable):
                 cancel=self._cancel,
             )
         except RecognitionCancelled:
-            self.signals.failed.emit("Загрузка прервана.")
+            self.signals.failed.emit(tr('Загрузка прервана.'))
         except RecognitionError as exc:
             self.signals.failed.emit(str(exc))
         except Exception as exc:

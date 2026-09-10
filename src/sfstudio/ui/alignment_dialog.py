@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.time import format_ass
@@ -53,14 +54,14 @@ __all__ = ["LANGUAGES", "AlignmentDialog", "words_from"]
 
 #: Языки те же, что в окне распознавания: список намеренно короткий.
 LANGUAGES: tuple[tuple[str, str | None], ...] = (
-    ("Определить автоматически", None),
-    ("Русский", "ru"),
-    ("Английский", "en"),
-    ("Немецкий", "de"),
-    ("Французский", "fr"),
-    ("Испанский", "es"),
-    ("Японский", "ja"),
-    ("Китайский", "zh"),
+    (tr('Определить автоматически'), None),
+    (tr('Русский'), "ru"),
+    (tr('Английский'), "en"),
+    (tr('Немецкий'), "de"),
+    (tr('Французский'), "fr"),
+    (tr('Испанский'), "es"),
+    (tr('Японский'), "ja"),
+    (tr('Китайский'), "zh"),
 )
 
 PREVIEW_ROWS = 200
@@ -84,7 +85,7 @@ class _PlanTree(QTreeWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setColumnCount(4)
-        self.setHeaderLabels(["Реплика", "Станет", "Длительность", "Уверенность"])
+        self.setHeaderLabels([tr('Реплика'), tr('Станет'), tr('Длительность'), tr('Уверенность')])
         self.setRootIsDecorated(False)
         self.setUniformRowHeights(True)
         self.setAlternatingRowColors(True)
@@ -109,9 +110,9 @@ class _PlanTree(QTreeWidget):
                 if event is None:
                     continue
                 item = QTreeWidgetItem([
-                    (event.plain or "(пусто)").replace("\n", " ")[:70],
+                    (event.plain or tr('(пусто)')).replace("\n", " ")[:70],
                     f"{format_ass(change.start)} – {format_ass(change.end)}",
-                    f"{(change.end - change.start) / 1000:.2f} с",
+                    tr('{0:.2f} с').format((change.end - change.start) / 1000),
                     _confidence_text(change),
                 ])
                 if change.shaky:
@@ -126,19 +127,19 @@ class _PlanTree(QTreeWidget):
 
 def _confidence_text(change) -> str:
     if change.guessed:
-        return "нет опоры"
+        return tr('нет опоры')
     return f"{change.confidence * 100:.0f} %"
 
 
 def _why_shaky(change) -> str:
     if change.guessed:
         return (
-            "Ни одно слово этой реплики не нашлось в распознанном тексте. "
-            "Время взято из соседних реплик — проверьте его."
+            tr('Ни одно слово этой реплики не нашлось в распознанном тексте. Время взято из '
+                   'соседних реплик — проверьте его.')
         )
     return (
-        "Совпало меньше половины слов. Время посчитано по тому, что нашлось, "
-        "но проверить стоит."
+        tr('Совпало меньше половины слов. Время посчитано по тому, что нашлось, но '
+               'проверить стоит.')
     )
 
 
@@ -154,7 +155,7 @@ class AlignmentDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Выровнять текст по речи")
+        self.setWindowTitle(tr('Выровнять текст по речи'))
         self.resize(900, 680)
         self._doc = doc
         self._media = media
@@ -171,18 +172,18 @@ class AlignmentDialog(QDialog):
 
         self.buttons = QDialogButtonBox()
         self.run_button = self.buttons.addButton(
-            "Выровнять", QDialogButtonBox.ActionRole
+            tr('Выровнять'), QDialogButtonBox.ActionRole
         )
         self.run_button.clicked.connect(self._start)
         self.cancel_button = self.buttons.addButton(
-            "Прервать", QDialogButtonBox.ActionRole
+            tr('Прервать'), QDialogButtonBox.ActionRole
         )
         self.cancel_button.clicked.connect(self._cancel)
         self.apply_button = self.buttons.addButton(
-            "Применить тайминги", QDialogButtonBox.AcceptRole
+            tr('Применить тайминги'), QDialogButtonBox.AcceptRole
         )
         self.apply_button.clicked.connect(self.accept)
-        close_button = self.buttons.addButton("Закрыть", QDialogButtonBox.RejectRole)
+        close_button = self.buttons.addButton(tr('Закрыть'), QDialogButtonBox.RejectRole)
         close_button.clicked.connect(self.reject)
         root.addWidget(self.buttons)
 
@@ -194,21 +195,21 @@ class AlignmentDialog(QDialog):
 
     def _explain(self) -> QLabel:
         label = QLabel(
-            "Программа прослушает дорожку и разложит уже написанный текст по "
-            "речи. Сам текст не меняется — меняются только тайминги."
+            tr('Программа прослушает дорожку и разложит уже написанный текст по речи. Сам '
+                   'текст не меняется — меняются только тайминги.')
         )
         label.setWordWrap(True)
         label.setProperty("role", "hint")
         return label
 
     def _scope_group(self) -> QWidget:
-        box = QGroupBox("Что выравнивать")
+        box = QGroupBox(tr('Что выравнивать'))
         layout = QVBoxLayout(box)
 
         row = QHBoxLayout()
-        self.scope_all = QRadioButton(f"Все реплики ({len(self._doc)})")
+        self.scope_all = QRadioButton(tr('Все реплики ({0})').format(len(self._doc)))
         self.scope_selection = QRadioButton(
-            f"Только выделенные ({len(self._selection)})"
+            tr('Только выделенные ({0})').format(len(self._selection))
         )
         self.scope_selection.setEnabled(len(self._selection) > 1)
         # По умолчанию — всё: выравнивание части файла оставляет соседей на
@@ -220,14 +221,14 @@ class AlignmentDialog(QDialog):
         layout.addLayout(row)
 
         self.media_label = QLabel(
-            self._media.name if self._media else "видео или аудио не открыто"
+            self._media.name if self._media else tr('видео или аудио не открыто')
         )
         self.media_label.setProperty("role", "hint")
         layout.addWidget(self.media_label)
         return box
 
     def _engine_group(self) -> QWidget:
-        box = QGroupBox("Распознавание")
+        box = QGroupBox(tr('Распознавание'))
         form = QFormLayout(box)
         form.setLabelAlignment(Qt.AlignRight)
 
@@ -238,14 +239,14 @@ class AlignmentDialog(QDialog):
             # ставить его незачем — выравнивать по целым фразам всё равно
             # нечего, и знать об этом надо до установки, а не после.
             if not info.word_timings:
-                suffix = "  — не выдаёт тайминги слов"
+                suffix = tr('  — не выдаёт тайминги слов')
             elif not info.available:
-                suffix = "  — не установлен"
+                suffix = tr('  — не установлен')
             else:
                 suffix = ""
             self.engine_box.addItem(f"{info.title}{suffix}", info.key)
         self.engine_box.currentIndexChanged.connect(self._refresh_engine)
-        form.addRow("Движок", self.engine_box)
+        form.addRow(tr('Движок'), self.engine_box)
 
         self.engine_note = QLabel("")
         self.engine_note.setWordWrap(True)
@@ -254,20 +255,20 @@ class AlignmentDialog(QDialog):
 
         self.model_box = QComboBox()
         self.model_box.setEditable(True)
-        form.addRow("Модель", self.model_box)
+        form.addRow(tr('Модель'), self.model_box)
 
         self.language_box = QComboBox()
         for title, code in LANGUAGES:
             self.language_box.addItem(title, code)
         self.language_box.setToolTip(
-            "Указанный язык надёжнее определения на слух: ошибка здесь "
-            "оставит текст без единой привязки"
+            tr('Указанный язык надёжнее определения на слух: ошибка здесь оставит текст '
+                   'без единой привязки')
         )
-        form.addRow("Язык", self.language_box)
+        form.addRow(tr('Язык'), self.language_box)
 
         hint = QLabel(
-            "Модели скачиваются и настраиваются в окне «Распознать речь». "
-            "Здесь используются те же настройки."
+            tr('Модели скачиваются и настраиваются в окне «Распознать речь». Здесь '
+                   'используются те же настройки.')
         )
         hint.setWordWrap(True)
         hint.setProperty("role", "hint")
@@ -275,20 +276,20 @@ class AlignmentDialog(QDialog):
         return box
 
     def _progress_group(self) -> QWidget:
-        box = QGroupBox("План")
+        box = QGroupBox(tr('План'))
         layout = QVBoxLayout(box)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         layout.addWidget(self.progress)
 
-        self.status = QLabel("Готово к запуску.")
+        self.status = QLabel(tr('Готово к запуску.'))
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
 
-        self.only_shaky = QCheckBox("Показывать только сомнительные")
+        self.only_shaky = QCheckBox(tr('Показывать только сомнительные'))
         self.only_shaky.setToolTip(
-            "Реплики, для которых опор не нашлось или нашлось меньше половины"
+            tr('Реплики, для которых опор не нашлось или нашлось меньше половины')
         )
         self.only_shaky.toggled.connect(self._show_plan)
         layout.addWidget(self.only_shaky)
@@ -323,8 +324,8 @@ class AlignmentDialog(QDialog):
             # Отказ объясняется до запуска: иначе человек ждёт минуты и
             # получает пустой план без единой понятной причины.
             self.engine_note.setText(
-                "Этот движок выдаёт только целые фразы, без времени отдельных "
-                "слов. Выравнивать по ним нечего — возьмите faster-whisper."
+                tr('Этот движок выдаёт только целые фразы, без времени отдельных слов. '
+                       'Выравнивать по ним нечего — возьмите faster-whisper.')
             )
             role = "warning"
         elif not info.available:
@@ -359,9 +360,9 @@ class AlignmentDialog(QDialog):
         self.apply_button.setDefault(has_plan)
 
         if self._media is None:
-            self.status.setText("Сначала откройте видео или аудио.")
+            self.status.setText(tr('Сначала откройте видео или аудио.'))
         elif info is not None and not info.available:
-            self.status.setText("Выбранный движок не установлен.")
+            self.status.setText(tr('Выбранный движок не установлен.'))
 
     def _targets(self) -> list[SubtitleEvent]:
         """Реплики в порядке документа — порядок здесь принципиален.
@@ -384,7 +385,7 @@ class AlignmentDialog(QDialog):
         self._plan = AlignmentPlan()
         self.preview.clear()
         self.progress.setValue(0)
-        self.status.setText("Запуск распознавания…")
+        self.status.setText(tr('Запуск распознавания…'))
 
         models_dir = str(self._settings.get("asr.models_dir", "") or "")
         options: dict[str, object] = {}
@@ -413,7 +414,7 @@ class AlignmentDialog(QDialog):
     def _cancel(self) -> None:
         if self._task is not None:
             self._task.cancel()
-            self.status.setText("Прерывание…")
+            self.status.setText(tr('Прерывание…'))
 
     def _on_progress(self, fraction: float, note: str) -> None:
         self.progress.setValue(int(max(0.0, min(1.0, fraction)) * 100))
@@ -427,15 +428,15 @@ class AlignmentDialog(QDialog):
         words = words_from(getattr(result, "segments", ()))
         if not words:
             self.status.setText(
-                "Движок не вернул слова со временем — выравнивать не по чему. "
-                "Проверьте, что звук в файле есть и выбран верный язык."
+                tr('Движок не вернул слова со временем — выравнивать не по чему. Проверьте, '
+                       'что звук в файле есть и выбран верный язык.')
             )
             self._refresh_buttons(running=False)
             return
 
         self._plan = align(self._targets(), words)
         if self._plan.is_empty:
-            self.status.setText("Реплик с текстом не нашлось.")
+            self.status.setText(tr('Реплик с текстом не нашлось.'))
             self._refresh_buttons(running=False)
             return
 
@@ -448,10 +449,10 @@ class AlignmentDialog(QDialog):
         )
         text = self._plan.summary()
         if self._plan.skipped:
-            text += f" · пропущено без текста: {len(self._plan.skipped)}"
+            text += tr(' · пропущено без текста: {0}').format(len(self._plan.skipped))
         total = len(self._plan.shaky) if self.only_shaky.isChecked() else len(self._plan)
         if shown < total:
-            text += f" · показаны первые {shown}"
+            text += tr(' · показаны первые {0}').format(shown)
         if self._plan.coverage < 0.5:
             text += (
                 "\nОпор нашлось мало. Так бывает на шумном звуке, при неверном "

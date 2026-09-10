@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
@@ -33,7 +34,7 @@ class SetTiming(Command):
         start: int | None = None,
         end: int | None = None,
         *,
-        label: str = "Правка тайминга",
+        label: str = tr('Правка тайминга'),
     ) -> None:
         self.eid = eid
         self._after = (start, end)
@@ -62,7 +63,7 @@ class SetTiming(Command):
         return ChangeSet.changed(self.eid)
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None, "revert до apply"
+        assert self._before is not None, tr('revert до apply')
         event = doc.by_eid(self.eid)
         event.start, event.end = self._before
         doc.touch(self.eid)
@@ -95,8 +96,8 @@ class ShiftTimes(Command):
         self.delta = delta
         self.shift_start = shift_start
         self.shift_end = shift_end
-        sign = "вперёд" if delta >= 0 else "назад"
-        self.label = f"Сдвиг {len(eids)} событий {sign}"
+        sign = tr('вперёд') if delta >= 0 else tr('назад')
+        self.label = tr('Сдвиг {0} событий {1}').format(len(eids), sign)
 
     def _move(self, doc: SubtitleDocument, delta: int) -> ChangeSet:
         for eid in self.eids:
@@ -151,18 +152,18 @@ class LinearSync(Command):
 
     def __init__(self, eids: list[int], points: SyncPoints) -> None:
         if points.src_a == points.src_b:
-            raise SyncError("Опорные точки источника совпадают — масштаб не определён.")
+            raise SyncError(tr('Опорные точки источника совпадают — масштаб не определён.'))
         if points.dst_b <= points.dst_a:
-            raise SyncError("Целевые точки должны идти по возрастанию.")
+            raise SyncError(tr('Целевые точки должны идти по возрастанию.'))
 
         self.points = points
         self.eids = eids
         self.scale = (points.dst_b - points.dst_a) / (points.src_b - points.src_a)
         if self.scale <= 0:
-            raise SyncError("Масштаб получился неположительным — проверьте порядок точек.")
+            raise SyncError(tr('Масштаб получился неположительным — проверьте порядок точек.'))
         self.offset = points.dst_a - points.src_a * self.scale
         self._before: dict[int, tuple[int, int]] = {}
-        self.label = f"Синхронизация ×{self.scale:.4f}"
+        self.label = tr('Синхронизация ×{0:.4f}').format(self.scale)
 
     def _map(self, t: int) -> int:
         return max(0, round(t * self.scale + self.offset))
@@ -204,7 +205,7 @@ class ApplyTimings(Command):
     def __init__(
         self,
         timings: dict[int, tuple[int, int]],
-        label: str = "Доводка таймингов",
+        label: str = tr('Доводка таймингов'),
     ) -> None:
         self.timings = timings
         self._before: dict[int, tuple[int, int]] = {}

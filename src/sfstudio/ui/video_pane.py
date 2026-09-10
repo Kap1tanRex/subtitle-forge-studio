@@ -21,6 +21,7 @@ from pathlib import Path
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import QStackedLayout, QWidget
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.undo import UndoStack
 from sfstudio.ui.preview import PreviewCanvas
@@ -74,12 +75,12 @@ class VideoPane(QWidget):
     def attach_player(self) -> str:
         """Создаёт плеер и видеовиджет. Возвращает пояснение о результате."""
         if self._video is not None:
-            return "плеер уже подключён"
+            return tr('плеер уже подключён')
 
         from sfstudio.media.player import MpvPlayer, MpvUnavailableError, mpv_available
 
         if not mpv_available():
-            return "libmpv недоступна — работаем без видео"
+            return tr('libmpv недоступна — работаем без видео')
 
         try:
             self._player = MpvPlayer()
@@ -103,7 +104,7 @@ class VideoPane(QWidget):
         self._player.on_position = self.position_changed.emit
         self._player.on_duration = self.duration_changed.emit
         self._player.on_pause = self.pause_changed.emit
-        return "видео подключено"
+        return tr('видео подключено')
 
     def load_media(self, path: Path) -> bool:
         """Открывает файл в плеере. ``False``, если видео недоступно.
@@ -144,7 +145,7 @@ class VideoPane(QWidget):
         """Сбой GL — возвращаемся к режиму без видео, а не роняем окно."""
         self._has_video = False
         self._show_video(False)
-        self.status_message.emit(f"Видео недоступно: {message}")
+        self.status_message.emit(tr('Видео недоступно: {0}').format(message))
 
     # -- транспорт ---------------------------------------------------------------- #
 

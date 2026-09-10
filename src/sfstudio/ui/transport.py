@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.time import format_srt
 from sfstudio.ui.combo import index_of_data
 from sfstudio.ui.icons import make_icon
@@ -80,22 +81,22 @@ class TransportBar(QWidget):
         row = QHBoxLayout()
         row.setSpacing(3)
 
-        self.btn_start = self._button("start", "В начало",
+        self.btn_start = self._button("start", tr('В начало'),
                                       lambda: self.seek_edge.emit(False))
-        self.btn_prev = self._button("prev_frame", "Кадр назад (←)",
+        self.btn_prev = self._button("prev_frame", tr('Кадр назад (←)'),
                                      lambda: self.step_frame.emit(False))
-        self.btn_play = self._button("play", "Играть / Пауза (Пробел)",
+        self.btn_play = self._button("play", tr('Играть / Пауза (Пробел)'),
                                      self.play_pause.emit)
-        self.btn_next = self._button("next_frame", "Кадр вперёд (→)",
+        self.btn_next = self._button("next_frame", tr('Кадр вперёд (→)'),
                                      lambda: self.step_frame.emit(True))
-        self.btn_end = self._button("end", "В конец", lambda: self.seek_edge.emit(True))
+        self.btn_end = self._button("end", tr('В конец'), lambda: self.seek_edge.emit(True))
 
         for button in (self.btn_start, self.btn_prev, self.btn_play,
                        self.btn_next, self.btn_end):
             row.addWidget(button)
 
         row.addSpacing(6)
-        self.btn_loop = self._button("loop", "Зациклить текущую реплику", None)
+        self.btn_loop = self._button("loop", tr('Зациклить текущую реплику'), None)
         self.btn_loop.setCheckable(True)
         self.btn_loop.toggled.connect(self._on_loop)
         row.addWidget(self.btn_loop)
@@ -104,18 +105,18 @@ class TransportBar(QWidget):
 
         self.time_label = QLabel("00:00:00,000")
         self.time_label.setProperty("role", "timecode")
-        self.time_label.setToolTip("Текущее положение")
+        self.time_label.setToolTip(tr('Текущее положение'))
         row.addWidget(self.time_label)
 
         self.total_label = QLabel("/ 00:00:00,000")
         self.total_label.setProperty("role", "hint")
-        self.total_label.setToolTip("Длительность")
+        self.total_label.setToolTip(tr('Длительность'))
         row.addWidget(self.total_label)
 
         row.addStretch(1)
 
         # -- громкость ---------------------------------------------------- #
-        self.btn_mute = self._button("volume", "Заглушить (M)", None)
+        self.btn_mute = self._button("volume", tr('Заглушить (M)'), None)
         self.btn_mute.setCheckable(True)
         self.btn_mute.toggled.connect(self._on_mute)
         row.addWidget(self.btn_mute)
@@ -124,7 +125,7 @@ class TransportBar(QWidget):
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(80)
         self.volume_slider.setFixedWidth(96)
-        self.volume_slider.setToolTip("Громкость")
+        self.volume_slider.setToolTip(tr('Громкость'))
         self.volume_slider.valueChanged.connect(self._on_volume)
         row.addWidget(self.volume_slider)
 
@@ -135,7 +136,7 @@ class TransportBar(QWidget):
 
         row.addSpacing(10)
 
-        speed_caption = QLabel("Скорость")
+        speed_caption = QLabel(tr('Скорость'))
         speed_caption.setProperty("role", "hint")
         row.addWidget(speed_caption)
 
@@ -143,7 +144,7 @@ class TransportBar(QWidget):
         for value in SPEED_PRESETS:
             self.speed_box.addItem(_format_speed(value), value)
         self.speed_box.setCurrentIndex(SPEED_PRESETS.index(1.0))
-        self.speed_box.setToolTip("Скорость воспроизведения ([ и ])")
+        self.speed_box.setToolTip(tr('Скорость воспроизведения ([ и ])'))
         self.speed_box.currentIndexChanged.connect(self._on_speed)
         self.speed_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         row.addWidget(self.speed_box)
@@ -178,7 +179,7 @@ class TransportBar(QWidget):
         self.btn_play.setIcon(
             make_icon("play" if paused else "pause", self._palette.text_primary)
         )
-        self.btn_play.setToolTip("Играть (Пробел)" if paused else "Пауза (Пробел)")
+        self.btn_play.setToolTip(tr('Играть (Пробел)') if paused else tr('Пауза (Пробел)'))
 
     def set_position(self, ms: int) -> None:
         """Положение. Приходит и от плеера, и от таймлайна — источник неважен."""
@@ -227,7 +228,7 @@ class TransportBar(QWidget):
         name = "mute" if self.btn_mute.isChecked() else "volume"
         self.btn_mute.setIcon(make_icon(name, self._palette.text_primary))
         self.btn_mute.setToolTip(
-            "Включить звук (M)" if self.btn_mute.isChecked() else "Заглушить (M)"
+            tr('Включить звук (M)') if self.btn_mute.isChecked() else tr('Заглушить (M)')
         )
 
     def set_speed(self, value: float) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
@@ -21,7 +22,7 @@ class InsertEvent(Command):
         self.template = template
         self.at = at
         self._eid: int | None = None
-        self.label = "Новое событие"
+        self.label = tr('Новое событие')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         if self._eid is None:
@@ -33,7 +34,7 @@ class InsertEvent(Command):
         return ChangeSet.added(self._eid)
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._eid is not None, "revert до apply"
+        assert self._eid is not None, tr('revert до apply')
         doc.remove_event(self._eid)
         doc.bump_revision()
         return ChangeSet.removed(self._eid)
@@ -47,7 +48,10 @@ class DeleteEvents(Command):
     def __init__(self, eids: list[int]) -> None:
         self.eids = eids
         self._saved: list[tuple[int, SubtitleEvent]] = []
-        self.label = f"Удаление {len(eids)} событий" if len(eids) > 1 else "Удаление события"
+        self.label = (
+            tr('Удаление {0} событий').format(len(eids)) if len(eids) > 1
+            else tr('Удаление события')
+        )
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         self._saved = []
@@ -75,7 +79,7 @@ class DuplicateEvents(Command):
     def __init__(self, eids: list[int]) -> None:
         self.src_eids = eids
         self._new_eids: list[int] = []
-        self.label = "Дублирование"
+        self.label = tr('Дублирование')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         reuse = bool(self._new_eids)
@@ -114,7 +118,7 @@ class SplitEvent(Command):
         self.at_ms = at_ms
         self._new_eid: int | None = None
         self._before: tuple[str, int, int] | None = None
-        self.label = "Разбить событие"
+        self.label = tr('Разбить событие')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         event = doc.by_eid(self.eid)
@@ -150,7 +154,7 @@ class SplitEvent(Command):
         )
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None and self._new_eid is not None, "revert до apply"
+        assert self._before is not None and self._new_eid is not None, tr('revert до apply')
         doc.remove_event(self._new_eid)
         event = doc.by_eid(self.eid)
         event.set_text(self._before[0])
@@ -171,13 +175,13 @@ class MergeEvents(Command):
 
     def __init__(self, eids: list[int], separator: str = "\\N") -> None:
         if len(eids) < 2:
-            raise ValueError("для слияния нужно минимум два события")
+            raise ValueError(tr('для слияния нужно минимум два события'))
         self.eids = eids
         self.separator = separator
         self.keep = eids[0]
         self._before: tuple[str, int, int] | None = None
         self._removed: list[tuple[int, SubtitleEvent]] = []
-        self.label = f"Слияние {len(eids)} событий"
+        self.label = tr('Слияние {0} событий').format(len(eids))
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         ordered = sorted(self.eids, key=lambda e: (doc.by_eid(e).start, e))
@@ -205,7 +209,7 @@ class MergeEvents(Command):
         )
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None, "revert до apply"
+        assert self._before is not None, tr('revert до apply')
         for pos, event in reversed(self._removed):
             doc.add_event(event, pos)
         target = doc.by_eid(self.keep)

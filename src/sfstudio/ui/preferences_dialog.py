@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from sfstudio.app.i18n import available_languages, translation_progress
+from sfstudio.app.i18n import available_languages, tr, translation_progress
 from sfstudio.app.settings import Settings
 from sfstudio.app.storage import (
     StorageMode,
@@ -83,9 +83,9 @@ def swatch(color: str):
 
 #: Плотность таблицы: подпись и высота строки.
 DENSITIES: tuple[tuple[str, str, int], ...] = (
-    ("Компактная", "compact", 20),
-    ("Обычная", "comfortable", 24),
-    ("Просторная", "spacious", 30),
+    (tr('Компактная'), "compact", 20),
+    (tr('Обычная'), "comfortable", 24),
+    (tr('Просторная'), "spacious", 30),
 )
 
 
@@ -99,7 +99,7 @@ class PreferencesDialog(QDialog):
 
     def __init__(self, settings: Settings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Настройки")
+        self.setWindowTitle(tr('Настройки'))
         self._settings = settings
         # Пока идёт первичное заполнение, обработчики не пишут в настройки:
         # иначе открытие окна само по себе помечало бы их изменёнными.
@@ -107,19 +107,19 @@ class PreferencesDialog(QDialog):
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._projects_tab(), "Проекты")
-        self.tabs.addTab(self._subtitles_tab(), "Субтитры")
-        self.tabs.addTab(self._editing_tab(), "Редактирование")
-        self.tabs.addTab(self._playback_tab(), "Воспроизведение")
-        self.tabs.addTab(self._qc_tab(), "Проверки")
-        self.tabs.addTab(self._interface_tab(), "Интерфейс")
-        self.tabs.addTab(self._storage_tab(), "Загрузки")
-        self.tabs.addTab(self._plugins_tab(), "Плагины")
+        self.tabs.addTab(self._projects_tab(), tr('Проекты'))
+        self.tabs.addTab(self._subtitles_tab(), tr('Субтитры'))
+        self.tabs.addTab(self._editing_tab(), tr('Редактирование'))
+        self.tabs.addTab(self._playback_tab(), tr('Воспроизведение'))
+        self.tabs.addTab(self._qc_tab(), tr('Проверки'))
+        self.tabs.addTab(self._interface_tab(), tr('Интерфейс'))
+        self.tabs.addTab(self._storage_tab(), tr('Загрузки'))
+        self.tabs.addTab(self._plugins_tab(), tr('Плагины'))
         layout.addWidget(self.tabs, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close | QDialogButtonBox.RestoreDefaults)
-        buttons.button(QDialogButtonBox.Close).setText("Закрыть")
-        buttons.button(QDialogButtonBox.RestoreDefaults).setText("Сбросить раздел")
+        buttons.button(QDialogButtonBox.Close).setText(tr('Закрыть'))
+        buttons.button(QDialogButtonBox.RestoreDefaults).setText(tr('Сбросить раздел'))
         buttons.rejected.connect(self.accept)
         buttons.button(QDialogButtonBox.RestoreDefaults).clicked.connect(self._reset_section)
         layout.addWidget(buttons)
@@ -150,25 +150,25 @@ class PreferencesDialog(QDialog):
 
         folder_row = QHBoxLayout()
         self.folder_edit = QLineEdit()
-        self.folder_edit.setPlaceholderText("по умолчанию — домашняя папка")
+        self.folder_edit.setPlaceholderText(tr('по умолчанию — домашняя папка'))
         self.folder_edit.editingFinished.connect(
             lambda: self._set("project.folder", self.folder_edit.text().strip())
         )
         folder_row.addWidget(self.folder_edit, 1)
-        browse = QPushButton("Обзор…")
+        browse = QPushButton(tr('Обзор…'))
         browse.clicked.connect(self._choose_folder)
         folder_row.addWidget(browse)
-        form.addRow("Папка проектов", folder_row)
+        form.addRow(tr('Папка проектов'), folder_row)
 
-        self.startup_check = QCheckBox("Показывать окно выбора проекта при запуске")
+        self.startup_check = QCheckBox(tr('Показывать окно выбора проекта при запуске'))
         self.startup_check.toggled.connect(
             lambda on: self._set("project.show_startup_dialog", on)
         )
         form.addRow("", self.startup_check)
 
-        self.restore_check = QCheckBox("Открывать последний проект сразу")
+        self.restore_check = QCheckBox(tr('Открывать последний проект сразу'))
         self.restore_check.setToolTip(
-            "Окно выбора при этом не показывается"
+            tr('Окно выбора при этом не показывается')
         )
         self.restore_check.toggled.connect(
             lambda on: self._set("project.restore_last_on_start", on)
@@ -177,19 +177,19 @@ class PreferencesDialog(QDialog):
 
         self.autosave_spin = QSpinBox()
         self.autosave_spin.setRange(0, 120)
-        self.autosave_spin.setSuffix(" мин")
-        self.autosave_spin.setSpecialValueText("выключено")
+        self.autosave_spin.setSuffix(tr(' мин'))
+        self.autosave_spin.setSpecialValueText(tr('выключено'))
         self.autosave_spin.setToolTip(
-            "Автосохранение пишет копию рядом с проектом и не трогает сам файл"
+            tr('Автосохранение пишет копию рядом с проектом и не трогает сам файл')
         )
         self.autosave_spin.valueChanged.connect(
             lambda v: self._set("project.autosave_minutes", v)
         )
-        form.addRow("Автосохранение", self.autosave_spin)
+        form.addRow(tr('Автосохранение'), self.autosave_spin)
 
         hint = QLabel(
-            "Проект хранит субтитры, привязанное видео и место, где вы "
-            "остановились. Файл субтитров этого не помнит."
+            tr('Проект хранит субтитры, привязанное видео и место, где вы остановились. '
+                   'Файл субтитров этого не помнит.')
         )
         hint.setProperty("role", "hint")
         hint.setWordWrap(True)
@@ -206,7 +206,7 @@ class PreferencesDialog(QDialog):
         for mode in StorageMode:
             self.storage_box.addItem(mode.title, mode.value)
         self.storage_box.currentIndexChanged.connect(self._on_storage_mode)
-        form.addRow("Складывать", self.storage_box)
+        form.addRow(tr('Складывать'), self.storage_box)
 
         self.storage_note = QLabel("")
         self.storage_note.setProperty("role", "hint")
@@ -215,27 +215,27 @@ class PreferencesDialog(QDialog):
 
         storage_row = QHBoxLayout()
         self.storage_edit = QLineEdit()
-        self.storage_edit.setPlaceholderText("путь к папке")
+        self.storage_edit.setPlaceholderText(tr('путь к папке'))
         self.storage_edit.editingFinished.connect(
             lambda: self._set("storage.folder", self.storage_edit.text().strip())
         )
         storage_row.addWidget(self.storage_edit, 1)
-        storage_browse = QPushButton("Обзор…")
+        storage_browse = QPushButton(tr('Обзор…'))
         storage_browse.clicked.connect(self._choose_storage_folder)
         storage_row.addWidget(storage_browse)
-        form.addRow("Своя папка", storage_row)
+        form.addRow(tr('Своя папка'), storage_row)
 
         self.storage_paths = QLabel("")
         self.storage_paths.setProperty("role", "hint")
         self.storage_paths.setWordWrap(True)
         self.storage_paths.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        form.addRow("Получается", self.storage_paths)
+        form.addRow(tr('Получается'), self.storage_paths)
 
         hint = QLabel(
-            "Модель распознавания весит от 75 МБ до 3 ГБ, библиотеки для "
-            "видеокарты — ещё 0,7 ГБ. Всё это качается только по вашей "
-            "команде и лежит там, где вы укажете: папку можно удалить "
-            "целиком, программа продолжит работать без неё."
+            tr('Модель распознавания весит от 75 МБ до 3 ГБ, библиотеки для видеокарты — '
+                   'ещё 0,7 ГБ. Всё это качается только по вашей команде и лежит '
+                       'там, где вы укажете: папку можно удалить целиком, программа '
+                           'продолжит работать без неё.')
         )
         hint.setProperty("role", "hint")
         hint.setWordWrap(True)
@@ -247,17 +247,16 @@ class PreferencesDialog(QDialog):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        self.plugins_check = QCheckBox("Загружать плагины при запуске")
-        self.plugins_check.setToolTip("Изменение вступит в силу после перезапуска")
+        self.plugins_check = QCheckBox(tr('Загружать плагины при запуске'))
+        self.plugins_check.setToolTip(tr('Изменение вступит в силу после перезапуска'))
         self.plugins_check.toggled.connect(
             lambda on: self._set("plugins.enabled", on)
         )
         layout.addWidget(self.plugins_check)
 
         warning = QLabel(
-            "Плагин — это чужой код, который выполняется наравне с самой "
-            "программой: он может читать и менять ваши файлы. Ставьте только "
-            "те, чьему автору доверяете."
+            tr('Плагин — это чужой код, который выполняется наравне с самой программой: он '
+                   'может читать и менять ваши файлы. Ставьте только те, чьему автору доверяете.')
         )
         warning.setProperty("role", "warning")
         warning.setWordWrap(True)
@@ -274,8 +273,8 @@ class PreferencesDialog(QDialog):
         layout.addWidget(self.plugins_folder)
 
         hint = QLabel(
-            "Плагин — папка с файлом plugin.json и модулем Python. Положите "
-            "её в каталог выше и перезапустите программу."
+            tr('Плагин — папка с файлом plugin.json и модулем Python. Положите её в '
+                   'каталог выше и перезапустите программу.')
         )
         hint.setProperty("role", "hint")
         hint.setWordWrap(True)
@@ -292,7 +291,7 @@ class PreferencesDialog(QDialog):
         from sfstudio.plugins import PluginManager, PluginState
 
         folder = plugins_dir(self._settings)
-        self.plugins_folder.setText(f"Каталог плагинов: {folder}")
+        self.plugins_folder.setText(tr('Каталог плагинов: {0}').format(folder))
         self.plugins_list.clear()
 
         manager = PluginManager(folder, self._settings)
@@ -301,11 +300,11 @@ class PreferencesDialog(QDialog):
                 enabled=bool(self._settings.get("plugins.enabled", False))
             )
         except Exception as exc:
-            self.plugins_list.addItem(f"Не удалось прочитать каталог: {exc}")
+            self.plugins_list.addItem(tr('Не удалось прочитать каталог: {0}').format(exc))
             return
 
         if not found:
-            self.plugins_list.addItem("Плагинов нет.")
+            self.plugins_list.addItem(tr('Плагинов нет.'))
             return
 
         for plugin in found:
@@ -330,12 +329,12 @@ class PreferencesDialog(QDialog):
         """
         code = str(self.language_box.currentData() or "ru")
         if code == "ru":
-            self.language_note.setText("Язык оригинала.")
+            self.language_note.setText(tr('Язык оригинала.'))
             return
         share = translation_progress(code)
         self.language_note.setText(
-            f"Переведено {share:.0%} строк. Остальное показывается по-русски. "
-            "Изменение применится после перезапуска."
+            tr('Переведено {0:.0%} строк. Остальное показывается по-русски. Изменение '
+                   'применится после перезапуска.').format(share)
         )
 
     def _on_storage_mode(self, index: int) -> None:
@@ -345,7 +344,7 @@ class PreferencesDialog(QDialog):
 
     def _choose_storage_folder(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
-            self, "Папка для загрузок", self.storage_edit.text() or str(Path.home())
+            self, tr('Папка для загрузок'), self.storage_edit.text() or str(Path.home())
         )
         if chosen:
             self.storage_edit.setText(chosen)
@@ -365,11 +364,11 @@ class PreferencesDialog(QDialog):
 
         models = models_dir(self._settings)
         libraries = libraries_dir(self._settings)
-        lines = [f"модели: {models}", f"библиотеки: {libraries}"]
+        lines = [tr('модели: {0}').format(models), tr('библиотеки: {0}').format(libraries)]
         if mode is StorageMode.BESIDE and not writable(beside_program()):
             lines.append(
-                "Рядом с программой писать нельзя — выберите профиль "
-                "пользователя или свою папку."
+                tr('Рядом с программой писать нельзя — выберите профиль пользователя или '
+                       'свою папку.')
             )
         self.storage_paths.setText("\n".join(lines))
 
@@ -380,13 +379,12 @@ class PreferencesDialog(QDialog):
 
         self.font_box = FontComboBox()
         self.font_box.setToolTip(
-            "Наведите на шрифт в списке — появится образец русского и "
-            "английского текста"
+            tr('Наведите на шрифт в списке — появится образец русского и английского текста')
         )
         self.font_box.currentFontChanged.connect(
             lambda f: self._set("subtitles.default_font", f.family())
         )
-        form.addRow("Шрифт по умолчанию", self.font_box)
+        form.addRow(tr('Шрифт по умолчанию'), self.font_box)
 
         self.font_size_spin = QDoubleSpinBox()
         self.font_size_spin.setRange(8.0, 400.0)
@@ -394,26 +392,26 @@ class PreferencesDialog(QDialog):
         self.font_size_spin.valueChanged.connect(
             lambda v: self._set("subtitles.default_size", float(v))
         )
-        form.addRow("Кегль по умолчанию", self.font_size_spin)
+        form.addRow(tr('Кегль по умолчанию'), self.font_size_spin)
 
         self.spelling_box = QComboBox()
         for code, title in SPELL_LANGUAGES:
             self.spelling_box.addItem(title, code)
         self.spelling_box.setToolTip(
-            "Проверка орфографии в поле правки. Замены и «добавить в словарь» "
-            "— по правому щелчку по подчёркнутому слову"
+            tr('Проверка орфографии в поле правки. Замены и «добавить в словарь» — по '
+                   'правому щелчку по подчёркнутому слову')
         )
         self.spelling_box.currentIndexChanged.connect(
             lambda i: self._set("spelling.language", self.spelling_box.itemData(i))
         )
-        form.addRow("Проверять орфографию", self.spelling_box)
+        form.addRow(tr('Проверять орфографию'), self.spelling_box)
 
         words_row = QHBoxLayout()
         self.words_note = QLabel("")
         self.words_note.setProperty("role", "hint")
         words_row.addWidget(self.words_note, 1)
-        forget = QPushButton("Очистить словарь")
-        forget.setToolTip("Забыть все слова, добавленные вручную")
+        forget = QPushButton(tr('Очистить словарь'))
+        forget.setToolTip(tr('Забыть все слова, добавленные вручную'))
         forget.clicked.connect(self._clear_dictionary)
         words_row.addWidget(forget)
         form.addRow("", words_row)
@@ -421,12 +419,11 @@ class PreferencesDialog(QDialog):
         self.font_sample = QLabel("")
         self.font_sample.setWordWrap(True)
         self.font_sample.setTextFormat(Qt.RichText)
-        form.addRow("Образец", self.font_sample)
+        form.addRow(tr('Образец'), self.font_sample)
 
         hint = QLabel(
-            "Шрифт применяется к новым проектам и новым стилям. Уже созданные "
-            "стили не меняются — иначе правка настройки переоформила бы "
-            "чужие файлы."
+            tr('Шрифт применяется к новым проектам и новым стилям. Уже созданные стили не '
+                   'меняются — иначе правка настройки переоформила бы чужие файлы.')
         )
         hint.setProperty("role", "hint")
         hint.setWordWrap(True)
@@ -436,28 +433,27 @@ class PreferencesDialog(QDialog):
         for fmt in LABEL_PRESETS:
             self.label_box.addItem(fmt.title, fmt.key)
         self.label_box.setToolTip(
-            "Имя говорящего прямо в тексте реплики — его видит зритель"
+            tr('Имя говорящего прямо в тексте реплики — его видит зритель')
         )
         self.label_box.currentIndexChanged.connect(self._on_label_format)
-        form.addRow("Имя говорящего", self.label_box)
+        form.addRow(tr('Имя говорящего'), self.label_box)
 
         self.label_custom = QLineEdit()
         self.label_custom.setPlaceholderText("[{actor}] {text}")
         self.label_custom.setToolTip(
-            "Свой шаблон. {actor} — имя, {text} — сама реплика"
+            tr('Свой шаблон. {actor} — имя, {text} — сама реплика')
         )
         self.label_custom.textChanged.connect(self._on_label_custom)
-        form.addRow("Свой шаблон", self.label_custom)
+        form.addRow(tr('Свой шаблон'), self.label_custom)
 
         self.label_sample = QLabel("")
         self.label_sample.setWordWrap(True)
-        form.addRow("Получится", self.label_sample)
+        form.addRow(tr('Получится'), self.label_sample)
 
         label_hint = QLabel(
-            "Метки не проставляются задним числом: настройка действует на "
-            "будущие назначения говорящих. Уже готовый файл обновляет команда "
-            "«Правка → Обновить метки говорящих» — одним шагом истории, и её "
-            "можно отменить."
+            tr('Метки не проставляются задним числом: настройка действует на будущие '
+                'назначения говорящих. Уже готовый файл обновляет команда «Правка → '
+                    'Обновить метки говорящих» — одним шагом истории, и её можно отменить.')
         )
         label_hint.setProperty("role", "hint")
         label_hint.setWordWrap(True)
@@ -487,16 +483,15 @@ class PreferencesDialog(QDialog):
         if template == TEXT_FIELD:
             self.label_sample.setProperty("role", "hint")
             self.label_sample.setText(
-                "Привет  — имя останется только в поле говорящего"
+                tr('Привет  — имя останется только в поле говорящего')
                 if key == "off"
-                else "В шаблоне нет {text} — реплика потерялась бы. "
-                     "Пока метка не добавляется."
+                else tr('В шаблоне нет {text} — реплика потерялась бы. Пока метка не добавляется.')
             )
             self.label_sample.setProperty(
                 "role", "hint" if key == "off" else "warning"
             )
         else:
-            sample = format_label(template, "Иван", "Привет")
+            sample = format_label(template, tr('Иван'), tr('Привет'))
             self.label_sample.setProperty("role", "hint")
             self.label_sample.setText(sample.replace(LINE_BREAK, "  ⏎  "))
         repolish(self.label_sample)
@@ -506,19 +501,19 @@ class PreferencesDialog(QDialog):
         form = QFormLayout(page)
         form.setLabelAlignment(Qt.AlignRight)
 
-        self.snap_frames = QCheckBox("К кадрам")
+        self.snap_frames = QCheckBox(tr('К кадрам'))
         self.snap_frames.toggled.connect(
             lambda on: self._set("editing.snap_to_frames", on)
         )
-        form.addRow("Магниты", self.snap_frames)
+        form.addRow(tr('Магниты'), self.snap_frames)
 
-        self.snap_keyframes = QCheckBox("К ключевым кадрам")
+        self.snap_keyframes = QCheckBox(tr('К ключевым кадрам'))
         self.snap_keyframes.toggled.connect(
             lambda on: self._set("editing.snap_to_keyframes", on)
         )
         form.addRow("", self.snap_keyframes)
 
-        self.snap_events = QCheckBox("К границам соседних реплик")
+        self.snap_events = QCheckBox(tr('К границам соседних реплик'))
         self.snap_events.toggled.connect(
             lambda on: self._set("editing.snap_to_events", on)
         )
@@ -526,41 +521,41 @@ class PreferencesDialog(QDialog):
 
         self.gap_spin = QSpinBox()
         self.gap_spin.setRange(0, 30)
-        self.gap_spin.setSuffix(" кадр(ов)")
+        self.gap_spin.setSuffix(tr(' кадр(ов)'))
         self.gap_spin.setToolTip(
-            "Минимальный зазор между репликами: слипшиеся строки читаются как одна"
+            tr('Минимальный зазор между репликами: слипшиеся строки читаются как одна')
         )
         self.gap_spin.valueChanged.connect(
             lambda v: self._set("editing.min_gap_frames", v)
         )
-        form.addRow("Зазор между репликами", self.gap_spin)
+        form.addRow(tr('Зазор между репликами'), self.gap_spin)
 
         self.position_box = QComboBox()
         self.position_box.addItem("Координатами \\pos", "pos")
-        self.position_box.addItem("Полями и выравниванием", "margins")
+        self.position_box.addItem(tr('Полями и выравниванием'), "margins")
         self.position_box.setToolTip(
-            "Чем записывать перетаскивание субтитра в кадре"
+            tr('Чем записывать перетаскивание субтитра в кадре')
         )
         self.position_box.currentIndexChanged.connect(
             lambda i: self._set("editing.position_mode", self.position_box.itemData(i))
         )
-        form.addRow("Положение в кадре", self.position_box)
+        form.addRow(tr('Положение в кадре'), self.position_box)
 
         self.paste_box = QComboBox()
-        self.paste_box.addItem("На курсор таймлайна", "playhead")
-        self.paste_box.addItem("Под указатель мыши", "mouse")
+        self.paste_box.addItem(tr('На курсор таймлайна'), "playhead")
+        self.paste_box.addItem(tr('Под указатель мыши'), "mouse")
         self.paste_box.setToolTip(
-            "Куда попадёт реплика, вставленная из буфера обмена (Ctrl+Shift+V)"
+            tr('Куда попадёт реплика, вставленная из буфера обмена (Ctrl+Shift+V)')
         )
         self.paste_box.currentIndexChanged.connect(
             lambda i: self._set("editing.paste_at", self.paste_box.itemData(i))
         )
-        form.addRow("Вставка из буфера", self.paste_box)
+        form.addRow(tr('Вставка из буфера'), self.paste_box)
 
         paste_hint = QLabel(
-            "Под указателем мыши удобно, когда место выбирают глазами по волне; "
-            "на курсоре — когда работают клавишами. Если мышь не над дорожкой "
-            "субтитров, программа скажет об этом, а не станет угадывать место."
+            tr('Под указателем мыши удобно, когда место выбирают глазами по волне; на '
+                'курсоре — когда работают клавишами. Если мышь не над дорожкой '
+                    'субтитров, программа скажет об этом, а не станет угадывать место.')
         )
         paste_hint.setProperty("role", "hint")
         paste_hint.setWordWrap(True)
@@ -579,9 +574,9 @@ class PreferencesDialog(QDialog):
         self.volume_spin.valueChanged.connect(
             lambda v: self._set("media.volume", v)
         )
-        form.addRow("Громкость", self.volume_spin)
+        form.addRow(tr('Громкость'), self.volume_spin)
 
-        self.autoplay_check = QCheckBox("Начинать воспроизведение при открытии видео")
+        self.autoplay_check = QCheckBox(tr('Начинать воспроизведение при открытии видео'))
         self.autoplay_check.toggled.connect(
             lambda on: self._set("media.autoplay", on)
         )
@@ -597,15 +592,16 @@ class PreferencesDialog(QDialog):
         for key, profile in PROFILES.items():
             self.profile_box.addItem(profile.name, key)
         self.profile_box.currentIndexChanged.connect(self._on_profile)
-        form.addRow("Профиль", self.profile_box)
+        form.addRow(tr('Профиль'), self.profile_box)
 
         self.severity_box = QComboBox()
-        for title, value in (("Все", 0), ("Предупреждения и ошибки", 1), ("Только ошибки", 2)):
+        for title, value in ((tr('Все'), 0), (tr('Предупреждения и ошибки'), 1),
+            (tr('Только ошибки'), 2)):
             self.severity_box.addItem(title, value)
         self.severity_box.currentIndexChanged.connect(
             lambda i: self._set("qc.min_severity", self.severity_box.itemData(i))
         )
-        form.addRow("Показывать", self.severity_box)
+        form.addRow(tr('Показывать'), self.severity_box)
 
         self.profile_hint = QLabel("")
         self.profile_hint.setProperty("role", "hint")
@@ -621,9 +617,9 @@ class PreferencesDialog(QDialog):
         self.language_box = QComboBox()
         for code, title in available_languages().items():
             self.language_box.addItem(title, code)
-        self.language_box.setToolTip("Изменение вступит в силу после перезапуска")
+        self.language_box.setToolTip(tr('Изменение вступит в силу после перезапуска'))
         self.language_box.currentIndexChanged.connect(self._on_language)
-        form.addRow("Язык", self.language_box)
+        form.addRow(tr('Язык'), self.language_box)
 
         self.language_note = QLabel("")
         self.language_note.setProperty("role", "hint")
@@ -632,7 +628,7 @@ class PreferencesDialog(QDialog):
 
         self.theme_box = QComboBox()
         self.theme_box.currentIndexChanged.connect(self._on_theme)
-        form.addRow("Тема", self.theme_box)
+        form.addRow(tr('Тема'), self.theme_box)
 
         self.theme_note = QLabel("")
         self.theme_note.setProperty("role", "hint")
@@ -640,13 +636,13 @@ class PreferencesDialog(QDialog):
         form.addRow("", self.theme_note)
 
         themes_row = QHBoxLayout()
-        open_themes = QPushButton("Папка тем")
-        open_themes.setToolTip("Открыть каталог, куда кладут файлы тем")
+        open_themes = QPushButton(tr('Папка тем'))
+        open_themes.setToolTip(tr('Открыть каталог, куда кладут файлы тем'))
         open_themes.clicked.connect(self._open_themes_folder)
         themes_row.addWidget(open_themes)
-        make_theme = QPushButton("Создать образец")
+        make_theme = QPushButton(tr('Создать образец'))
         make_theme.setToolTip(
-            "Положить в каталог тем готовый файл, который можно править"
+            tr('Положить в каталог тем готовый файл, который можно править')
         )
         make_theme.clicked.connect(self._make_theme_example)
         themes_row.addWidget(make_theme)
@@ -654,38 +650,38 @@ class PreferencesDialog(QDialog):
         form.addRow("", themes_row)
 
         self.accent_box = QComboBox()
-        self.accent_box.addItem("Как в теме", "")
+        self.accent_box.addItem(tr('Как в теме'), "")
         for title, value in ACCENTS:
             self.accent_box.addItem(swatch(value), title, value)
-        self.accent_box.addItem("Свой цвет…", CUSTOM_ACCENT)
+        self.accent_box.addItem(tr('Свой цвет…'), CUSTOM_ACCENT)
         self.accent_box.currentIndexChanged.connect(self._on_accent)
-        form.addRow("Акцентный цвет", self.accent_box)
+        form.addRow(tr('Акцентный цвет'), self.accent_box)
 
         self.motion_box = QComboBox()
-        self.motion_box.addItem("Как в системе", None)
-        self.motion_box.addItem("Включены", True)
-        self.motion_box.addItem("Выключены", False)
+        self.motion_box.addItem(tr('Как в системе'), None)
+        self.motion_box.addItem(tr('Включены'), True)
+        self.motion_box.addItem(tr('Выключены'), False)
         self.motion_box.setToolTip(
-            "Плавное появление окон, меню и прокрутки. «Как в системе» — "
-            "смотреть настройку анимации Windows"
+            tr('Плавное появление окон, меню и прокрутки. «Как в системе» — смотреть '
+                'настройку анимации Windows')
         )
         self.motion_box.currentIndexChanged.connect(
             lambda i: self._set("ui.animations", self.motion_box.itemData(i))
         )
-        form.addRow("Анимации", self.motion_box)
+        form.addRow(tr('Анимации'), self.motion_box)
 
         self.scale_spin = QSpinBox()
         self.scale_spin.setRange(MIN_FONT_SCALE, MAX_FONT_SCALE)
         self.scale_spin.setSingleStep(10)
         self.scale_spin.setSuffix(" %")
         self.scale_spin.setToolTip(
-            "Размер шрифта интерфейса. Размеры виджетов Qt считает от шрифта, "
-            "поэтому вместе с ним растут отступы, строки и кнопки"
+            tr('Размер шрифта интерфейса. Размеры виджетов Qt считает от шрифта, '
+                'поэтому вместе с ним растут отступы, строки и кнопки')
         )
         self.scale_spin.valueChanged.connect(
             lambda value: self._set("ui.font_scale", value)
         )
-        form.addRow("Масштаб интерфейса", self.scale_spin)
+        form.addRow(tr('Масштаб интерфейса'), self.scale_spin)
 
         self.density_box = QComboBox()
         for title, key, _ in DENSITIES:
@@ -693,28 +689,28 @@ class PreferencesDialog(QDialog):
         self.density_box.currentIndexChanged.connect(
             lambda i: self._set("ui.table_density", self.density_box.itemData(i))
         )
-        form.addRow("Плотность таблицы", self.density_box)
+        form.addRow(tr('Плотность таблицы'), self.density_box)
 
         self.preset_box = QComboBox()
         for preset in LayoutPreset:
             self.preset_box.addItem(preset.title, preset)
         apply_row = QHBoxLayout()
         apply_row.addWidget(self.preset_box, 1)
-        apply_button = QPushButton("Применить")
+        apply_button = QPushButton(tr('Применить'))
         apply_button.clicked.connect(
             lambda: self.layout_preset_requested.emit(self.preset_box.currentData())
         )
         apply_row.addWidget(apply_button)
-        form.addRow("Раскладка панелей", apply_row)
+        form.addRow(tr('Раскладка панелей'), apply_row)
 
-        reset_button = QPushButton("Сбросить расположение панелей")
+        reset_button = QPushButton(tr('Сбросить расположение панелей'))
         reset_button.clicked.connect(self.layout_reset_requested)
         form.addRow("", reset_button)
 
         hint = QLabel(
-            "Панели можно перетаскивать за заголовок, отрывать в отдельные окна "
-            "и менять их размер, ведя мышью по границе. Расположение "
-            "запоминается между запусками."
+            tr('Панели можно перетаскивать за заголовок, отрывать в отдельные окна и '
+                'менять их размер, ведя мышью по границе. Расположение запоминается '
+                    'между запусками.')
         )
         hint.setProperty("role", "hint")
         hint.setWordWrap(True)
@@ -782,18 +778,18 @@ class PreferencesDialog(QDialog):
     def _refresh_words_note(self) -> None:
         words = list(self._settings.get("spelling.words", []) or ())
         if not words:
-            self.words_note.setText("Свой словарь пуст.")
+            self.words_note.setText(tr('Свой словарь пуст.'))
             return
         shown = ", ".join(sorted(words)[:6])
-        tail = " и ещё…" if len(words) > 6 else ""
-        self.words_note.setText(f"В своём словаре: {shown}{tail}")
+        tail = tr(' и ещё…') if len(words) > 6 else ""
+        self.words_note.setText(tr('В своём словаре: {0}{1}').format(shown, tail))
 
     def _clear_dictionary(self) -> None:
         if not self._settings.get("spelling.words", []):
             return
         answer = QMessageBox.question(
-            self, "Свой словарь",
-            "Забыть все слова, добавленные вручную?",
+            self, tr('Свой словарь'),
+            tr('Забыть все слова, добавленные вручную?'),
         )
         if answer != QMessageBox.Yes:
             return
@@ -815,7 +811,7 @@ class PreferencesDialog(QDialog):
             themes_for(self._settings).values(),
             key=lambda p: (not p.builtin, p.title.lower()),
         ):
-            title = pack.title if pack.builtin else f"{pack.title} (файл)"
+            title = pack.title if pack.builtin else tr('{0} (файл)').format(pack.title)
             self.theme_box.addItem(title, pack.name)
             index = self.theme_box.count() - 1
             if pack.error:
@@ -834,13 +830,13 @@ class PreferencesDialog(QDialog):
             self.theme_note.setText("")
             return
         if pack.error:
-            self.theme_note.setText(f"Тема не читается: {pack.error}")
+            self.theme_note.setText(tr('Тема не читается: {0}').format(pack.error))
             return
         if pack.builtin:
-            self.theme_note.setText("Встроенная тема.")
+            self.theme_note.setText(tr('Встроенная тема.'))
             return
-        author = f", автор {pack.author}" if pack.author else ""
-        self.theme_note.setText(f"Из файла {pack.path.name}{author}.")
+        author = tr(', автор {0}').format(pack.author) if pack.author else ""
+        self.theme_note.setText(tr('Из файла {0}{1}.').format(pack.path.name, author))
 
     def _themes_folder(self) -> Path:
         from sfstudio.app.storage import themes_dir
@@ -855,7 +851,7 @@ class PreferencesDialog(QDialog):
         try:
             folder.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            QMessageBox.warning(self, "Папка тем", f"Не удалось создать: {exc}")
+            QMessageBox.warning(self, tr('Папка тем'), tr('Не удалось создать: {0}').format(exc))
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
@@ -867,21 +863,23 @@ class PreferencesDialog(QDialog):
         чтением документации.
         """
         folder = self._themes_folder()
-        target = folder / ("образец" + SUFFIX)
+        target = folder / (tr('образец') + SUFFIX)
         try:
             folder.mkdir(parents=True, exist_ok=True)
             if target.exists():
                 # Второй вызов не должен затирать уже поправленный образец.
-                target = folder / f"образец-{len(list(folder.glob('*' + SUFFIX)))}{SUFFIX}"
+                taken = len(list(folder.glob('*' + SUFFIX)))
+                target = folder / tr('образец-{0}{1}').format(taken, SUFFIX)
             target.write_text(example_text(), encoding="utf-8")
         except OSError as exc:
-            QMessageBox.warning(self, "Образец темы", f"Не удалось записать: {exc}")
+            QMessageBox.warning(self, tr('Образец темы'),
+                tr('Не удалось записать: {0}').format(exc))
             return
 
         self._fill_themes()
         self._select(self.theme_box, self._settings.get("ui.theme", "dark"))
         QMessageBox.information(
-            self, "Образец темы",
+            self, tr('Образец темы'),
             f"Готово: {target}\n\nПоправьте цвета в файле и выберите тему в списке.",
         )
 
@@ -907,7 +905,7 @@ class PreferencesDialog(QDialog):
         from PySide6.QtWidgets import QColorDialog
 
         current = str(self._settings.get("ui.accent", "") or "#4C8DFF")
-        chosen = QColorDialog.getColor(QColor(current), self, "Акцентный цвет")
+        chosen = QColorDialog.getColor(QColor(current), self, tr('Акцентный цвет'))
         if not chosen.isValid():
             self._select_accent(str(self._settings.get("ui.accent", "") or ""))
             return
@@ -938,15 +936,17 @@ class PreferencesDialog(QDialog):
             self.profile_hint.setText("")
             return
         self.profile_hint.setText(
-            f"Не более {profile.max_cps:g} знаков в секунду, "
-            f"{profile.max_line_length} символов в строке, "
-            f"{profile.max_lines} строк(и); длительность "
-            f"{profile.min_duration_ms / 1000:g}–{profile.max_duration_ms / 1000:g} с."
+            tr('Не более {0:g} знаков в секунду, {1} символов в строке, {2} строк(и); '
+                'длительность {3:g}–{4:g} с.').format(profile.max_cps,
+                profile.max_line_length,
+                profile.max_lines,
+                profile.min_duration_ms / 1000,
+                profile.max_duration_ms / 1000)
         )
 
     def _choose_folder(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
-            self, "Папка проектов", self.folder_edit.text() or str(Path.home())
+            self, tr('Папка проектов'), self.folder_edit.text() or str(Path.home())
         )
         if chosen:
             self.folder_edit.setText(chosen)
@@ -960,8 +960,8 @@ class PreferencesDialog(QDialog):
         title = self.tabs.tabText(self.tabs.currentIndex())
         answer = QMessageBox.question(
             self,
-            "Сбросить раздел",
-            f"Вернуть значения по умолчанию для раздела «{title}»?",
+            tr('Сбросить раздел'),
+            tr('Вернуть значения по умолчанию для раздела «{0}»?').format(title),
         )
         if answer != QMessageBox.Yes:
             return

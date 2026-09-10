@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from sfstudio.app.i18n import tr
 from sfstudio.core import time as timemod
 from sfstudio.core.actors import INFO_KEY as ACTORS_KEY
 from sfstudio.core.actors import ActorRegistry
@@ -166,9 +167,9 @@ def read_ass(text: str) -> SubtitleDocument:
         # пропускаются; модуль вложений подключается на этапе 6.
 
     if not seen_sections:
-        raise AssParseError("не найдено ни одной секции — файл не похож на ASS")
+        raise AssParseError(tr('не найдено ни одной секции — файл не похож на ASS'))
     if not saw_events_format and not doc.events:
-        raise AssParseError("секция [Events] отсутствует или пуста")
+        raise AssParseError(tr('секция [Events] отсутствует или пуста'))
     _ = saw_styles_format
 
     if not doc.styles:

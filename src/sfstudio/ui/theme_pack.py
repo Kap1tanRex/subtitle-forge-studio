@@ -23,6 +23,7 @@ import json
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.ui.theme import BUILTIN, DARK, THEMES, Palette, with_accent
 
 __all__ = [
@@ -95,15 +96,15 @@ def read_pack(path: Path) -> ThemePack:
         raw = path.read_text(encoding="utf-8-sig")
     except OSError as exc:
         return ThemePack(name=stem, title=stem, path=path,
-                         error=f"файл не читается: {exc.strerror or exc}")
+                         error=tr('файл не читается: {0}').format(exc.strerror or exc))
     try:
         data = json.loads(raw)
     except ValueError as exc:
         return ThemePack(name=stem, title=stem, path=path,
-                         error=f"ошибка в json: {exc}")
+                         error=tr('ошибка в json: {0}').format(exc))
     if not isinstance(data, dict):
         return ThemePack(name=stem, title=stem, path=path,
-                         error="ожидался объект json")
+                         error=tr('ожидался объект json'))
 
     name = str(data.get("name") or stem).strip() or stem
     base = str(data.get("base") or "dark").strip().lower()
@@ -133,7 +134,7 @@ def read_pack(path: Path) -> ThemePack:
     # видна как сломанная здесь, а не разъехаться в окне.
     broken = _bad_colors(clean)
     if broken:
-        return replace(pack, error="неверные цвета: " + ", ".join(broken))
+        return replace(pack, error=tr('неверные цвета: ') + ", ".join(broken))
     return pack
 
 
@@ -181,8 +182,8 @@ def available(folder: Path | None) -> dict[str, ThemePack]:
 def example_text() -> str:
     """Образец файла темы — его кладут человеку, когда он просит «свою тему»."""
     sample = {
-        "name": "моя-тема",
-        "title": "Моя тема",
+        "name": tr('моя-тема'),
+        "title": tr('Моя тема'),
         "author": "",
         "version": "1.0",
         "base": "dark",
@@ -200,8 +201,8 @@ def example_text() -> str:
     # Пояснение лежит внутри объекта, а не комментарием перед ним: json
     # комментариев не знает, и файл с ними не открылся бы ни здесь, ни в
     # редакторе, куда его понесут править.
-    sample["_подсказка"] = (
-        "base — основа (dark или light); colors — что в ней поменять; "
-        "qss — необязательная добавка к таблице стилей Qt"
+    sample[tr('_подсказка')] = (
+        tr('base — основа (dark или light); colors — что в ней поменять; qss — '
+               'необязательная добавка к таблице стилей Qt')
     )
     return json.dumps(sample, ensure_ascii=False, indent=2) + "\n"

@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.time import FpsModel, format_ass
@@ -44,7 +45,7 @@ class _PreviewTree(QTreeWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setColumnCount(4)
-        self.setHeaderLabels(["Реплика", "Было", "Станет", "Длительность"])
+        self.setHeaderLabels([tr('Реплика'), tr('Было'), tr('Станет'), tr('Длительность')])
         self.setRootIsDecorated(False)
         self.setUniformRowHeights(True)
         self.setAlternatingRowColors(True)
@@ -61,17 +62,17 @@ class _PreviewTree(QTreeWidget):
                 if event is None:
                     continue
                 delta = change.delta_duration
-                length = f"{(change.new_end - change.new_start) / 1000:.2f} с"
+                length = tr('{0:.2f} с').format((change.new_end - change.new_start) / 1000)
                 if delta:
-                    length += f" ({delta:+d} мс)"
+                    length += tr(' ({0:+d} мс)').format(delta)
                 item = QTreeWidgetItem([
-                    (event.plain or "(пусто)").replace("\n", " ")[:60],
+                    (event.plain or tr('(пусто)')).replace("\n", " ")[:60],
                     f"{format_ass(change.old_start)} – {format_ass(change.old_end)}",
                     f"{format_ass(change.new_start)} – {format_ass(change.new_end)}",
                     length,
                 ])
                 if change.eid in plan.unresolved:
-                    item.setToolTip(0, "Не хватило места: мешает соседняя реплика")
+                    item.setToolTip(0, tr('Не хватило места: мешает соседняя реплика'))
                 self.addTopLevelItem(item)
         finally:
             self.setUpdatesEnabled(True)
@@ -90,7 +91,7 @@ class AutoTimingDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Доводка таймингов")
+        self.setWindowTitle(tr('Доводка таймингов'))
         self.resize(880, 620)
         self._doc = doc
         self._selection = selection
@@ -105,10 +106,10 @@ class AutoTimingDialog(QDialog):
 
         root = QVBoxLayout(self)
 
-        scope = QGroupBox("К чему применить")
+        scope = QGroupBox(tr('К чему применить'))
         scope_layout = QHBoxLayout(scope)
-        self.scope_selection = QRadioButton(f"К выделенным ({len(selection)})")
-        self.scope_all = QRadioButton(f"Ко всем ({len(doc)})")
+        self.scope_selection = QRadioButton(tr('К выделенным ({0})').format(len(selection)))
+        self.scope_all = QRadioButton(tr('Ко всем ({0})').format(len(doc)))
         (self.scope_selection if len(selection) > 1 else self.scope_all).setChecked(True)
         self.scope_selection.setEnabled(len(selection) > 0)
         for button in (self.scope_selection, self.scope_all):
@@ -117,65 +118,65 @@ class AutoTimingDialog(QDialog):
         scope_layout.addStretch(1)
         root.addWidget(scope)
 
-        options = QGroupBox("Что сделать")
+        options = QGroupBox(tr('Что сделать'))
         form = QFormLayout(options)
 
-        self.lead_in = _spin(0, 3000, 120, self._recalculate, " мс")
-        self.lead_out = _spin(0, 3000, 300, self._recalculate, " мс")
+        self.lead_in = _spin(0, 3000, 120, self._recalculate, tr(' мс'))
+        self.lead_out = _spin(0, 3000, 300, self._recalculate, tr(' мс'))
         lead_row = QHBoxLayout()
-        lead_row.addWidget(QLabel("раньше на"))
+        lead_row.addWidget(QLabel(tr('раньше на')))
         lead_row.addWidget(self.lead_in)
-        lead_row.addWidget(QLabel("дольше на"))
+        lead_row.addWidget(QLabel(tr('дольше на')))
         lead_row.addWidget(self.lead_out)
         lead_row.addStretch(1)
         self.lead_check = _group_check(
-            "Расширить реплики", form, _wrap(lead_row), self._recalculate
+            tr('Расширить реплики'), form, _wrap(lead_row), self._recalculate
         )
 
-        self.close_gap = _spin(0, 2000, 200, self._recalculate, " мс")
+        self.close_gap = _spin(0, 2000, 200, self._recalculate, tr(' мс'))
         self.gap_check = _group_check(
-            "Смыкать зазоры короче", form, self.close_gap, self._recalculate
+            tr('Смыкать зазоры короче'), form, self.close_gap, self._recalculate
         )
 
-        self.min_duration = _spin(0, 10_000, 1000, self._recalculate, " мс")
+        self.min_duration = _spin(0, 10_000, 1000, self._recalculate, tr(' мс'))
         self.duration_check = _group_check(
-            "Минимальная длительность", form, self.min_duration, self._recalculate
+            tr('Минимальная длительность'), form, self.min_duration, self._recalculate
         )
 
         self.target_cps = QDoubleSpinBox()
         self.target_cps.setRange(1.0, 60.0)
         self.target_cps.setValue(17.0)
-        self.target_cps.setSuffix(" симв/с")
+        self.target_cps.setSuffix(tr(' симв/с'))
         self.target_cps.valueChanged.connect(self._recalculate)
         self.cps_check = _group_check(
-            "Растянуть под скорость чтения", form, self.target_cps, self._recalculate
+            tr('Растянуть под скорость чтения'), form, self.target_cps, self._recalculate
         )
 
-        self.keyframe_radius = _spin(1, 60, 5, self._recalculate, " кадр.")
+        self.keyframe_radius = _spin(1, 60, 5, self._recalculate, tr(' кадр.'))
         self.keyframe_check = _group_check(
-            "Притянуть к монтажным склейкам", form, self.keyframe_radius, self._recalculate
+            tr('Притянуть к монтажным склейкам'), form, self.keyframe_radius, self._recalculate
         )
         has_keyframes = bool(keyframes)
         self.keyframe_check.setEnabled(has_keyframes)
         if not has_keyframes:
             self.keyframe_check.setChecked(False)
             self.keyframe_check.setToolTip(
-                "Индекс ключевых кадров не построен — откройте видео"
+                tr('Индекс ключевых кадров не построен — откройте видео')
             )
 
-        self.frames_check = QCheckBox("Округлить к сетке кадров")
+        self.frames_check = QCheckBox(tr('Округлить к сетке кадров'))
         self.frames_check.setChecked(fps is not None)
         self.frames_check.setEnabled(fps is not None)
         if fps is None:
-            self.frames_check.setToolTip("Частота кадров неизвестна — откройте видео")
+            self.frames_check.setToolTip(tr('Частота кадров неизвестна — откройте видео'))
         self.frames_check.stateChanged.connect(self._recalculate)
         form.addRow("", self.frames_check)
 
-        self.min_gap = _spin(0, 30, 2, self._recalculate, " кадр.")
-        form.addRow("Зазор между репликами:", self.min_gap)
+        self.min_gap = _spin(0, 30, 2, self._recalculate, tr(' кадр.'))
+        form.addRow(tr('Зазор между репликами:'), self.min_gap)
         root.addWidget(options)
 
-        root.addWidget(QLabel("Предпросмотр:"))
+        root.addWidget(QLabel(tr('Предпросмотр:')))
         self.preview = _PreviewTree()
         root.addWidget(self.preview, 1)
 
@@ -185,8 +186,8 @@ class AutoTimingDialog(QDialog):
         root.addWidget(self.summary)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self)
-        buttons.button(QDialogButtonBox.Ok).setText("Применить")
-        buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        buttons.button(QDialogButtonBox.Ok).setText(tr('Применить'))
+        buttons.button(QDialogButtonBox.Cancel).setText(tr('Отмена'))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         self._ok = buttons.button(QDialogButtonBox.Ok)
@@ -231,7 +232,7 @@ class AutoTimingDialog(QDialog):
 
         text = self._plan.summary()
         if len(self._plan.changes) > PREVIEW_ROWS:
-            text += f" · показаны первые {PREVIEW_ROWS}"
+            text += tr(' · показаны первые {0}').format(PREVIEW_ROWS)
         if self._plan.unresolved:
             text += "\nПодсвеченным репликам не хватило места: мешают соседние."
         self.summary.setText(text)
@@ -253,7 +254,7 @@ class ShiftTimesDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Сдвиг таймингов")
+        self.setWindowTitle(tr('Сдвиг таймингов'))
         self.resize(760, 520)
         self._doc = doc
         self._selection = selection
@@ -267,35 +268,35 @@ class ShiftTimesDialog(QDialog):
         self.amount = QSpinBox()
         self.amount.setRange(0, 10 * 60 * 60 * 1000)
         self.amount.setValue(500)
-        self.amount.setSuffix(" мс")
+        self.amount.setSuffix(tr(' мс'))
         self.amount.valueChanged.connect(self._recalculate)
         self.direction = QComboBox()
-        self.direction.addItem("вперёд", 1)
-        self.direction.addItem("назад", -1)
+        self.direction.addItem(tr('вперёд'), 1)
+        self.direction.addItem(tr('назад'), -1)
         self.direction.currentIndexChanged.connect(self._recalculate)
         amount_row.addWidget(self.amount)
         amount_row.addWidget(self.direction)
         amount_row.addStretch(1)
-        form.addRow("Сдвинуть на:", _wrap(amount_row))
+        form.addRow(tr('Сдвинуть на:'), _wrap(amount_row))
 
         self.scope = QComboBox()
-        self.scope.addItem(f"выделенные ({len(selection)})", "selection")
-        self.scope.addItem(f"все ({len(doc)})", "all")
-        self.scope.addItem("от выделенной и далее", "after")
+        self.scope.addItem(tr('выделенные ({0})').format(len(selection)), "selection")
+        self.scope.addItem(tr('все ({0})').format(len(doc)), "all")
+        self.scope.addItem(tr('от выделенной и далее'), "after")
         if len(selection) <= 1:
             self.scope.setCurrentIndex(1)
         self.scope.currentIndexChanged.connect(self._recalculate)
-        form.addRow("Что двигать:", self.scope)
+        form.addRow(tr('Что двигать:'), self.scope)
 
         self.what = QComboBox()
-        self.what.addItem("начало и конец", "both")
-        self.what.addItem("только начало", "start")
-        self.what.addItem("только конец", "end")
+        self.what.addItem(tr('начало и конец'), "both")
+        self.what.addItem(tr('только начало'), "start")
+        self.what.addItem(tr('только конец'), "end")
         self.what.currentIndexChanged.connect(self._recalculate)
-        form.addRow("Границы:", self.what)
+        form.addRow(tr('Границы:'), self.what)
         root.addLayout(form)
 
-        root.addWidget(QLabel("Предпросмотр:"))
+        root.addWidget(QLabel(tr('Предпросмотр:')))
         self.preview = _PreviewTree()
         root.addWidget(self.preview, 1)
 
@@ -304,8 +305,8 @@ class ShiftTimesDialog(QDialog):
         root.addWidget(self.summary)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self)
-        buttons.button(QDialogButtonBox.Ok).setText("Сдвинуть")
-        buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        buttons.button(QDialogButtonBox.Ok).setText(tr('Сдвинуть'))
+        buttons.button(QDialogButtonBox.Cancel).setText(tr('Отмена'))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         self._ok = buttons.button(QDialogButtonBox.Ok)
@@ -366,11 +367,11 @@ class ShiftTimesDialog(QDialog):
         ])
         self.preview.show_plan(plan, self._doc)
 
-        text = f"затронуто реплик: {len(self._mapping)}"
+        text = tr('затронуто реплик: {0}').format(len(self._mapping))
         if len(self._mapping) > PREVIEW_ROWS:
-            text += f" · показаны первые {PREVIEW_ROWS}"
+            text += tr(' · показаны первые {0}').format(PREVIEW_ROWS)
         if clamped:
-            text += f" · упёрлись в ограничение: {clamped}"
+            text += tr(' · упёрлись в ограничение: {0}').format(clamped)
         self.summary.setText(text)
         self._ok.setEnabled(bool(self._mapping))
 
@@ -379,7 +380,7 @@ class ShiftTimesDialog(QDialog):
 
     def describe(self) -> str:
         delta = self.amount.value() * int(self.direction.currentData())
-        return f"Сдвиг на {delta:+d} мс"
+        return tr('Сдвиг на {0:+d} мс').format(delta)
 
 
 def _change(doc: SubtitleDocument, eid: int, times: tuple[int, int]):

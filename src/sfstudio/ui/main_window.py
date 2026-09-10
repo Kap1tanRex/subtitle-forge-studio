@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 )
 
 from sfstudio import __version__
+from sfstudio.app.i18n import tr
 from sfstudio.app.settings import Settings
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands import (
@@ -83,14 +84,12 @@ from sfstudio.ui.transport import TransportBar
 from sfstudio.ui.video_pane import VideoPane
 
 SUBTITLE_FILTER = (
-    "Субтитры (*.ass *.ssa *.srt *.vtt *.ttml *.dfxp);;"
-    "ASS (*.ass *.ssa);;SubRip (*.srt);;WebVTT (*.vtt);;"
-    "TTML / DFXP (*.ttml *.dfxp *.xml);;Все файлы (*)"
+    tr('Субтитры (*.ass *.ssa *.srt *.vtt *.ttml *.dfxp);;ASS (*.ass *.ssa);;SubRip '
+           '(*.srt);;WebVTT (*.vtt);;TTML / DFXP (*.ttml *.dfxp *.xml);;Все файлы (*)')
 )
-PROJECT_FILTER = f"Проект SubtitleForge (*{PROJECT_SUFFIX});;Все файлы (*)"
+PROJECT_FILTER = tr('Проект SubtitleForge (*{0});;Все файлы (*)').format(PROJECT_SUFFIX)
 MEDIA_FILTER = (
-    "Видео и аудио (*.mkv *.mp4 *.mov *.webm *.avi *.m4v *.ts *.wav *.mp3 *.aac);;"
-    "Все файлы (*)"
+    tr('Видео и аудио (*.mkv *.mp4 *.mov *.webm *.avi *.m4v *.ts *.wav *.mp3 *.aac);;Все файлы (*)')
 )
 
 
@@ -224,11 +223,11 @@ class MainWindow(QMainWindow):
 
     def apply_layout_preset(self, preset: LayoutPreset) -> None:
         self._layout.apply_preset(preset)
-        self._show_status(f"Раскладка: {preset.title}")
+        self._show_status(tr('Раскладка: {0}').format(preset.title))
 
     def reset_layout(self) -> None:
         self._layout.reset()
-        self._show_status("Раскладка сброшена")
+        self._show_status(tr('Раскладка сброшена'))
 
     # -- построение интерфейса ------------------------------------------------ #
 
@@ -304,7 +303,7 @@ class MainWindow(QMainWindow):
         # стоила постоянно, а читают её один раз: место под редактором нужнее
         # тексту реплики.
         self.hint = QLabel(
-            "Кадр: тяните субтитр · Таймлайн: края реплики, Ctrl+колесо — зум"
+            tr('Кадр: тяните субтитр · Таймлайн: края реплики, Ctrl+колесо — зум')
         )
         self.hint.setProperty("role", "hint")
         # Перенос по словам обязателен: без него подсказка в одну длинную
@@ -330,7 +329,7 @@ class MainWindow(QMainWindow):
         self.original = QPlainTextEdit()
         self.original.setReadOnly(True)
         self.original.setMaximumHeight(64)
-        self.original.setPlaceholderText("Оригинал")
+        self.original.setPlaceholderText(tr('Оригинал'))
         self.original.setProperty("role", "reference")
         self.original.setVisible(False)
 
@@ -375,20 +374,20 @@ class MainWindow(QMainWindow):
         # свойства от общего к частному. Список и текст встают в начало,
         # хотя добавляются последними: инспектор заводит свои вкладки в
         # конструкторе, до того как главное окно соберёт остальные панели.
-        self.inspector.add_panel("table", "События", self.table, at=0)
-        self.inspector.add_panel("editor", "Текст", editor_box, at=1)
-        self.inspector.add_panel("style", "Оформление", self.style_forge)
-        self.inspector.add_panel("actors", "Акторы", self.actors_panel)
-        self.inspector.add_panel("qc", "Замечания", self.qc_panel)
+        self.inspector.add_panel("table", tr('События'), self.table, at=0)
+        self.inspector.add_panel("editor", tr('Текст'), editor_box, at=1)
+        self.inspector.add_panel("style", tr('Оформление'), self.style_forge)
+        self.inspector.add_panel("actors", tr('Акторы'), self.actors_panel)
+        self.inspector.add_panel("qc", tr('Замечания'), self.qc_panel)
         self.inspector.detach_requested.connect(self.detach_panel)
         self._detached: dict[str, DetachedPanel] = {}
 
         self._layout = LayoutManager(self, self._settings)
         self._layout.add(
-            DockSpec("inspector", "Инспектор", self.inspector, Qt.RightDockWidgetArea)
+            DockSpec("inspector", tr('Инспектор'), self.inspector, Qt.RightDockWidgetArea)
         )
         self._layout.add(
-            DockSpec("timeline", "Таймлайн", self.timeline, Qt.BottomDockWidgetArea)
+            DockSpec("timeline", tr('Таймлайн'), self.timeline, Qt.BottomDockWidgetArea)
         )
         self.inspector_dock = self._layout.dock("inspector")
 
@@ -399,7 +398,7 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("")
         self.statusBar().addPermanentWidget(self.progress)
         self.statusBar().addPermanentWidget(self.status_label)
-        self._show_status("Готово")
+        self._show_status(tr('Готово'))
 
     def _build_actions(self) -> None:
         """Собирает все действия в реестр, затем раскладывает по меню.
@@ -411,165 +410,165 @@ class MainWindow(QMainWindow):
         registry = self._actions_registry = ActionRegistry()
         add = registry.add
 
-        add("file.new_project", "Новый проект…", self.new_project,
-            shortcut="Ctrl+N", menu="Файл")
-        add("file.open_project", "Открыть проект…", self.open_project,
-            shortcut="Ctrl+O", menu="Файл")
-        add("file.save_project", "Сохранить проект", self.save_project_file,
-            shortcut="Ctrl+S", menu="Файл")
-        add("file.save_project_as", "Сохранить проект как…", self.save_project_as,
-            shortcut="Ctrl+Shift+S", menu="Файл")
+        add("file.new_project", tr('Новый проект…'), self.new_project,
+            shortcut="Ctrl+N", menu=tr('Файл'))
+        add("file.open_project", tr('Открыть проект…'), self.open_project,
+            shortcut="Ctrl+O", menu=tr('Файл'))
+        add("file.save_project", tr('Сохранить проект'), self.save_project_file,
+            shortcut="Ctrl+S", menu=tr('Файл'))
+        add("file.save_project_as", tr('Сохранить проект как…'), self.save_project_as,
+            shortcut="Ctrl+Shift+S", menu=tr('Файл'))
 
-        add("file.open_subtitles", "Импорт субтитров…", self.open_subtitles,
-            shortcut="Ctrl+I", menu="Файл")
-        add("file.import_script", "Импорт текста без таймингов…",
-            self.open_script_import, menu="Файл",
-            tip="Сценарий или готовый перевод из текстового файла. "
-                "Тайминг делается потом выравниванием по речи")
-        add("file.open_reference", "Открыть оригинал…", self.open_reference,
-            menu="Файл",
-            tip="Второй файл субтитров, с которого идёт перевод. "
-                "Он показывается рядом и не меняется")
-        add("file.close_reference", "Убрать оригинал", self.close_reference,
-            menu="Файл")
-        add("file.open_media", "Открыть видео…", self.open_media,
-            shortcut="Ctrl+Shift+O", menu="Файл")
-        add("file.save", "Экспорт субтитров", self.save_file,
-            shortcut="Ctrl+E", menu="Файл")
-        add("file.save_as", "Экспорт субтитров как…", self.save_file_as,
-            shortcut="Ctrl+Shift+E", menu="Файл")
-        add("file.mux", "Записать в контейнер…", self.save_into_container,
-            shortcut="Ctrl+M", menu="Файл")
-        add("file.quit", "Выход", self.close, shortcut="Ctrl+Q", menu="Файл")
+        add("file.open_subtitles", tr('Импорт субтитров…'), self.open_subtitles,
+            shortcut="Ctrl+I", menu=tr('Файл'))
+        add("file.import_script", tr('Импорт текста без таймингов…'),
+            self.open_script_import, menu=tr('Файл'),
+            tip=tr('Сценарий или готовый перевод из текстового файла. Тайминг делается потом '
+                   'выравниванием по речи'))
+        add("file.open_reference", tr('Открыть оригинал…'), self.open_reference,
+            menu=tr('Файл'),
+            tip=tr('Второй файл субтитров, с которого идёт перевод. Он показывается рядом и не '
+                   'меняется'))
+        add("file.close_reference", tr('Убрать оригинал'), self.close_reference,
+            menu=tr('Файл'))
+        add("file.open_media", tr('Открыть видео…'), self.open_media,
+            shortcut="Ctrl+Shift+O", menu=tr('Файл'))
+        add("file.save", tr('Экспорт субтитров'), self.save_file,
+            shortcut="Ctrl+E", menu=tr('Файл'))
+        add("file.save_as", tr('Экспорт субтитров как…'), self.save_file_as,
+            shortcut="Ctrl+Shift+E", menu=tr('Файл'))
+        add("file.mux", tr('Записать в контейнер…'), self.save_into_container,
+            shortcut="Ctrl+M", menu=tr('Файл'))
+        add("file.quit", tr('Выход'), self.close, shortcut="Ctrl+Q", menu=tr('Файл'))
 
-        add("edit.undo", "Отменить", self.undo, shortcut="Ctrl+Z", menu="Правка")
-        add("edit.redo", "Вернуть", self.redo, shortcut="Ctrl+Y", menu="Правка")
-        add("edit.insert", "Новое событие", self.insert_event,
-            shortcut="Ctrl+Return", menu="Правка")
-        add("edit.duplicate", "Дублировать", self.duplicate_event,
-            shortcut="Ctrl+D", menu="Правка")
-        add("edit.delete", "Удалить", self.delete_events,
-            shortcut="Ctrl+Delete", menu="Правка")
-        add("edit.clear_position", "Сбросить позицию", self.preview.clear_position,
-            shortcut="Ctrl+Shift+0", menu="Правка")
-        add("edit.style_presets", "Шаблоны оформления…", self.open_style_presets,
-            shortcut="Ctrl+Shift+Y", menu="Правка")
+        add("edit.undo", tr('Отменить'), self.undo, shortcut="Ctrl+Z", menu=tr('Правка'))
+        add("edit.redo", tr('Вернуть'), self.redo, shortcut="Ctrl+Y", menu=tr('Правка'))
+        add("edit.insert", tr('Новое событие'), self.insert_event,
+            shortcut="Ctrl+Return", menu=tr('Правка'))
+        add("edit.duplicate", tr('Дублировать'), self.duplicate_event,
+            shortcut="Ctrl+D", menu=tr('Правка'))
+        add("edit.delete", tr('Удалить'), self.delete_events,
+            shortcut="Ctrl+Delete", menu=tr('Правка'))
+        add("edit.clear_position", tr('Сбросить позицию'), self.preview.clear_position,
+            shortcut="Ctrl+Shift+0", menu=tr('Правка'))
+        add("edit.style_presets", tr('Шаблоны оформления…'), self.open_style_presets,
+            shortcut="Ctrl+Shift+Y", menu=tr('Правка'))
 
-        add("edit.recognise", "Распознать речь…", self.open_asr,
-            shortcut="Ctrl+R", menu="Правка")
-        add("edit.relabel", "Обновить метки говорящих", self.relabel_all,
-            menu="Правка",
-            tip="Проставить или убрать имена акторов в тексте по настройке")
-        add("edit.glossary", "Глоссарий…", self.open_glossary,
-            menu="Правка",
-            tip="Как переводить термины и имена. Проверяется по оригиналу")
-        add("edit.actors", "Акторы…", self.open_actors,
-            shortcut="Ctrl+Shift+A", menu="Правка")
-        add("edit.add_track", "Новая дорожка", self.add_track,
-            shortcut="Ctrl+Shift+N", menu="Правка")
+        add("edit.recognise", tr('Распознать речь…'), self.open_asr,
+            shortcut="Ctrl+R", menu=tr('Правка'))
+        add("edit.relabel", tr('Обновить метки говорящих'), self.relabel_all,
+            menu=tr('Правка'),
+            tip=tr('Проставить или убрать имена акторов в тексте по настройке'))
+        add("edit.glossary", tr('Глоссарий…'), self.open_glossary,
+            menu=tr('Правка'),
+            tip=tr('Как переводить термины и имена. Проверяется по оригиналу'))
+        add("edit.actors", tr('Акторы…'), self.open_actors,
+            shortcut="Ctrl+Shift+A", menu=tr('Правка'))
+        add("edit.add_track", tr('Новая дорожка'), self.add_track,
+            shortcut="Ctrl+Shift+N", menu=tr('Правка'))
 
-        add("timing.auto", "Доводка таймингов…", self.open_auto_timing,
-            shortcut="Ctrl+T", menu="Тайминг")
-        add("timing.shift", "Сдвиг таймингов…", self.open_shift_times,
-            shortcut="Ctrl+Shift+T", menu="Тайминг")
-        add("timing.align", "Выровнять текст по речи…", self.open_alignment,
-            menu="Тайминг",
-            tip="Разложить готовый перевод по речи: тайминги считаются "
-                "по распознаванию, текст не меняется")
+        add("timing.auto", tr('Доводка таймингов…'), self.open_auto_timing,
+            shortcut="Ctrl+T", menu=tr('Тайминг'))
+        add("timing.shift", tr('Сдвиг таймингов…'), self.open_shift_times,
+            shortcut="Ctrl+Shift+T", menu=tr('Тайминг'))
+        add("timing.align", tr('Выровнять текст по речи…'), self.open_alignment,
+            menu=tr('Тайминг'),
+            tip=tr('Разложить готовый перевод по речи: тайминги считаются по распознаванию, '
+                   'текст не меняется'))
 
-        add("marker.add", "Поставить маркер", self.add_marker,
-            shortcut="Alt+M", menu="Маркеры",
-            tip="Отметка на текущем времени: имя, примечание, цвет")
-        add("marker.edit", "Правка маркера…", self.edit_marker_at_playhead,
-            menu="Маркеры",
-            tip="Открыть маркер, стоящий на текущем времени")
-        add("marker.previous", "Предыдущий маркер", self.goto_previous_marker,
-            shortcut="Alt+Left", menu="Маркеры")
-        add("marker.next", "Следующий маркер", self.goto_next_marker,
-            shortcut="Alt+Right", menu="Маркеры")
-        add("marker.list", "Список маркеров…", self.open_markers,
-            shortcut="Alt+Shift+M", menu="Маркеры",
-            tip="Все отметки списком: поиск по имени и ключевому слову")
-        add("marker.clear", "Убрать все маркеры", self.clear_markers,
-            menu="Маркеры")
+        add("marker.add", tr('Поставить маркер'), self.add_marker,
+            shortcut="Alt+M", menu=tr('Маркеры'),
+            tip=tr('Отметка на текущем времени: имя, примечание, цвет'))
+        add("marker.edit", tr('Правка маркера…'), self.edit_marker_at_playhead,
+            menu=tr('Маркеры'),
+            tip=tr('Открыть маркер, стоящий на текущем времени'))
+        add("marker.previous", tr('Предыдущий маркер'), self.goto_previous_marker,
+            shortcut="Alt+Left", menu=tr('Маркеры'))
+        add("marker.next", tr('Следующий маркер'), self.goto_next_marker,
+            shortcut="Alt+Right", menu=tr('Маркеры'))
+        add("marker.list", tr('Список маркеров…'), self.open_markers,
+            shortcut="Alt+Shift+M", menu=tr('Маркеры'),
+            tip=tr('Все отметки списком: поиск по имени и ключевому слову'))
+        add("marker.clear", tr('Убрать все маркеры'), self.clear_markers,
+            menu=tr('Маркеры'))
 
-        add("view.guides", "Направляющие", self.preview.toggle_guides,
-            shortcut="F6", menu="Вид", checkable=True, checked=True)
-        add("view.safe_area", "Безопасные зоны", self.preview.toggle_safe_area,
-            shortcut="F7", menu="Вид", checkable=True)
-        add("view.snapping", "Магниты таймлайна", self.timeline.set_snapping,
-            shortcut="F8", menu="Вид", checkable=True, checked=True)
-        add("view.tracks_taller", "Дорожки выше",
+        add("view.guides", tr('Направляющие'), self.preview.toggle_guides,
+            shortcut="F6", menu=tr('Вид'), checkable=True, checked=True)
+        add("view.safe_area", tr('Безопасные зоны'), self.preview.toggle_safe_area,
+            shortcut="F7", menu=tr('Вид'), checkable=True)
+        add("view.snapping", tr('Магниты таймлайна'), self.timeline.set_snapping,
+            shortcut="F8", menu=tr('Вид'), checkable=True, checked=True)
+        add("view.tracks_taller", tr('Дорожки выше'),
             lambda: self.timeline.zoom_tracks(1.25),
-            shortcut="Ctrl+Alt+Up", menu="Вид")
-        add("view.tracks_shorter", "Дорожки ниже",
+            shortcut="Ctrl+Alt+Up", menu=tr('Вид'))
+        add("view.tracks_shorter", tr('Дорожки ниже'),
             lambda: self.timeline.zoom_tracks(0.8),
-            shortcut="Ctrl+Alt+Down", menu="Вид")
-        add("view.tracks_reset", "Обычная высота дорожек",
-            self.timeline.reset_track_zoom, menu="Вид")
+            shortcut="Ctrl+Alt+Down", menu=tr('Вид'))
+        add("view.tracks_reset", tr('Обычная высота дорожек'),
+            self.timeline.reset_track_zoom, menu=tr('Вид'))
 
-        add("view.fit_all", "Уместить всё", self.timeline.fit_all,
-            shortcut="Ctrl+Home", menu="Вид")
+        add("view.fit_all", tr('Уместить всё'), self.timeline.fit_all,
+            shortcut="Ctrl+Home", menu=tr('Вид'))
         # Ctrl+F по всем привычкам — это поиск. «Уместить выделение» жило на
         # нём только потому, что поиска не было.
-        add("view.fit_selection", "Уместить выделение", self.timeline.fit_selection,
-            shortcut="Ctrl+Shift+F", menu="Вид")
-        add("view.qc_panel", "Панель контроля качества", self._toggle_qc,
-            shortcut="F4", menu="Вид", checkable=True,
+        add("view.fit_selection", tr('Уместить выделение'), self.timeline.fit_selection,
+            shortcut="Ctrl+Shift+F", menu=tr('Вид'))
+        add("view.qc_panel", tr('Панель контроля качества'), self._toggle_qc,
+            shortcut="F4", menu=tr('Вид'), checkable=True,
             checked=bool(self._settings.get("qc.panel_visible", False)))
-        add("view.next_issue", "Следующая проблема", self.goto_next_issue,
-            shortcut="F9", menu="Вид")
-        add("view.qc_report", "Отчёт о проверке…", self.save_qc_report,
-            menu="Вид",
-            tip="Список замечаний и требования профиля — для сдачи работы")
-        add("view.next_question", "Следующий вопрос", self.goto_next_question,
-            shortcut="Shift+F9", menu="Вид",
-            tip="Реплики, помеченные вопросом в контекстном меню")
-        add("view.reset_layout", "Сбросить раскладку", self.reset_layout, menu="Вид")
+        add("view.next_issue", tr('Следующая проблема'), self.goto_next_issue,
+            shortcut="F9", menu=tr('Вид'))
+        add("view.qc_report", tr('Отчёт о проверке…'), self.save_qc_report,
+            menu=tr('Вид'),
+            tip=tr('Список замечаний и требования профиля — для сдачи работы'))
+        add("view.next_question", tr('Следующий вопрос'), self.goto_next_question,
+            shortcut="Shift+F9", menu=tr('Вид'),
+            tip=tr('Реплики, помеченные вопросом в контекстном меню'))
+        add("view.reset_layout", tr('Сбросить раскладку'), self.reset_layout, menu=tr('Вид'))
 
-        add("play.toggle", "Играть / Пауза", self.video_pane.toggle_pause,
-            shortcut="Space", menu="Воспроизведение")
-        add("play.frame_forward", "Кадр вперёд",
+        add("play.toggle", tr('Играть / Пауза'), self.video_pane.toggle_pause,
+            shortcut="Space", menu=tr('Воспроизведение'))
+        add("play.frame_forward", tr('Кадр вперёд'),
             lambda: self.video_pane.frame_step(True),
-            shortcut="Right", menu="Воспроизведение")
-        add("play.frame_back", "Кадр назад",
+            shortcut="Right", menu=tr('Воспроизведение'))
+        add("play.frame_back", tr('Кадр назад'),
             lambda: self.video_pane.frame_step(False),
-            shortcut="Left", menu="Воспроизведение")
-        add("play.loop_event", "Играть текущую реплику", self.play_current_event,
-            shortcut="Ctrl+Space", menu="Воспроизведение")
-        add("play.volume_up", "Громче", lambda: self.step_volume(True),
-            shortcut="Ctrl+Up", menu="Воспроизведение")
-        add("play.volume_down", "Тише", lambda: self.step_volume(False),
-            shortcut="Ctrl+Down", menu="Воспроизведение")
-        add("play.mute", "Заглушить", self.toggle_mute,
-            shortcut="M", menu="Воспроизведение")
+            shortcut="Left", menu=tr('Воспроизведение'))
+        add("play.loop_event", tr('Играть текущую реплику'), self.play_current_event,
+            shortcut="Ctrl+Space", menu=tr('Воспроизведение'))
+        add("play.volume_up", tr('Громче'), lambda: self.step_volume(True),
+            shortcut="Ctrl+Up", menu=tr('Воспроизведение'))
+        add("play.volume_down", tr('Тише'), lambda: self.step_volume(False),
+            shortcut="Ctrl+Down", menu=tr('Воспроизведение'))
+        add("play.mute", tr('Заглушить'), self.toggle_mute,
+            shortcut="M", menu=tr('Воспроизведение'))
 
-        add("play.faster", "Быстрее", lambda: self.step_speed(True),
-            shortcut="]", menu="Воспроизведение")
-        add("play.slower", "Медленнее", lambda: self.step_speed(False),
-            shortcut="[", menu="Воспроизведение")
-        add("play.normal_speed", "Обычная скорость", lambda: self._on_speed_selected(1.0),
-            shortcut="Ctrl+]", menu="Воспроизведение")
+        add("play.faster", tr('Быстрее'), lambda: self.step_speed(True),
+            shortcut="]", menu=tr('Воспроизведение'))
+        add("play.slower", tr('Медленнее'), lambda: self.step_speed(False),
+            shortcut="[", menu=tr('Воспроизведение'))
+        add("play.normal_speed", tr('Обычная скорость'), lambda: self._on_speed_selected(1.0),
+            shortcut="Ctrl+]", menu=tr('Воспроизведение'))
 
-        add("file.preferences", "Настройки…", self.open_preferences,
-            shortcut="Ctrl+,", menu="Файл")
+        add("file.preferences", tr('Настройки…'), self.open_preferences,
+            shortcut="Ctrl+,", menu=tr('Файл'))
 
-        add("help.palette", "Командная палитра…", self.open_command_palette,
-            shortcut="Ctrl+P", menu="Справка")
-        add("help.about", "О программе", self.about, menu="Справка")
-        add("help.shortcuts", "Горячие клавиши…", self.open_shortcuts, menu="Справка")
+        add("help.palette", tr('Командная палитра…'), self.open_command_palette,
+            shortcut="Ctrl+P", menu=tr('Справка'))
+        add("help.about", tr('О программе'), self.about, menu=tr('Справка'))
+        add("help.shortcuts", tr('Горячие клавиши…'), self.open_shortcuts, menu=tr('Справка'))
 
-        add("edit.paste_event", "Вставить реплику из буфера", self.paste_event,
-            shortcut="Ctrl+Shift+V", menu="Правка",
-            tip="Текст из буфера обмена станет новой репликой")
-        add("edit.find", "Найти и заменить…", self.open_find,
-            shortcut="Ctrl+F", menu="Правка")
-        add("edit.find_selection", "Найти в выделенных…", self.find_in_selection,
-            shortcut="Ctrl+Shift+H", menu="Правка")
+        add("edit.paste_event", tr('Вставить реплику из буфера'), self.paste_event,
+            shortcut="Ctrl+Shift+V", menu=tr('Правка'),
+            tip=tr('Текст из буфера обмена станет новой репликой'))
+        add("edit.find", tr('Найти и заменить…'), self.open_find,
+            shortcut="Ctrl+F", menu=tr('Правка'))
+        add("edit.find_selection", tr('Найти в выделенных…'), self.find_in_selection,
+            shortcut="Ctrl+Shift+H", menu=tr('Правка'))
 
         for preset in LayoutPreset:
-            add(f"layout.{preset.value}", f"Раскладка: {preset.title}",
-                lambda p=preset: self.apply_layout_preset(p), menu="Вид")
+            add(f"layout.{preset.value}", tr('Раскладка: {0}').format(preset.title),
+                lambda p=preset: self.apply_layout_preset(p), menu=tr('Вид'))
 
         self._add_plugin_actions(add)
 
@@ -606,27 +605,28 @@ class MainWindow(QMainWindow):
                 try:
                     callback()
                 except Exception as exc:
-                    self._show_status(f"Плагин: «{title}» — {exc}")
+                    self._show_status(tr('Плагин: «{0}» — {1}').format(title, exc))
 
             add(
                 item.action_id,
                 item.title,
                 run,
                 shortcut=item.shortcut,
-                menu="Плагины",
+                menu=tr('Плагины'),
                 tip=item.tooltip,
             )
 
     def _install_menus(self, registry: ActionRegistry, actions: dict) -> None:
         """Раскладывает действия по меню в порядке регистрации."""
         menus: dict[str, object] = {}
-        names = ["Файл", "Правка", "Тайминг", "Маркеры", "Вид", "Воспроизведение"]
+        names = [tr('Файл'), tr('Правка'), tr('Тайминг'), tr('Маркеры'), tr('Вид'),
+            tr('Воспроизведение')]
         # Меню плагинов появляется, только когда плагины вообще есть: пустой
         # пункт в строке меню сообщал бы о возможности, которой человек не
         # просил и не увидит.
         if self._plugins.plugins:
-            names.append("Плагины")
-        names.append("Справка")
+            names.append(tr('Плагины'))
+        names.append(tr('Справка'))
         for name in names:
             menus[name] = self.menuBar().addMenu(f"&{name}")
 
@@ -637,33 +637,33 @@ class MainWindow(QMainWindow):
                 continue
             if spec.key.startswith("layout."):
                 if layout_menu is None:
-                    layout_menu = menu.addMenu("Раскладка")
+                    layout_menu = menu.addMenu(tr('Раскладка'))
                 layout_menu.addAction(actions[spec.key])
                 continue
             menu.addAction(actions[spec.key])
 
-        panels_menu = menus["Вид"].addMenu("Панели")
+        panels_menu = menus[tr('Вид')].addMenu(tr('Панели'))
         for action in self._layout.toggle_actions():
             panels_menu.addAction(action)
 
         # Вкладки боковой колонки — там же, где панели: для человека это одно
         # и то же «показать нужное», а чем оно устроено внутри — вкладкой или
         # доком — вопрос не его.
-        column_menu = menus["Вид"].addMenu("Колонка свойств")
+        column_menu = menus[tr('Вид')].addMenu(tr('Колонка свойств'))
         for key in self.inspector.panel_keys():
             action = QAction(self.inspector.panel_title(key), self)
             action.triggered.connect(lambda _=False, k=key: self.show_panel(k))
             column_menu.addAction(action)
         column_menu.addSeparator()
-        detach = QAction("Вынести открытую вкладку", self)
-        detach.setToolTip("Отдельное окно; его закрытие вернёт вкладку назад")
+        detach = QAction(tr('Вынести открытую вкладку'), self)
+        detach.setToolTip(tr('Отдельное окно; его закрытие вернёт вкладку назад'))
         detach.triggered.connect(self._detach_current_panel)
         column_menu.addAction(detach)
-        collect = QAction("Собрать все вкладки обратно", self)
+        collect = QAction(tr('Собрать все вкладки обратно'), self)
         collect.triggered.connect(self.collect_panels)
         column_menu.addAction(collect)
 
-        plugins_menu = menus.get("Плагины")
+        plugins_menu = menus.get(tr('Плагины'))
         if plugins_menu is not None:
             self._plugins_menu = plugins_menu
             # Меню собирается при каждом открытии: состав действий меняется
@@ -689,7 +689,7 @@ class MainWindow(QMainWindow):
 
         found = self._plugins.plugins
         if not found:
-            empty = menu.addAction("Плагинов не найдено")
+            empty = menu.addAction(tr('Плагинов не найдено'))
             empty.setEnabled(False)
             return
 
@@ -720,8 +720,8 @@ class MainWindow(QMainWindow):
                 )
 
         menu.addSeparator()
-        manage = menu.addAction("Настройка плагинов…")
-        manage.triggered.connect(lambda: self.open_preferences("Плагины"))
+        manage = menu.addAction(tr('Настройка плагинов…'))
+        manage.triggered.connect(lambda: self.open_preferences(tr('Плагины')))
 
     @staticmethod
     def _plugin_caption(plugin) -> str:
@@ -739,11 +739,11 @@ class MainWindow(QMainWindow):
             return
 
         if active and updated.state is not PluginState.LOADED:
-            self._show_status(f"Плагин «{name}» не запустился: {updated.reason}")
+            self._show_status(tr('Плагин «{0}» не запустился: {1}').format(name, updated.reason))
         else:
             self._show_status(
-                f"Плагин «{updated.info.title}» "
-                + ("включён" if active else "выключен")
+                tr('Плагин «{0}» ').format(updated.info.title)
+                + (tr('включён') if active else tr('выключен'))
             )
 
         # Проверки пересчитываются: правило плагина только что появилось или
@@ -758,7 +758,7 @@ class MainWindow(QMainWindow):
         try:
             spec.callback()
         except Exception as exc:
-            self._show_status(f"Плагин: «{spec.title}» — {exc}")
+            self._show_status(tr('Плагин: «{0}» — {1}').format(spec.title, exc))
 
     def open_command_palette(self) -> None:
         """Поиск по всем командам приложения."""
@@ -874,15 +874,15 @@ class MainWindow(QMainWindow):
         self.qc_panel.refresh()
         issues = self._qc.all_issues()
 
-        suggested = "проверка.html"
+        suggested = tr('проверка.html')
         if self._doc.source_path is not None:
-            suggested = f"{self._doc.source_path.stem} — проверка.html"
+            suggested = tr('{0} — проверка.html').format(self._doc.source_path.stem)
         elif self._project is not None and self._project.path is not None:
-            suggested = f"{self._project.path.stem} — проверка.html"
+            suggested = tr('{0} — проверка.html').format(self._project.path.stem)
 
         path, _ = QFileDialog.getSaveFileName(
-            self, "Отчёт о проверке", suggested,
-            "Страница HTML (*.html);;Таблица CSV (*.csv)",
+            self, tr('Отчёт о проверке'), suggested,
+            tr('Страница HTML (*.html);;Таблица CSV (*.csv)'),
         )
         if not path:
             return False
@@ -899,13 +899,13 @@ class MainWindow(QMainWindow):
             # BOM: Excel иначе открывает CSV с кириллицей крякозябрами.
             target.write_text(text, encoding="utf-8-sig")
         except OSError as exc:
-            QMessageBox.warning(self, "Отчёт", f"Не удалось записать:\n{exc}")
+            QMessageBox.warning(self, tr('Отчёт'), f"Не удалось записать:\n{exc}")
             return False
 
         from sfstudio.ui.safe_text import plural
 
-        found = plural(len(issues), "замечание", "замечания", "замечаний")
-        self._show_status(f"Отчёт сохранён: {target.name} · {found}")
+        found = plural(len(issues), tr('замечание'), tr('замечания'), tr('замечаний'))
+        self._show_status(tr('Отчёт сохранён: {0} · {1}').format(target.name, found))
         return True
 
     # -- глоссарий ----------------------------------------------------------------- #
@@ -940,14 +940,14 @@ class MainWindow(QMainWindow):
         self.qc_panel.refresh()
 
         if self._glossary is None:
-            self._show_status("Глоссарий пуст")
+            self._show_status(tr('Глоссарий пуст'))
             return
 
         from sfstudio.ui.safe_text import plural
 
-        count = plural(len(self._glossary), "термин", "термина", "терминов")
-        note = "" if self._reference else " · оригинал не подключён"
-        self._show_status(f"Глоссарий: {count}{note}")
+        count = plural(len(self._glossary), tr('термин'), tr('термина'), tr('терминов'))
+        note = "" if self._reference else tr(' · оригинал не подключён')
+        self._show_status(tr('Глоссарий: {0}{1}').format(count, note))
 
     # -- оригинал для перевода ---------------------------------------------------- #
 
@@ -961,8 +961,8 @@ class MainWindow(QMainWindow):
 
         start = str(self._doc.source_path or self._settings.get("project.folder", "") or "")
         path, _ = QFileDialog.getOpenFileName(
-            self, "Открыть оригинал", start,
-            "Субтитры (*.ass *.ssa *.srt *.vtt *.ttml *.dfxp);;Все файлы (*)",
+            self, tr('Открыть оригинал'), start,
+            tr('Субтитры (*.ass *.ssa *.srt *.vtt *.ttml *.dfxp);;Все файлы (*)'),
         )
         if not path:
             return False
@@ -972,14 +972,14 @@ class MainWindow(QMainWindow):
             document = registry.load(target)
         except Exception as exc:
             QMessageBox.critical(
-                self, "Не удалось открыть оригинал",
+                self, tr('Не удалось открыть оригинал'),
                 f"{target}\n\n{exc}",
             )
             return False
 
         if not document.events:
             QMessageBox.warning(
-                self, "Оригинал", f"В файле нет ни одной реплики:\n{target}"
+                self, tr('Оригинал'), f"В файле нет ни одной реплики:\n{target}"
             )
             return False
 
@@ -1001,7 +1001,7 @@ class MainWindow(QMainWindow):
         if share >= 0.25:
             return
         QMessageBox.warning(
-            self, "Оригинал почти не совпадает",
+            self, tr('Оригинал почти не совпадает'),
             f"Совпадений по времени: {share * 100:.0f} %.\n\n"
             "Похоже, это оригинал от другой серии или с другими таймингами. "
             "Файл подключён — проверьте, тот ли он.",
@@ -1031,13 +1031,13 @@ class MainWindow(QMainWindow):
         if not announce:
             return
         if self._reference is None:
-            self._show_status("Оригинал отключён")
+            self._show_status(tr('Оригинал отключён'))
         else:
             from sfstudio.ui.safe_text import plural
 
-            source = self._reference.source or "оригинал"
-            count = plural(len(self._reference), "строка", "строки", "строк")
-            self._show_status(f"Оригинал: {source} · {count}")
+            source = self._reference.source or tr('оригинал')
+            count = plural(len(self._reference), tr('строка'), tr('строки'), tr('строк'))
+            self._show_status(tr('Оригинал: {0} · {1}').format(source, count))
 
     # -- проект ------------------------------------------------------------------ #
 
@@ -1051,7 +1051,7 @@ class MainWindow(QMainWindow):
         try:
             project = load_project(path)
         except ProjectError as exc:
-            QMessageBox.critical(self, "Не удалось открыть проект", str(exc))
+            QMessageBox.critical(self, tr('Не удалось открыть проект'), str(exc))
             return False
 
         self._project = project
@@ -1070,13 +1070,13 @@ class MainWindow(QMainWindow):
             if project.media_path.is_file():
                 self.load_media(project.media_path)
             else:
-                self._show_status(f"Видео не найдено: {project.media_path}")
+                self._show_status(tr('Видео не найдено: {0}').format(project.media_path))
 
         self._restore_state(project.state)
         self._undo.mark_clean()
         self._refresh_title()
         self._show_status(
-            f"Проект «{project.display_name}» · {len(self._doc)} событий"
+            tr('Проект «{0}» · {1} событий').format(project.display_name, len(self._doc))
         )
         return True
 
@@ -1141,7 +1141,7 @@ class MainWindow(QMainWindow):
         if self._project is None or self._project.path is None:
             return None
         path = self._project.path
-        return path.with_name(f"{path.stem}.автосохранение{path.suffix}")
+        return path.with_name(tr('{0}.автосохранение{1}').format(path.stem, path.suffix))
 
     def _autosave(self) -> None:
         """Пишет копию проекта, не трогая сам файл и не помечая его чистым.
@@ -1166,17 +1166,17 @@ class MainWindow(QMainWindow):
             # Диск мог отвалиться, папка — стать недоступной. Автосохранение
             # не повод прерывать работу: сообщаем в строке состояния и живём
             # дальше, а следующий тик попробует снова.
-            self._show_status(f"Автосохранение не удалось: {exc}")
+            self._show_status(tr('Автосохранение не удалось: {0}').format(exc))
             return
-        self._show_status(f"Автосохранение: {target.name}")
+        self._show_status(tr('Автосохранение: {0}').format(target.name))
 
     def save_project_as(self) -> bool:
         if self._project is not None and self._project.path is not None:
             suggested = str(self._project.path)
         else:
-            suggested = str(Path(self._default_project_folder()) / "Новый проект.sfproj")
+            suggested = str(Path(self._default_project_folder()) / tr('Новый проект.sfproj'))
         path, _ = QFileDialog.getSaveFileName(
-            self, "Сохранить проект", suggested, PROJECT_FILTER
+            self, tr('Сохранить проект'), suggested, PROJECT_FILTER
         )
         return self._write_project(Path(path)) if path else False
 
@@ -1193,7 +1193,7 @@ class MainWindow(QMainWindow):
         try:
             written = save_project(self._project, path)
         except ProjectError as exc:
-            QMessageBox.critical(self, "Не удалось сохранить проект", str(exc))
+            QMessageBox.critical(self, tr('Не удалось сохранить проект'), str(exc))
             return False
 
         self._settings.push_recent("projects", written)
@@ -1206,7 +1206,7 @@ class MainWindow(QMainWindow):
             with contextlib.suppress(OSError):
                 stale.unlink(missing_ok=True)
         self._refresh_title()
-        self._show_status(f"Проект сохранён: {written.name}")
+        self._show_status(tr('Проект сохранён: {0}').format(written.name))
         return True
 
     def _maybe_restore_autosave(self, path: Path) -> Path:
@@ -1217,7 +1217,7 @@ class MainWindow(QMainWindow):
         тех правок намеренно; молча игнорировать тоже нельзя, иначе смысл
         автосохранения теряется. Поэтому вопрос, и по умолчанию — проект.
         """
-        backup = path.with_name(f"{path.stem}.автосохранение{path.suffix}")
+        backup = path.with_name(tr('{0}.автосохранение{1}').format(path.stem, path.suffix))
         try:
             if not backup.is_file() or backup.stat().st_mtime <= path.stat().st_mtime:
                 return path
@@ -1229,7 +1229,7 @@ class MainWindow(QMainWindow):
         when = datetime.fromtimestamp(backup.stat().st_mtime).strftime("%d.%m.%Y %H:%M")
         answer = QMessageBox.question(
             self,
-            "Найдено автосохранение",
+            tr('Найдено автосохранение'),
             f"Рядом с проектом лежит копия, сделанная позже последнего "
             f"сохранения ({when}).\n\n"
             f"Похоже, прошлый сеанс завершился неожиданно.\n\n"
@@ -1260,7 +1260,7 @@ class MainWindow(QMainWindow):
 
         path = dialog.project_path()
         if path is None:
-            QMessageBox.warning(self, "Новый проект", "Укажите название и папку.")
+            QMessageBox.warning(self, tr('Новый проект'), tr('Укажите название и папку.'))
             return False
 
         project = dialog.build()
@@ -1272,7 +1272,7 @@ class MainWindow(QMainWindow):
         if media is not None and media.is_file():
             self.load_media(media)
         elif media is not None:
-            self._show_status(f"Видео не найдено: {media}")
+            self._show_status(tr('Видео не найдено: {0}').format(media))
 
         return self._write_project(path)
 
@@ -1291,7 +1291,7 @@ class MainWindow(QMainWindow):
         if media is not None and media.is_file():
             self.load_media(media)
         elif media is not None:
-            self._show_status(f"Видео не найдено: {media}")
+            self._show_status(tr('Видео не найдено: {0}').format(media))
 
         return self._write_project(path)
 
@@ -1299,7 +1299,7 @@ class MainWindow(QMainWindow):
         if not self._confirm_discard():
             return
         path, _ = QFileDialog.getOpenFileName(
-            self, "Открыть проект", self._default_project_folder(), PROJECT_FILTER
+            self, tr('Открыть проект'), self._default_project_folder(), PROJECT_FILTER
         )
         if path:
             self.open_project_file(Path(path))
@@ -1315,8 +1315,8 @@ class MainWindow(QMainWindow):
             return True
         answer = QMessageBox.question(
             self,
-            "Несохранённые изменения",
-            "В проекте есть несохранённые изменения. Сохранить их?",
+            tr('Несохранённые изменения'),
+            tr('В проекте есть несохранённые изменения. Сохранить их?'),
             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
         )
         if answer == QMessageBox.Cancel:
@@ -1357,7 +1357,7 @@ class MainWindow(QMainWindow):
         text = clipboard.text() if clipboard is not None else ""
         text = text.strip()
         if not text:
-            self._show_status("Буфер обмена пуст")
+            self._show_status(tr('Буфер обмена пуст'))
             return
 
         where = str(self._settings.get("editing.paste_at", "playhead"))
@@ -1367,8 +1367,8 @@ class MainWindow(QMainWindow):
             if position is None:
                 # Мышь не над дорожками — не место придумывать за человека.
                 self._show_status(
-                    "Наведите указатель на дорожку субтитров или переключите "
-                    "вставку на курсор в настройках"
+                    tr('Наведите указатель на дорожку субтитров или переключите вставку на '
+                           'курсор в настройках')
                 )
                 return
 
@@ -1386,7 +1386,7 @@ class MainWindow(QMainWindow):
         if created is None:
             return
         self._select_eid(created)
-        self._show_status(f"Вставлена реплика: {len(prepared)} знаков")
+        self._show_status(tr('Вставлена реплика: {0} знаков').format(len(prepared)))
 
     def open_find(self) -> None:
         """Открывает поиск. Второй вызов поднимает уже открытое окно.
@@ -1453,10 +1453,10 @@ class MainWindow(QMainWindow):
         """Назначает говорящего всем выделенным репликам одной командой."""
         chosen = self._selected_eids()
         if not chosen:
-            self._show_status("Сначала выберите реплики в таблице или на таймлайне")
+            self._show_status(tr('Сначала выберите реплики в таблице или на таймлайне'))
             return
         self._undo.run(self.actor_command(chosen, name))
-        self._show_status(f"«{name}» назначен {len(chosen)} репликам")
+        self._show_status(tr('«{0}» назначен {1} репликам').format(name, len(chosen)))
 
     def label_template(self) -> str:
         """Шаблон метки говорящего по настройкам. Пустая — метки выключены."""
@@ -1514,17 +1514,17 @@ class MainWindow(QMainWindow):
             self._doc.actors.names(),
         )
         if not changes:
-            self._show_status("Метки говорящих уже в порядке")
+            self._show_status(tr('Метки говорящих уже в порядке'))
             return
 
         self._undo.run(
             CompositeCommand(
                 [SetText(eid, text) for eid, text in changes.items()],
-                label=f"Метки говорящих: {len(changes)} реплик",
+                label=tr('Метки говорящих: {0} реплик').format(len(changes)),
             )
         )
-        action = "убраны из" if not template else "проставлены в"
-        self._show_status(f"Метки говорящих {action} {len(changes)} репликах")
+        action = tr('убраны из') if not template else tr('проставлены в')
+        self._show_status(tr('Метки говорящих {0} {1} репликах').format(action, len(changes)))
 
     def _actor_names(self) -> list[str]:
         """Имена акторов для выпадающего списка, с пустым в начале.
@@ -1557,22 +1557,23 @@ class MainWindow(QMainWindow):
             player.volume = float(self._settings.get("media.volume", 80.0) or 0.0)
 
     def open_subtitles(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Открыть субтитры", "", SUBTITLE_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, tr('Открыть субтитры'), "", SUBTITLE_FILTER)
         if not path:
             return
         try:
             doc = registry.load(Path(path))
         except Exception as exc:
-            QMessageBox.critical(self, "Не удалось открыть", f"{type(exc).__name__}: {exc}")
+            QMessageBox.critical(self, tr('Не удалось открыть'), f"{type(exc).__name__}: {exc}")
             return
         self._load_document(doc)
-        note = f"Открыт {Path(path).name} · {len(doc)} событий · {doc.source_encoding}"
+        note = tr('Открыт {0} · {1} событий · '
+               '{2}').format(Path(path).name, len(doc), doc.source_encoding)
         if doc.script_info.play_res_inferred:
-            note += " · PlayRes не задан, подставлен 1920×1080"
+            note += tr(' · PlayRes не задан, подставлен 1920×1080')
         self._show_status(note)
 
     def open_media(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Открыть видео или аудио", "", MEDIA_FILTER)
+        path, _ = QFileDialog.getOpenFileName(self, tr('Открыть видео или аудио'), "", MEDIA_FILTER)
         if path:
             self.load_media(Path(path))
 
@@ -1583,7 +1584,7 @@ class MainWindow(QMainWindow):
         try:
             info = probe(path)
         except MediaProbeError as exc:
-            QMessageBox.critical(self, "Не удалось открыть медиа", str(exc))
+            QMessageBox.critical(self, tr('Не удалось открыть медиа'), str(exc))
             return
 
         self._media_path = path
@@ -1612,14 +1613,14 @@ class MainWindow(QMainWindow):
                 self._doc.script_info.play_res_y = h
                 self.preview.update()
 
-        self.timeline.set_peaks(None, "чтение звука…")
+        self.timeline.set_peaks(None, tr('чтение звука…'))
         self.timeline.set_keyframes(None)
 
         # Видео подключаем лениво: libmpv может отсутствовать, и это не повод
         # отказывать в открытии файла — волна и тайминги работают и без неё.
         note = self.video_pane.attach_player()
         if info.has_video and not self.video_pane.load_media(path):
-            self._show_status(f"Видео не воспроизводится: {note}")
+            self._show_status(tr('Видео не воспроизводится: {0}').format(note))
         else:
             # Открытие файла — не команда «играй». Пользователь открывает
             # видео, чтобы расставлять по нему субтитры, и уехавшая с места
@@ -1629,7 +1630,7 @@ class MainWindow(QMainWindow):
         if info.has_audio:
             self._start_peaks(path, token)
         else:
-            self.timeline.set_peaks(None, "в файле нет аудиодорожки")
+            self.timeline.set_peaks(None, tr('в файле нет аудиодорожки'))
 
         if info.has_video:
             self._start_keyframes(path, token)
@@ -1638,8 +1639,12 @@ class MainWindow(QMainWindow):
         self._offer_embedded_tracks(path, info)
         size = f"{info.video.display_size[0]}×{info.video.display_size[1]}" if info.video else "—"
         self._show_status(
-            f"Медиа: {path.name} · {info.duration_ms / 1000:.1f} с · {size} · "
-            f"{'звук есть' if info.has_audio else 'без звука'}"
+            tr('Медиа: {0} · {1:.1f} с · {2} · '
+                   '{3}').format(
+                       path.name,
+                       info.duration_ms / 1000,
+                       size,
+                       'звук есть' if info.has_audio else 'без звука')
         )
 
     def _apply_playback_defaults(self) -> None:
@@ -1691,15 +1696,15 @@ class MainWindow(QMainWindow):
 
         if not editable:
             self._show_status(
-                f"В файле есть дорожки субтитров ({len(info.subtitles)}), "
-                "но все они — картинки: для правки нужен OCR"
+                tr('В файле есть дорожки субтитров ({0}), но все они — картинки: для '
+                       'правки нужен OCR').format(len(info.subtitles))
             )
             return
 
         if not self._undo.is_clean:
             answer = QMessageBox.question(
                 self,
-                "Несохранённые изменения",
+                tr('Несохранённые изменения'),
                 "В файле есть вшитые субтитры, но текущий документ изменён.\n"
                 "Открыть дорожку из контейнера, потеряв правки?",
                 QMessageBox.Yes | QMessageBox.No,
@@ -1720,7 +1725,7 @@ class MainWindow(QMainWindow):
         try:
             doc = extract_subtitles(path, stream_index)
         except ContainerError as exc:
-            QMessageBox.critical(self, "Не удалось извлечь дорожку", str(exc))
+            QMessageBox.critical(self, tr('Не удалось извлечь дорожку'), str(exc))
             return
         self._load_document(doc)
         self._embedded_index = stream_index
@@ -1728,7 +1733,7 @@ class MainWindow(QMainWindow):
         # некуда, поэтому путь не выставляем — Ctrl+S спросит имя.
         doc.source_path = None
         self._show_status(
-            f"Открыта вшитая дорожка #{stream_index}: {len(doc)} событий"
+            tr('Открыта вшитая дорожка #{0}: {1} событий').format(stream_index, len(doc))
         )
 
     def save_into_container(self) -> None:
@@ -1739,15 +1744,16 @@ class MainWindow(QMainWindow):
 
         if self._media_path is None:
             QMessageBox.information(
-                self, "Нет медиафайла",
-                "Сначала откройте видео: субтитры записываются в него."
+                self, tr('Нет медиафайла'),
+                tr('Сначала откройте видео: субтитры записываются в него.')
             )
             return
         if not ffmpeg_available():
             QMessageBox.warning(
-                self, "ffmpeg не найден",
-                "Запись в контейнер требует ffmpeg. Установите его или положите "
-                "рядом с нативными библиотеками."
+                self, tr('ffmpeg не '
+                       'найден'),
+                tr('Запись в контейнер требует ffmpeg. Установите его или положите '
+                    'рядом с нативными библиотеками.')
             )
             return
 
@@ -1758,7 +1764,7 @@ class MainWindow(QMainWindow):
             f"{ext.upper().lstrip('.')} (*{ext})" for ext in sorted(CONTAINER_CODEC)
         )
         target, _ = QFileDialog.getSaveFileName(
-            self, "Сохранить контейнер как", suggested, filters
+            self, tr('Сохранить контейнер как'), suggested, filters
         )
         if not target:
             return
@@ -1788,13 +1794,13 @@ class MainWindow(QMainWindow):
                 progress=lambda f: self.progress.setValue(int(f * 100)),
             )
         except ContainerError as exc:
-            QMessageBox.critical(self, "Не удалось записать контейнер", str(exc))
+            QMessageBox.critical(self, tr('Не удалось записать контейнер'), str(exc))
             return
         finally:
             self.progress.hide()
             temporary.unlink(missing_ok=True)
 
-        self._show_status(f"Записано: {output.name}")
+        self._show_status(tr('Записано: {0}').format(output.name))
 
     # -- результаты фоновых задач ---------------------------------------------- #
 
@@ -1814,26 +1820,26 @@ class MainWindow(QMainWindow):
             return
         self.progress.hide()
         self.timeline.set_peaks(data)
-        self._show_status("Волна построена")
+        self._show_status(tr('Волна построена'))
 
     def _on_keyframes_ready(self, token: int, index: object) -> None:
         if self._stale(token):
             return
         self.timeline.set_keyframes(index)  # type: ignore[arg-type]
-        self._show_status(f"Ключевых кадров: {len(index)}")  # type: ignore[arg-type]
+        self._show_status(tr('Ключевых кадров: {0}').format(len(index)))  # type: ignore[arg-type]
 
     def _on_no_audio(self, token: int) -> None:
         if self._stale(token):
             return
         self.progress.hide()
-        self.timeline.set_peaks(None, "в файле нет аудиодорожки")
+        self.timeline.set_peaks(None, tr('в файле нет аудиодорожки'))
 
     def _on_task_failed(self, token: int, message: str) -> None:
         if self._stale(token):
             return
         self.progress.hide()
-        self.timeline.set_peaks(None, "не удалось прочитать звук")
-        self._show_status(f"Ошибка фоновой задачи: {message}")
+        self.timeline.set_peaks(None, tr('не удалось прочитать звук'))
+        self._show_status(tr('Ошибка фоновой задачи: {0}').format(message))
 
     # -- сохранение ------------------------------------------------------------- #
 
@@ -1845,7 +1851,7 @@ class MainWindow(QMainWindow):
 
     def save_file_as(self) -> None:
         suggested = str(self._doc.source_path or "subtitles.ass")
-        path, _ = QFileDialog.getSaveFileName(self, "Сохранить как", suggested, SUBTITLE_FILTER)
+        path, _ = QFileDialog.getSaveFileName(self, tr('Сохранить как'), suggested, SUBTITLE_FILTER)
         if path:
             self._save_to(Path(path))
 
@@ -1853,11 +1859,11 @@ class MainWindow(QMainWindow):
         try:
             registry.save(self._doc, path)
         except Exception as exc:
-            QMessageBox.critical(self, "Не удалось сохранить", f"{type(exc).__name__}: {exc}")
+            QMessageBox.critical(self, tr('Не удалось сохранить'), f"{type(exc).__name__}: {exc}")
             return
         self._undo.mark_clean()
         self._refresh_title()
-        self._show_status(f"Сохранено: {path.name}")
+        self._show_status(tr('Сохранено: {0}').format(path.name))
 
     # -- правка ------------------------------------------------------------------ #
 
@@ -1915,7 +1921,7 @@ class MainWindow(QMainWindow):
         if len(allowed) < len(chosen):
             skipped = len(chosen) - len(allowed)
             self._show_status(
-                f"Пропущено {plural_events(skipped)} на заблокированных дорожках"
+                tr('Пропущено {0} на заблокированных дорожках').format(plural_events(skipped))
             )
         return allowed
 
@@ -1969,7 +1975,8 @@ class MainWindow(QMainWindow):
         self._qc.set_profile(PROFILES[key], self._doc)
         self.qc_panel.refresh()
         self.model.refresh_qc()
-        self._show_status(f"Профиль QC: {PROFILES[key].name} · {self._qc.summary()}")
+        self._show_status(tr('Профиль QC: {0} · {1}').format(PROFILES[key].name,
+            self._qc.summary()))
 
     def goto_next_question(self) -> None:
         """К следующей реплике с пометкой «вопрос», по кругу.
@@ -1981,7 +1988,7 @@ class MainWindow(QMainWindow):
 
         marked = questions(self._doc.events)
         if not marked:
-            self._show_status("Реплик с вопросом нет")
+            self._show_status(tr('Реплик с вопросом нет'))
             return
 
         current = self._current_eid()
@@ -1995,13 +2002,13 @@ class MainWindow(QMainWindow):
         note = self._doc.by_eid(target).note
         place = marked.index(target) + 1
         self._show_status(
-            f"Вопрос {place} из {len(marked)}" + (f": {note}" if note else "")
+            tr('Вопрос {0} из {1}').format(place, len(marked)) + (f": {note}" if note else "")
         )
 
     def goto_next_issue(self) -> None:
         eid = self.qc_panel.go_to_next(self._current_eid())
         if eid is None:
-            self._show_status("Проблем не найдено")
+            self._show_status(tr('Проблем не найдено'))
             return
         self._select_eid(eid)
         # Короткая вспышка по таблице: строка выбрана, но при переходе через
@@ -2222,7 +2229,7 @@ class MainWindow(QMainWindow):
 
     def _on_speed_selected(self, value: float) -> None:
         self.video_pane.set_speed(value)
-        self._show_status(f"Скорость: {value:g}×")
+        self._show_status(tr('Скорость: {0:g}×').format(value))
 
     def step_speed(self, faster: bool) -> None:
         self.transport.step_speed(faster)
@@ -2238,7 +2245,7 @@ class MainWindow(QMainWindow):
         target = max(0.0, min(100.0, self.transport.volume() + step))
         self.transport.set_volume(target)
         self._on_volume_changed(target)
-        self._show_status(f"Громкость: {target:.0f} %")
+        self._show_status(tr('Громкость: {0:.0f} %').format(target))
 
     def toggle_mute(self) -> None:
         self.transport.btn_mute.toggle()
@@ -2278,7 +2285,7 @@ class MainWindow(QMainWindow):
         self._on_widget_edit()
         self.timeline.update()
         self._show_status(
-            f"Дорожек: {len(self._doc.tracks.subtitles)}"
+            tr('Дорожек: {0}').format(len(self._doc.tracks.subtitles))
         )
 
     # -- распознавание речи -------------------------------------------------- #
@@ -2345,14 +2352,14 @@ class MainWindow(QMainWindow):
         )
 
         self._undo.run(
-            CompositeCommand(commands, label=f"Распознано реплик: {len(segments)}")
+            CompositeCommand(commands, label=tr('Распознано реплик: {0}').format(len(segments)))
         )
         self._on_widget_edit()
         self.model.reset_document(self._doc)
         self._qc.run_all(self._doc)
         self.model.refresh_qc()
         self._select_row(0)
-        self._show_status(f"Вставлено реплик: {len(segments)}")
+        self._show_status(tr('Вставлено реплик: {0}').format(len(segments)))
 
     def open_actors(self) -> None:
         """Диалог управления акторами."""
@@ -2423,10 +2430,12 @@ class MainWindow(QMainWindow):
         self.undo_action.setEnabled(self._undo.can_undo)
         self.redo_action.setEnabled(self._undo.can_redo)
         self.undo_action.setText(
-            f"Отменить: {self._undo.undo_label}" if self._undo.can_undo else "Отменить"
+            tr('Отменить: {0}').format(
+                self._undo.undo_label) if self._undo.can_undo else tr('Отменить')
         )
         self.redo_action.setText(
-            f"Вернуть: {self._undo.redo_label}" if self._undo.can_redo else "Вернуть"
+            tr('Вернуть: {0}').format(
+                self._undo.redo_label) if self._undo.can_redo else tr('Вернуть')
         )
 
     def _refresh_title(self) -> None:
@@ -2441,7 +2450,7 @@ class MainWindow(QMainWindow):
         elif self._doc.source_path is not None:
             name = self._doc.source_path.name
         else:
-            name = "Без имени"
+            name = tr('Без имени')
         media = f" — {self._media_path.name}" if self._media_path else ""
         dirty = "" if self._undo.is_clean else " •"
         self.setWindowTitle(f"{name}{dirty}{media} — SubtitleForge Studio")
@@ -2449,9 +2458,12 @@ class MainWindow(QMainWindow):
     def _show_status(self, text: str) -> None:
         self.statusBar().showMessage(text, 6000)
         self.status_label.setText(
-            f"{len(self._doc)} событий{self._progress_note()}   |   "
-            f"{self._doc.script_info.play_res_x}×{self._doc.script_info.play_res_y}   |   "
-            f"{self._doc.source_format.upper()}"
+            tr('{0} событий{1}   |   {2}×{3}   |   {4}').format(
+                len(self._doc),
+                self._progress_note(),
+                self._doc.script_info.play_res_x,
+                self._doc.script_info.play_res_y,
+                self._doc.source_format.upper())
         )
 
     def _progress_note(self) -> str:
@@ -2463,7 +2475,7 @@ class MainWindow(QMainWindow):
         from sfstudio.core.workflow import progress
 
         done, total = progress(self._doc.events)
-        return f"   |   готово {done} из {total}" if done else ""
+        return tr('   |   готово {0} из {1}').format(done, total) if done else ""
 
     def _timing_selection(self) -> list:
         """Выделенные события, либо пусто."""
@@ -2474,7 +2486,7 @@ class MainWindow(QMainWindow):
         from sfstudio.ui.timing_dialog import AutoTimingDialog
 
         if not self._doc.events:
-            self._show_status("Нет событий для доводки")
+            self._show_status(tr('Нет событий для доводки'))
             return
 
         dialog = AutoTimingDialog(
@@ -2489,7 +2501,7 @@ class MainWindow(QMainWindow):
         plan = dialog.plan()
         if plan.is_empty:
             return
-        self._undo.run(ApplyTimings(plan.as_mapping(), label="Доводка таймингов"))
+        self._undo.run(ApplyTimings(plan.as_mapping(), label=tr('Доводка таймингов')))
         self._show_status(plan.summary())
 
     def open_script_import(self) -> None:
@@ -2529,7 +2541,7 @@ class MainWindow(QMainWindow):
             for line, (start, end) in zip(lines, times, strict=True)
         ]
         self._undo.run(
-            CompositeCommand(commands, label=f"Импорт текста: {len(lines)}")
+            CompositeCommand(commands, label=tr('Импорт текста: {0}').format(len(lines)))
         )
         self._on_widget_edit()
         self.model.reset_document(self._doc)
@@ -2537,7 +2549,7 @@ class MainWindow(QMainWindow):
         self.model.refresh_qc()
         self._select_row(0)
         self._show_status(
-            f"Импортировано реплик: {len(lines)}. Тайминг — «Выровнять текст по речи»"
+            tr('Импортировано реплик: {0}. Тайминг — «Выровнять текст по речи»').format(len(lines))
         )
 
     # -- боковая колонка ------------------------------------------------------ #
@@ -2607,7 +2619,7 @@ class MainWindow(QMainWindow):
         window.move(cursor.x() - 40, cursor.y() + 10)
         window.show()
         self._detached[key] = window
-        self._show_status(f"«{self.inspector.panel_title(key)}» — в отдельном окне")
+        self._show_status(tr('«{0}» — в отдельном окне').format(self.inspector.panel_title(key)))
 
     def attach_panel(self, key: str) -> None:
         """Возвращает вынесенную вкладку обратно в колонку."""
@@ -2680,13 +2692,13 @@ class MainWindow(QMainWindow):
             commands.append(ApplyStyleToEvents(moving, name))
 
         self._undo.run(
-            CompositeCommand(commands, label=f"Оформление стиля «{name}»")
+            CompositeCommand(commands, label=tr('Оформление стиля «{0}»').format(name))
         )
         self._on_widget_edit()
         self.model.reset_document(self._doc)
         self.preview.update()
-        where = "ко всем репликам" if to_all else f"к выделенным ({len(moving)})"
-        self._show_status(f"Стиль «{name}» обновлён и применён {where}")
+        where = tr('ко всем репликам') if to_all else tr('к выделенным ({0})').format(len(moving))
+        self._show_status(tr('Стиль «{0}» обновлён и применён {1}').format(name, where))
 
     # -- маркеры ------------------------------------------------------------- #
 
@@ -2708,26 +2720,26 @@ class MainWindow(QMainWindow):
 
     def goto_next_marker(self) -> None:
         if not self.timeline.goto_next_marker():
-            self._show_status("Дальше маркеров нет")
+            self._show_status(tr('Дальше маркеров нет'))
 
     def goto_previous_marker(self) -> None:
         if not self.timeline.goto_previous_marker():
-            self._show_status("Раньше маркеров нет")
+            self._show_status(tr('Раньше маркеров нет'))
 
     def clear_markers(self) -> None:
         """Убирает все маркеры — по подтверждению и одним шагом отмены."""
         total = len(self._doc.markers)
         if not total:
-            self._show_status("Маркеров нет")
+            self._show_status(tr('Маркеров нет'))
             return
         from sfstudio.core.plural import plural
 
         answer = QMessageBox.question(
             self,
-            "Убрать все маркеры",
-            "Убрать "
-            + plural(total, "маркер", "маркера", "маркеров")
-            + "? Это отменяется одним Ctrl+Z.",
+            tr('Убрать все маркеры'),
+            tr('Убрать ')
+            + plural(total, tr('маркер'), tr('маркера'), tr('маркеров'))
+            + tr('? Это отменяется одним Ctrl+Z.'),
         )
         if answer != QMessageBox.Yes:
             return
@@ -2746,8 +2758,8 @@ class MainWindow(QMainWindow):
 
         total = len(self._doc.markers)
         self._show_status(
-            "Маркеров нет" if not total
-            else "Всего " + plural(total, "маркер", "маркера", "маркеров")
+            tr('Маркеров нет') if not total
+            else tr('Всего ') + plural(total, tr('маркер'), tr('маркера'), tr('маркеров'))
         )
 
     def open_alignment(self) -> None:
@@ -2762,7 +2774,7 @@ class MainWindow(QMainWindow):
             # Подсказка, а не тупик: чаще всего текст ещё не загружен, и
             # человеку нужен соседний пункт меню, а не сообщение об отказе.
             self._show_status(
-                "Нет реплик. Сначала Файл → «Импорт текста без таймингов»"
+                tr('Нет реплик. Сначала Файл → «Импорт текста без таймингов»')
             )
             return
 
@@ -2778,7 +2790,7 @@ class MainWindow(QMainWindow):
         plan = dialog.plan()
         if plan.is_empty:
             return
-        self._undo.run(ApplyTimings(plan.as_mapping(), label="Выравнивание по речи"))
+        self._undo.run(ApplyTimings(plan.as_mapping(), label=tr('Выравнивание по речи')))
         self._show_status(plan.summary())
 
     def open_shift_times(self) -> None:
@@ -2786,7 +2798,7 @@ class MainWindow(QMainWindow):
         from sfstudio.ui.timing_dialog import ShiftTimesDialog
 
         if not self._doc.events:
-            self._show_status("Нет событий для сдвига")
+            self._show_status(tr('Нет событий для сдвига'))
             return
 
         dialog = ShiftTimesDialog(
@@ -2798,7 +2810,7 @@ class MainWindow(QMainWindow):
         if not mapping:
             return
         self._undo.run(ApplyTimings(mapping, label=dialog.describe()))
-        self._show_status(f"{dialog.describe()} · реплик: {len(mapping)}")
+        self._show_status(tr('{0} · реплик: {1}').format(dialog.describe(), len(mapping)))
 
     def open_style_presets(self) -> None:
         """Библиотека шаблонов. Применяет выбранное оформление к стилю события."""
@@ -2824,7 +2836,7 @@ class MainWindow(QMainWindow):
             self._undo.run(CreateStyle(_replace(chosen, name=target)))
         else:
             self._undo.run(UpdateStyle(target, chosen))
-        self._show_status(f"Оформление применено к стилю «{target}»")
+        self._show_status(tr('Оформление применено к стилю «{0}»').format(target))
 
     def _save_session(self) -> None:
         """Складывает раскладку и предпочтения в настройки перед выходом."""
@@ -2850,7 +2862,7 @@ class MainWindow(QMainWindow):
         """
         from sfstudio.render import renderer as render_mod
 
-        engine = "libass недоступна"
+        engine = tr('libass недоступна')
         try:
             if render_mod.available():
                 # Версию спрашиваем у уже работающего рендерера, а не заводим
@@ -2863,7 +2875,7 @@ class MainWindow(QMainWindow):
 
         QMessageBox.about(
             self,
-            "О программе",
+            tr('О программе'),
             f"<h3>SubtitleForge Studio {__version__}</h3>"
             "<p>Редактор субтитров: ASS и SubRip, покадровая правка таймингов, "
             "оформление, контроль качества и распознавание речи.</p>"
@@ -2900,8 +2912,8 @@ class MainWindow(QMainWindow):
             return
         answer = QMessageBox.question(
             self,
-            "Несохранённые изменения",
-            "Есть несохранённые изменения. Сохранить перед выходом?",
+            tr('Несохранённые изменения'),
+            tr('Есть несохранённые изменения. Сохранить перед выходом?'),
             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
         )
         if answer == QMessageBox.Save:
@@ -2964,7 +2976,7 @@ class _PluginBridge:
         layout = QVBoxLayout(dialog)
         layout.addWidget(view, 1)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
-        buttons.button(QDialogButtonBox.Close).setText("Закрыть")
+        buttons.button(QDialogButtonBox.Close).setText(tr('Закрыть'))
         buttons.rejected.connect(dialog.accept)
         layout.addWidget(buttons)
         dialog.exec()
@@ -2977,12 +2989,12 @@ def _demo_document() -> SubtitleDocument:
     doc = SubtitleDocument.blank((1920, 1080))
     doc.styles["Default"].fontsize = 54
 
-    note = SubtitleStyle(name="Надпись", fontsize=44, alignment=8)
+    note = SubtitleStyle(name=tr('Надпись'), fontsize=44, alignment=8)
     note.primary = doc.styles["Default"].primary
     doc.add_style(note)
 
-    doc.create_event(0, 4000, "Перетащите эту строку мышью")
-    doc.create_event(0, 4000, r"{\pos(300,220)}Надпись сверху слева", style="Надпись")
+    doc.create_event(0, 4000, tr('Перетащите эту строку мышью'))
+    doc.create_event(0, 4000, r"{\pos(300,220)}Надпись сверху слева", style=tr('Надпись'))
     doc.create_event(4500, 8000, r"Вторая реплика,\Nв две строки")
     doc.create_event(8500, 12_000, r"{\pos(960,540)\an5}По центру кадра")
     return doc

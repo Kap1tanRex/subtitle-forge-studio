@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
@@ -36,7 +37,7 @@ class AddTrack(Command):
     def __init__(self, name: str = "", layer: int | None = None) -> None:
         self.name = name
         self._layer = layer
-        self.label = "Новая дорожка"
+        self.label = tr('Новая дорожка')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         if self._layer is None:
@@ -46,7 +47,7 @@ class AddTrack(Command):
         return ChangeSet.tracks()
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._layer is not None, "revert до apply"
+        assert self._layer is not None, tr('revert до apply')
         doc.tracks.remove(self._layer)
         doc.bump_revision()
         return ChangeSet.tracks()
@@ -63,7 +64,7 @@ class RemoveTrack(Command):
         self._removed: Track | None = None
         self._moved: list[tuple[int, int]] = []          # (eid, прежний слой)
         self._saved: list[tuple[int, SubtitleEvent]] = []  # для удаления
-        self.label = "Удаление дорожки"
+        self.label = tr('Удаление дорожки')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         track = doc.tracks.by_layer(self.layer)
@@ -131,7 +132,7 @@ class UpdateTrack(Command):
         self.layer = layer
         self.after = after
         self._before: Track | None = None
-        self.label = "Правка дорожки"
+        self.label = tr('Правка дорожки')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         current = doc.tracks.by_layer(self.layer)
@@ -172,7 +173,7 @@ class SetTrackFlags(Command):
         self.locked = locked
         self.muted = muted
         self._before: tuple[bool, bool, bool] | None = None
-        self.label = "Свойства дорожки"
+        self.label = tr('Свойства дорожки')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         track = doc.tracks.by_layer(self.layer)
@@ -218,7 +219,7 @@ class MoveEventsToLayer(Command):
         self.eids = eids
         self.layer = layer
         self._before: list[tuple[int, int]] = []
-        self.label = "Перенос на дорожку"
+        self.label = tr('Перенос на дорожку')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         self._before = []

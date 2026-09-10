@@ -24,6 +24,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
 
@@ -47,9 +48,9 @@ class SearchScope(StrEnum):
     @property
     def title(self) -> str:
         return {
-            SearchScope.ALL: "Везде",
-            SearchScope.SELECTION: "В выделенных",
-            SearchScope.FROM_CURSOR: "От текущей реплики",
+            SearchScope.ALL: tr('Везде'),
+            SearchScope.SELECTION: tr('В выделенных'),
+            SearchScope.FROM_CURSOR: tr('От текущей реплики'),
         }[self]
 
 

@@ -21,6 +21,7 @@ import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 from sfstudio.core.style import SubtitleStyle
 from sfstudio.platform.paths import presets_dir
@@ -96,7 +97,7 @@ class StylePreset:
     def from_dict(cls, data: dict) -> StylePreset:
         raw = data.get("style")
         if not isinstance(raw, dict):
-            raise PresetError("в файле шаблона нет раздела style")
+            raise PresetError(tr('в файле шаблона нет раздела style'))
 
         def colour(key: str, fallback: RGBA) -> RGBA:
             try:
@@ -106,7 +107,7 @@ class StylePreset:
 
         base = SubtitleStyle()
         style = SubtitleStyle(
-            name=str(data.get("name", "Без имени")),
+            name=str(data.get("name", tr('Без имени'))),
             fontname=str(raw.get("fontname", base.fontname)),
             fontsize=float(raw.get("fontsize", base.fontsize)),
             primary=colour("primary", base.primary),
@@ -133,7 +134,7 @@ class StylePreset:
         if not 1 <= style.alignment <= 9:
             style.alignment = 2
         return cls(
-            name=str(data.get("name", "Без имени")),
+            name=str(data.get("name", tr('Без имени'))),
             style=style,
             description=str(data.get("description", "")),
         )
@@ -164,43 +165,43 @@ def _preset(
 #: Встроенные шаблоны — отправная точка, а не исчерпывающий набор.
 BUILTIN_PRESETS: tuple[StylePreset, ...] = (
     _preset(
-        "Классические белые",
-        "Белый текст с чёрной обводкой — то, что ждут от субтитров по умолчанию",
+        tr('Классические белые'),
+        tr('Белый текст с чёрной обводкой — то, что ждут от субтитров по умолчанию'),
         fontname="Arial", fontsize=48,
         primary=RGBA(255, 255, 255), outline_color=RGBA(0, 0, 0),
         outline=2.5, shadow=1.5,
     ),
     _preset(
-        "Крупные для телевизора",
-        "Увеличенный кегль и поля: читается с дивана и не липнет к краю экрана",
+        tr('Крупные для телевизора'),
+        tr('Увеличенный кегль и поля: читается с дивана и не липнет к краю экрана'),
         fontname="Arial", fontsize=68,
         primary=RGBA(255, 255, 255), outline_color=RGBA(0, 0, 0),
         outline=3.5, shadow=2.0, margin_v=60, margin_l=80, margin_r=80,
     ),
     _preset(
-        "Жёлтые",
-        "Тёплый жёлтый: заметнее на светлом и пёстром фоне",
+        tr('Жёлтые'),
+        tr('Тёплый жёлтый: заметнее на светлом и пёстром фоне'),
         fontname="Arial", fontsize=50,
         primary=RGBA(255, 222, 89), outline_color=RGBA(0, 0, 0),
         outline=2.5, shadow=1.5,
     ),
     _preset(
-        "Надпись сверху",
-        "Для вывесок и пояснений: прижата к верху кадра, курсив",
+        tr('Надпись сверху'),
+        tr('Для вывесок и пояснений: прижата к верху кадра, курсив'),
         fontname="Arial", fontsize=40, italic=True,
         primary=RGBA(255, 255, 255), outline_color=RGBA(0, 0, 0),
         outline=2.0, shadow=0.0, alignment=8, margin_v=30,
     ),
     _preset(
-        "Плашка",
-        "Непрозрачная подложка вместо обводки — для очень пёстрого видео",
+        tr('Плашка'),
+        tr('Непрозрачная подложка вместо обводки — для очень пёстрого видео'),
         fontname="Arial", fontsize=46,
         primary=RGBA(255, 255, 255), back_color=RGBA(0, 0, 0, 190),
         border_style=3, outline=1.0, shadow=0.0,
     ),
     _preset(
-        "Мелкие плотные",
-        "Компактный вариант для длинных реплик и плотного диалога",
+        tr('Мелкие плотные'),
+        tr('Компактный вариант для длинных реплик и плотного диалога'),
         fontname="Arial", fontsize=38,
         primary=RGBA(255, 255, 255), outline_color=RGBA(0, 0, 0),
         outline=2.0, shadow=1.0, margin_v=16,
@@ -258,7 +259,7 @@ class PresetLibrary:
         """Сохраняет шаблон. Запись атомарная."""
         name = preset.name.strip()
         if not name:
-            raise PresetError("у шаблона должно быть имя")
+            raise PresetError(tr('у шаблона должно быть имя'))
 
         self.directory.mkdir(parents=True, exist_ok=True)
         path = self.directory / f"{_safe_filename(name)}.json"
@@ -271,7 +272,7 @@ class PresetLibrary:
             )
             temporary.replace(path)
         except OSError as exc:
-            raise PresetError(f"не удалось сохранить шаблон: {exc}") from exc
+            raise PresetError(tr('не удалось сохранить шаблон: {0}').format(exc)) from exc
         finally:
             if temporary.exists():
                 temporary.unlink(missing_ok=True)

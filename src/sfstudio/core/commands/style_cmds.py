@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
@@ -27,7 +28,7 @@ class UpdateStyle(Command):
         # Имя стиля не меняем: на него ссылаются события.
         self.new_style = replace(new_style, name=name)
         self._before: SubtitleStyle | None = None
-        self.label = f"Изменить стиль «{name}»"
+        self.label = tr('Изменить стиль «{0}»').format(name)
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         if self._before is None:
@@ -53,7 +54,7 @@ class CreateStyle(Command):
 
     def __init__(self, style: SubtitleStyle) -> None:
         self.style = style
-        self.label = f"Новый стиль «{style.name}»"
+        self.label = tr('Новый стиль «{0}»').format(style.name)
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         doc.styles[self.style.name] = replace(self.style)
@@ -81,7 +82,7 @@ class DeleteStyle(Command):
         self.fallback = fallback
         self._removed: SubtitleStyle | None = None
         self._moved: list[int] = []
-        self.label = f"Удалить стиль «{name}»"
+        self.label = tr('Удалить стиль «{0}»').format(name)
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         self._removed = replace(doc.styles[self.name]) if self.name in doc.styles else None
@@ -110,7 +111,7 @@ class RenameStyle(Command):
         self.old_name = old_name
         self.new_name = new_name
         self._moved: list[int] = []
-        self.label = f"Переименовать стиль в «{new_name}»"
+        self.label = tr('Переименовать стиль в «{0}»').format(new_name)
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         style = doc.styles.pop(self.old_name, None)
@@ -142,7 +143,7 @@ class ApplyStyleToEvents(Command):
         self.eids = eids
         self.style_name = style_name
         self._before: dict[int, str] = {}
-        self.label = f"Стиль «{style_name}» для {len(eids)} событий"
+        self.label = tr('Стиль «{0}» для {1} событий').format(style_name, len(eids))
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         if not self._before:

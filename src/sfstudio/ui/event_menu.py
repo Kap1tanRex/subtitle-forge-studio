@@ -19,6 +19,7 @@ from collections.abc import Callable, Sequence
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import QInputDialog, QMenu, QWidget
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 from sfstudio.core.commands import (
     AddActor,
@@ -51,8 +52,8 @@ def color_icon(color: RGBA) -> QIcon:
 def plural_events(count: int) -> str:
     """«реплику» / «2 реплики» / «7 реплик» — для подписи пункта меню."""
     if count == 1:
-        return "реплику"  # «1 реплику» звучит как счёт, а не как действие
-    return plural(count, "реплику", "реплики", "реплик")
+        return tr('реплику')  # «1 реплику» звучит как счёт, а не как действие
+    return plural(count, tr('реплику'), tr('реплики'), tr('реплик'))
 
 
 def editable_eids(doc: SubtitleDocument, eids: Sequence[int]) -> list[int]:
@@ -80,7 +81,7 @@ def status_submenu(
     eids: Sequence[int],
     run: Callable[[Command], object],
     *,
-    title: str = "Пометка",
+    title: str = tr('Пометка'),
 ) -> QMenu:
     """Подменю рабочего состояния: черновик, готово, вопрос.
 
@@ -121,8 +122,8 @@ def note_action(
             return
         widget = parent if isinstance(parent, QWidget) else None
         text, accepted = QInputDialog.getText(
-            widget, "Заметка к реплике",
-            "О чём помнить (пусто — убрать заметку):",
+            widget, tr('Заметка к реплике'),
+            tr('О чём помнить (пусто — убрать заметку):'),
             text=event.note,
         )
         if accepted and text.strip() != event.note:
@@ -137,7 +138,7 @@ def actor_submenu(
     run: Callable[[Command], object],
     *,
     actor_command: Callable[[list[int], str], Command] | None = None,
-    title: str = "Акторы",
+    title: str = tr('Акторы'),
 ) -> QMenu:
     """Подменю со списком акторов проекта.
 
@@ -184,11 +185,11 @@ def actor_submenu(
             add_choice(name, None)
 
     menu.addSeparator()
-    clear = menu.addAction("Без говорящего")
+    clear = menu.addAction(tr('Без говорящего'))
     clear.setEnabled(any(current))
     clear.triggered.connect(lambda: assign(""))
 
-    fresh = menu.addAction("Новый актор…")
+    fresh = menu.addAction(tr('Новый актор…'))
     fresh.triggered.connect(
         lambda: _new_actor(parent, doc, targets, run, actor_command)
     )
@@ -208,7 +209,7 @@ def _new_actor(
     реестре актора, которого человек не заводил отдельно.
     """
     widget = parent if isinstance(parent, QWidget) else None
-    name, accepted = QInputDialog.getText(widget, "Новый актор", "Имя:")
+    name, accepted = QInputDialog.getText(widget, tr('Новый актор'), tr('Имя:'))
     name = name.strip()
     if not accepted or not name:
         return
@@ -220,4 +221,4 @@ def _new_actor(
     if name in doc.actors:
         run(assign)
         return
-    run(CompositeCommand([AddActor(name), assign], label="Новый актор"))
+    run(CompositeCommand([AddActor(name), assign], label=tr('Новый актор')))

@@ -19,11 +19,13 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QFontComboBox, QToolTip, QWidget
 
+from sfstudio.app.i18n import tr
+
 __all__ = ["SAMPLE_EN", "SAMPLE_RU", "FontComboBox", "font_sample_html"]
 
 #: Панграммы: в каждой встречаются почти все буквы алфавита, поэтому по ним
 #: видно и начертание, и наличие нужных знаков.
-SAMPLE_RU = "Съешь ещё этих мягких французских булок, да выпей чаю."
+SAMPLE_RU = tr('Съешь ещё этих мягких французских булок, да выпей чаю.')
 SAMPLE_EN = "The quick brown fox jumps over the lazy dog."
 
 
@@ -42,8 +44,8 @@ def font_sample_html(family: str, size: int = 15) -> str:
     note = (
         ""
         if supports_ru
-        else '<div style="color:#D29922">Нет кириллицы — русский текст '
-             "покажется прямоугольниками</div>"
+        else tr('<div style="color:#D29922">Нет кириллицы — русский текст покажется '
+               'прямоугольниками</div>')
     )
     return (
         f'<div style="font-weight:600">{safe}</div>'

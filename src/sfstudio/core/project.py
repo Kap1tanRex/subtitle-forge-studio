@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from fractions import Fraction
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 
 __all__ = [
@@ -57,9 +58,9 @@ RESOLUTION_PRESETS: tuple[tuple[str, int, int], ...] = (
     ("HD 1280×720", 1280, 720),
     ("SD 720×576 (PAL)", 720, 576),
     ("SD 720×480 (NTSC)", 720, 480),
-    ("Кино 2K 2048×1080", 2048, 1080),
-    ("Кино 4K 4096×2160", 4096, 2160),
-    ("Вертикальное 1080×1920", 1080, 1920),
+    (tr('Кино 2K 2048×1080'), 2048, 1080),
+    (tr('Кино 4K 4096×2160'), 4096, 2160),
+    (tr('Вертикальное 1080×1920'), 1080, 1920),
 )
 
 #: Частоты кадров. Дробные записаны точно: 23.976 — это 24000/1001, и
@@ -122,7 +123,7 @@ class ProjectState:
 class Project:
     """Проект целиком."""
 
-    name: str = "Без имени"
+    name: str = tr('Без имени')
     document: SubtitleDocument = field(default_factory=SubtitleDocument.blank)
     #: Путь к видео или звуку. ``None`` — проект без медиа, это законно.
     media_path: Path | None = None
@@ -155,7 +156,7 @@ class Project:
 
     @property
     def display_name(self) -> str:
-        return self.name or (self.path.stem if self.path else "Без имени")
+        return self.name or (self.path.stem if self.path else tr('Без имени'))
 
     def snapshot(
         self,

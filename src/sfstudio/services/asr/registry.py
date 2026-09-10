@@ -24,6 +24,7 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.base import EngineInfo, SpeechRecognizer
 
 __all__ = [
@@ -65,7 +66,7 @@ def downloads_dir() -> Path | None:
 def register(key: str, factory: Callable[[], SpeechRecognizer]) -> None:
     """Добавляет движок в реестр. Повторная регистрация ключа заменяет его."""
     if not key:
-        raise ValueError("ключ движка не может быть пустым")
+        raise ValueError(tr('ключ движка не может быть пустым'))
     _FACTORIES[key] = factory
 
 
@@ -99,9 +100,9 @@ def engine_infos() -> list[EngineInfo]:
                 EngineInfo(
                     key=key,
                     title=key,
-                    description="адаптер не отвечает",
+                    description=tr('адаптер не отвечает'),
                     available=False,
-                    hint=f"ошибка адаптера: {exc}",
+                    hint=tr('ошибка адаптера: {0}').format(exc),
                 )
             )
     return infos

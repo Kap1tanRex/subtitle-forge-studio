@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.markers import Marker, color_title, color_value
 from sfstudio.core.time import format_ass
@@ -63,7 +64,7 @@ class MarkersDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Маркеры")
+        self.setWindowTitle(tr('Маркеры'))
         self.resize(760, 520)
         self._doc = doc
         self._timeline = timeline
@@ -71,9 +72,9 @@ class MarkersDialog(QDialog):
         root = QVBoxLayout(self)
 
         search_row = QHBoxLayout()
-        search_row.addWidget(QLabel("Найти"))
+        search_row.addWidget(QLabel(tr('Найти')))
         self.search = QLineEdit()
-        self.search.setPlaceholderText("по имени, примечанию или ключевому слову")
+        self.search.setPlaceholderText(tr('по имени, примечанию или ключевому слову'))
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self._refill)
         search_row.addWidget(self.search, 1)
@@ -81,7 +82,7 @@ class MarkersDialog(QDialog):
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(4)
-        self.tree.setHeaderLabels(["Время", "Имя", "Ключевое слово", "Примечание"])
+        self.tree.setHeaderLabels([tr('Время'), tr('Имя'), tr('Ключевое слово'), tr('Примечание')])
         self.tree.setRootIsDecorated(False)
         self.tree.setUniformRowHeights(True)
         self.tree.setAlternatingRowColors(True)
@@ -100,22 +101,22 @@ class MarkersDialog(QDialog):
         # «Удалить» первой и делает её кнопкой по умолчанию, то есть Enter в
         # списке уносил бы маркер вместо перехода к нему.
         row = QHBoxLayout()
-        self.goto_button = QPushButton("Перейти")
-        self.goto_button.setToolTip("Поставить курсор времени на этот маркер")
+        self.goto_button = QPushButton(tr('Перейти'))
+        self.goto_button.setToolTip(tr('Поставить курсор времени на этот маркер'))
         self.goto_button.setDefault(True)
         self.goto_button.clicked.connect(self._goto)
         row.addWidget(self.goto_button)
 
-        self.edit_button = QPushButton("Правка…")
+        self.edit_button = QPushButton(tr('Правка…'))
         self.edit_button.clicked.connect(self._edit)
         row.addWidget(self.edit_button)
 
-        self.delete_button = QPushButton("Удалить")
+        self.delete_button = QPushButton(tr('Удалить'))
         self.delete_button.clicked.connect(self._delete)
         row.addWidget(self.delete_button)
 
         row.addStretch(1)
-        close_button = QPushButton("Закрыть")
+        close_button = QPushButton(tr('Закрыть'))
         close_button.clicked.connect(self.reject)
         row.addWidget(close_button)
         root.addLayout(row)
@@ -142,7 +143,8 @@ class MarkersDialog(QDialog):
                 item.setIcon(0, _dot(color_value(marker.color)))
                 item.setToolTip(0, color_title(marker.color))
                 if marker.duration:
-                    item.setText(0, f"{format_ass(marker.time)}  +{marker.duration / 1000:.1f} с")
+                    item.setText(0, tr('{0}  +{1:.1f} '
+                           'с').format(format_ass(marker.time), marker.duration / 1000))
                 # Сам маркер, а не индекс: список фильтруется, и позиция в
                 # нём не совпадает с позицией в документе.
                 item.setData(0, Qt.UserRole, marker)
@@ -154,12 +156,12 @@ class MarkersDialog(QDialog):
         total = len(self._doc.markers)
         if not total:
             self.summary.setText(
-                "Маркеров нет. Ставятся флажком у линейки таймлайна или по Alt+M."
+                tr('Маркеров нет. Ставятся флажком у линейки таймлайна или по Alt+M.')
             )
         elif shown == total:
-            self.summary.setText(f"Маркеров: {total}")
+            self.summary.setText(tr('Маркеров: {0}').format(total))
         else:
-            self.summary.setText(f"Показано {shown} из {total}")
+            self.summary.setText(tr('Показано {0} из {1}').format(shown, total))
         self._on_selection()
 
     @staticmethod

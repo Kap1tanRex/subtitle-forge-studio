@@ -70,15 +70,15 @@ class StartupDialog(QDialog):
         layout.addWidget(self.list, 1)
 
         self.empty_hint = QLabel(
-            "Недавних проектов нет. Создайте новый или откройте файл "
-            f"{PROJECT_SUFFIX}."
+            tr('Недавних проектов нет. Создайте новый или откройте файл '
+                   '{0}.').format(PROJECT_SUFFIX)
         )
         self.empty_hint.setProperty("role", "hint")
         self.empty_hint.setWordWrap(True)
         layout.addWidget(self.empty_hint)
 
         row = QHBoxLayout()
-        self.version_label = QLabel(f"Версия {__version__}")
+        self.version_label = QLabel(tr('Версия {0}').format(__version__))
         self.version_label.setProperty("role", "hint")
         row.addWidget(self.version_label)
         row.addStretch(1)

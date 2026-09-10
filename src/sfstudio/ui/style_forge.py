@@ -51,6 +51,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.style import ALIGNMENT_NAMES, BorderStyle, SubtitleStyle
@@ -73,9 +74,9 @@ class PreviewBackground:
     GRADIENT = "gradient"
 
     TITLES: tuple[tuple[str, str], ...] = (
-        (DARK, "Тёмный"),
-        (LIGHT, "Светлый"),
-        (GRADIENT, "Градиент"),
+        (DARK, tr('Тёмный')),
+        (LIGHT, tr('Светлый')),
+        (GRADIENT, tr('Градиент')),
     )
 
 
@@ -234,7 +235,7 @@ class _Swatch(QPushButton):
 
         current = QColor(self._colour.r, self._colour.g, self._colour.b, self._colour.a)
         chosen = QColorDialog.getColor(
-            current, self, "Цвет", QColorDialog.ShowAlphaChannel
+            current, self, tr('Цвет'), QColorDialog.ShowAlphaChannel
         )
         if not chosen.isValid():
             return
@@ -309,7 +310,7 @@ class _Preview(QWidget):
             painter.setPen(QColor(self._palette.text_muted))
             painter.drawText(
                 rect, Qt.AlignCenter,
-                "libass недоступна — предпросмотр не рисуется",
+                tr('libass недоступна — предпросмотр не рисуется'),
             )
             painter.end()
             return
@@ -415,24 +416,24 @@ class StyleForge(QWidget):
         row = QHBoxLayout(box)
         row.setContentsMargins(8, 6, 8, 6)
 
-        title = QLabel("Оформление")
+        title = QLabel(tr('Оформление'))
         font = QFont(title.font())
         font.setBold(True)
         title.setFont(font)
         row.addWidget(title)
         row.addStretch(1)
 
-        self.apply_selected_button = QPushButton("К выделенным")
+        self.apply_selected_button = QPushButton(tr('К выделенным'))
         self.apply_selected_button.setToolTip(
-            "Присвоить этот стиль выделенным репликам"
+            tr('Присвоить этот стиль выделенным репликам')
         )
         self.apply_selected_button.clicked.connect(
             lambda: self.apply_requested.emit(self.style(), False)
         )
         row.addWidget(self.apply_selected_button)
 
-        self.apply_all_button = QPushButton("Ко всем репликам")
-        self.apply_all_button.setToolTip("Переписать стиль всего документа")
+        self.apply_all_button = QPushButton(tr('Ко всем репликам'))
+        self.apply_all_button.setToolTip(tr('Переписать стиль всего документа'))
         self.apply_all_button.clicked.connect(
             lambda: self.apply_requested.emit(self.style(), True)
         )
@@ -473,14 +474,14 @@ class StyleForge(QWidget):
         return box, column
 
     def _presets_group(self) -> QWidget:
-        box, column = self._section("Готовый набор")
+        box, column = self._section(tr('Готовый набор'))
         self.presets = PresetCards()
         self.presets.chosen.connect(self._apply_preset)
         column.addWidget(self.presets)
         return box
 
     def _typography_group(self) -> QWidget:
-        box, column = self._section("Шрифт и начертание")
+        box, column = self._section(tr('Шрифт и начертание'))
 
         self.font_box = FontComboBox()
         self.font_box.currentFontChanged.connect(self._on_font_chosen)
@@ -503,15 +504,15 @@ class StyleForge(QWidget):
 
         face_row = QHBoxLayout()
         self.bold_check = QToolButton()
-        self.bold_check.setText("Ж")
+        self.bold_check.setText(tr('Ж'))
         self.italic_check = QToolButton()
-        self.italic_check.setText("К")
+        self.italic_check.setText(tr('К'))
         self.underline_check = QToolButton()
-        self.underline_check.setText("Ч")
+        self.underline_check.setText(tr('Ч'))
         for button, tip in (
-            (self.bold_check, "Полужирный"),
-            (self.italic_check, "Курсив"),
-            (self.underline_check, "Подчёркнутый"),
+            (self.bold_check, tr('Полужирный')),
+            (self.italic_check, tr('Курсив')),
+            (self.underline_check, tr('Подчёркнутый')),
         ):
             button.setCheckable(True)
             button.setToolTip(tip)
@@ -523,7 +524,7 @@ class StyleForge(QWidget):
         return box
 
     def _colors_group(self) -> QWidget:
-        box, column = self._section("Цвет, обводка и тень")
+        box, column = self._section(tr('Цвет, обводка и тень'))
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
@@ -532,9 +533,9 @@ class StyleForge(QWidget):
         self.outline_swatch = _Swatch(RGBA(0, 0, 0))
         self.shadow_swatch = _Swatch(RGBA(0, 0, 0, 180))
         for column_index, (title, swatch) in enumerate((
-            ("Основной", self.primary_swatch),
-            ("Обводка", self.outline_swatch),
-            ("Тень", self.shadow_swatch),
+            (tr('Основной'), self.primary_swatch),
+            (tr('Обводка'), self.outline_swatch),
+            (tr('Тень'), self.shadow_swatch),
         )):
             caption = QLabel(title)
             caption.setProperty("role", "hint")
@@ -544,13 +545,13 @@ class StyleForge(QWidget):
         column.addLayout(grid)
 
         self.outline_spin = self._thickness_row(
-            column, "Толщина обводки", 0.0, 20.0, 0.5
+            column, tr('Толщина обводки'), 0.0, 20.0, 0.5
         )
-        self.shadow_spin = self._thickness_row(column, "Глубина тени", 0.0, 20.0, 0.5)
+        self.shadow_spin = self._thickness_row(column, tr('Глубина тени'), 0.0, 20.0, 0.5)
 
-        self.box_check = QCheckBox("Плашка вместо обводки")
+        self.box_check = QCheckBox(tr('Плашка вместо обводки'))
         self.box_check.setToolTip(
-            "Непрозрачная подложка под текстом — для очень пёстрого видео"
+            tr('Непрозрачная подложка под текстом — для очень пёстрого видео')
         )
         self.box_check.toggled.connect(self._on_change)
         column.addWidget(self.box_check)
@@ -577,7 +578,7 @@ class StyleForge(QWidget):
         return spin
 
     def _placement_group(self) -> QWidget:
-        box, column = self._section("Положение в кадре")
+        box, column = self._section(tr('Положение в кадре'))
 
         row = QHBoxLayout()
         self.pad = AlignmentPad()
@@ -590,9 +591,9 @@ class StyleForge(QWidget):
         self.margin_r = self._margin_spin()
         self.margin_v = self._margin_spin()
         for index, (title, spin) in enumerate((
-            ("Слева", self.margin_l),
-            ("Справа", self.margin_r),
-            ("По верт.", self.margin_v),
+            (tr('Слева'), self.margin_l),
+            (tr('Справа'), self.margin_r),
+            (tr('По верт.'), self.margin_v),
         )):
             caption = QLabel(title)
             caption.setProperty("role", "hint")
@@ -617,7 +618,7 @@ class StyleForge(QWidget):
         column.setSpacing(6)
 
         head = QHBoxLayout()
-        caption = QLabel("ПРЕДПРОСМОТР")
+        caption = QLabel(tr('ПРЕДПРОСМОТР'))
         caption.setProperty("role", "hint")
         font = QFont(caption.font())
         font.setBold(True)
@@ -643,7 +644,7 @@ class StyleForge(QWidget):
         self.line = QPlainTextEdit()
         self.line.setReadOnly(True)
         self.line.setFixedHeight(58)
-        self.line.setToolTip("Строка, которая уйдёт в секцию [V4+ Styles]")
+        self.line.setToolTip(tr('Строка, которая уйдёт в секцию [V4+ Styles]'))
         font = QFont("Consolas")
         font.setPixelSize(11)
         self.line.setFont(font)

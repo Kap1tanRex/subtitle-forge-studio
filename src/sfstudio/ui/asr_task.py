@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr import (
     CancelToken,
     RecognitionCancelled,
@@ -50,7 +51,7 @@ class RecognitionTask(QRunnable):
     def run(self) -> None:
         engine = get_engine(self._engine_key)
         if engine is None:
-            self.signals.failed.emit(f"движок «{self._engine_key}» не найден")
+            self.signals.failed.emit(tr('движок «{0}» не найден').format(self._engine_key))
             return
 
         try:
@@ -62,7 +63,7 @@ class RecognitionTask(QRunnable):
                 cancel=self._cancel,
             )
         except RecognitionCancelled:
-            self.signals.failed.emit("Распознавание прервано.")
+            self.signals.failed.emit(tr('Распознавание прервано.'))
         except RecognitionError as exc:
             self.signals.failed.emit(str(exc))
         except Exception as exc:

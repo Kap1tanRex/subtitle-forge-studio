@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from sfstudio.app.i18n import tr
 from sfstudio.core import tags as tagmod
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command
@@ -44,7 +45,7 @@ class SetOverrideTag(Command):
         return ChangeSet.changed(self.eid)
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None, "revert до apply"
+        assert self._before is not None, tr('revert до apply')
         doc.by_eid(self.eid).set_text(self._before)
         doc.bump_revision()
         return ChangeSet.changed(self.eid)
@@ -72,14 +73,14 @@ class SetPosition(SetOverrideTag):
     """
 
     def __init__(self, eid: int, x: float, y: float) -> None:
-        super().__init__(eid, "pos", (round(x), round(y)), label="Перемещение")
+        super().__init__(eid, "pos", (round(x), round(y)), label=tr('Перемещение'))
 
 
 class ClearPosition(SetOverrideTag):
     """Убирает ``\\pos`` — событие возвращается к позиционированию по стилю."""
 
     def __init__(self, eid: int) -> None:
-        super().__init__(eid, "pos", None, label="Сброс позиции")
+        super().__init__(eid, "pos", None, label=tr('Сброс позиции'))
 
 
 class SetRotation(SetOverrideTag):
@@ -92,7 +93,7 @@ class SetRotation(SetOverrideTag):
 
     def __init__(self, eid: int, degrees: float) -> None:
         normalized = round(degrees % 360.0, 2)
-        super().__init__(eid, "frz", normalized, label="Поворот")
+        super().__init__(eid, "frz", normalized, label=tr('Поворот'))
 
 
 class SetAlignment(Command):
@@ -113,7 +114,7 @@ class SetAlignment(Command):
         self.new_an = an
         self.new_pos = new_pos
         self._before: str | None = None
-        self.label = "Выравнивание"
+        self.label = tr('Выравнивание')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         event = doc.by_eid(self.eid)
@@ -128,7 +129,7 @@ class SetAlignment(Command):
         return ChangeSet.changed(self.eid)
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None, "revert до apply"
+        assert self._before is not None, tr('revert до apply')
         doc.by_eid(self.eid).set_text(self._before)
         doc.bump_revision()
         return ChangeSet.changed(self.eid)
@@ -154,7 +155,7 @@ class SetOverrideTags(Command):
         self.eid = eid
         self.tags = dict(tags)
         self._before: str | None = None
-        self.label = label or "Теги реплики"
+        self.label = label or tr('Теги реплики')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         event = doc.by_eid(self.eid)
@@ -171,7 +172,7 @@ class SetOverrideTags(Command):
         return ChangeSet.changed(self.eid)
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None, "revert до apply"
+        assert self._before is not None, tr('revert до apply')
         doc.by_eid(self.eid).set_text(self._before)
         doc.bump_revision()
         return ChangeSet.changed(self.eid)

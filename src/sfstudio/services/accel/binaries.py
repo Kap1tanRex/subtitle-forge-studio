@@ -29,6 +29,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.base import (
     CancelToken,
     ProgressReporter,
@@ -83,26 +84,26 @@ class BinaryBuild:
 WHISPER_CPP_BUILDS: tuple[BinaryBuild, ...] = (
     BinaryBuild(
         key="cpu",
-        title="Для процессора",
+        title=tr('Для процессора'),
         asset="whisper-bin-x64.zip",
         size_mb=8,
-        note="Самая маленькая. Работает везде.",
+        note=tr('Самая маленькая. Работает везде.'),
     ),
     BinaryBuild(
         key="blas",
-        title="Для процессора, с ускорением BLAS",
+        title=tr('Для процессора, с ускорением BLAS'),
         asset="whisper-blas-bin-x64.zip",
         size_mb=20,
-        note="Заметно быстрее обычной на многоядерном процессоре.",
+        note=tr('Заметно быстрее обычной на многоядерном процессоре.'),
     ),
     BinaryBuild(
         key="cuda",
-        title="Для видеокарты NVIDIA (cuBLAS)",
+        title=tr('Для видеокарты NVIDIA (cuBLAS)'),
         asset="whisper-cublas-12.4.0-bin-x64.zip",
         size_mb=640,
         note=(
-            "Нужна только при отказе от faster-whisper: тот на той же карте "
-            "обычно быстрее и весит меньше."
+            tr('Нужна только при отказе от faster-whisper: тот на той же карте обычно '
+                   'быстрее и весит меньше.')
         ),
         needs_cuda=True,
     ),
@@ -148,7 +149,7 @@ def download_whisper_cpp(
     chosen = next((b for b in WHISPER_CPP_BUILDS if b.key == build), None)
     if chosen is None:
         raise RecognitionError(
-            f"неизвестный вариант сборки «{build}». Доступны: "
+            tr('неизвестный вариант сборки «{0}». Доступны: ').format(build)
             + ", ".join(b.key for b in WHISPER_CPP_BUILDS)
         )
 
@@ -156,16 +157,17 @@ def download_whisper_cpp(
     try:
         folder.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise RecognitionError(f"не удалось создать каталог {folder}: {exc}") from exc
+        raise RecognitionError(tr('не удалось создать каталог {0}: {1}')
+            .format(folder, exc)) from exc
 
     if progress is not None:
-        progress(0.0, f"поиск сборки {chosen.title}")
+        progress(0.0, tr('поиск сборки {0}').format(chosen.title))
     url = _asset_url(chosen.asset)
 
     archive = _download(url, folder, progress, cancel)
     try:
         if progress is not None:
-            progress(0.95, "распаковка")
+            progress(0.95, tr('распаковка'))
         _unpack(archive, folder)
     finally:
         archive.unlink(missing_ok=True)
@@ -173,15 +175,15 @@ def download_whisper_cpp(
     binary = installed_whisper_cpp(root)
     if binary is None:
         raise RecognitionError(
-            "в архиве не нашлось исполняемого файла whisper.cpp. "
-            "Возможно, изменился состав сборки."
+            tr('в архиве не нашлось исполняемого файла whisper.cpp. Возможно, изменился '
+                   'состав сборки.')
         )
     # На не-Windows архив приходит без бита исполнения.
     if os.name != "nt":
         binary.chmod(binary.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
 
     if progress is not None:
-        progress(1.0, "whisper.cpp установлен")
+        progress(1.0, tr('whisper.cpp установлен'))
     return binary
 
 
@@ -210,12 +212,13 @@ def _asset_url(asset: str) -> str:
         parts = urllib.parse.urlparse(url)
         if parts.scheme != "https" or parts.hostname not in _ALLOWED_HOSTS:
             raise RecognitionError(
-                f"ссылка на файл выпуска ведёт на неожиданный адрес: {url}"
+                tr('ссылка на файл выпуска ведёт на неожиданный адрес: {0}').format(url)
             )
         return url
     raise RecognitionError(
-        f"в выпуске {RELEASE_TAG} нет файла «{asset}». "
-        "Скачайте сборку вручную и укажите путь к ней в настройках."
+        tr('в выпуске {0} нет файла «{1}». Скачайте сборку вручную '
+           'и укажите путь к ней в настройках.').format(
+            RELEASE_TAG, asset)
     )
 
 
@@ -235,21 +238,22 @@ def _download(
             done = 0
             while chunk := answer.read(_CHUNK):
                 if cancel is not None and cancel.cancelled:
-                    raise RecognitionCancelled("загрузка прервана")
+                    raise RecognitionCancelled(tr('загрузка прервана'))
                 out.write(chunk)
                 done += len(chunk)
                 if progress is not None and total:
                     progress(
                         0.9 * done / total,
-                        f"загрузка: {done / 1024 / 1024:.0f} из "
-                        f"{total / 1024 / 1024:.0f} МБ",
+                        tr('загрузка: {0:.0f} из {1:.0f} МБ').format(
+                            done / 1024 / 1024, total / 1024 / 1024
+                        ),
                     )
     except RecognitionCancelled:
         temp.unlink(missing_ok=True)
         raise
     except Exception as exc:
         temp.unlink(missing_ok=True)
-        raise RecognitionError(f"не удалось скачать whisper.cpp: {exc}") from exc
+        raise RecognitionError(tr('не удалось скачать whisper.cpp: {0}').format(exc)) from exc
     return temp
 
 

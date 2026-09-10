@@ -28,6 +28,8 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "LABEL_PRESETS",
     "LabelFormat",
@@ -60,28 +62,28 @@ class LabelFormat:
     @property
     def sample(self) -> str:
         """Как это будет выглядеть — для показа в настройках."""
-        return format_label(self.template, "Иван", "Привет").replace(LINE_BREAK, " ⏎ ")
+        return format_label(self.template, tr('Иван'), tr('Привет')).replace(LINE_BREAK, " ⏎ ")
 
 
 #: Заготовки. Порядок — от самого частого к редкому.
 LABEL_PRESETS: tuple[LabelFormat, ...] = (
-    LabelFormat("off", "Не добавлять", TEXT_FIELD,
-                "Имя остаётся только в поле говорящего."),
-    LabelFormat("brackets_above", "[Имя] над репликой",
+    LabelFormat("off", tr('Не добавлять'), TEXT_FIELD,
+                tr('Имя остаётся только в поле говорящего.')),
+    LabelFormat("brackets_above", tr('[Имя] над репликой'),
                 f"[{{actor}}]{LINE_BREAK}{{text}}",
-                "Отдельной строкой сверху — так делают в театральных списках."),
-    LabelFormat("brackets_inline", "[Имя] в начале строки",
+                tr('Отдельной строкой сверху — так делают в театральных списках.')),
+    LabelFormat("brackets_inline", tr('[Имя] в начале строки'),
                 "[{actor}] {text}",
-                "Не занимает строку, но съедает место в кадре."),
-    LabelFormat("plain_above", "Имя над репликой без скобок",
+                tr('Не занимает строку, но съедает место в кадре.')),
+    LabelFormat("plain_above", tr('Имя над репликой без скобок'),
                 f"{{actor}}{LINE_BREAK}{{text}}"),
-    LabelFormat("colon", "Имя с двоеточием",
+    LabelFormat("colon", tr('Имя с двоеточием'),
                 "{actor}: {text}",
-                "Привычно для расшифровок интервью."),
-    LabelFormat("dash", "Имя через тире",
+                tr('Привычно для расшифровок интервью.')),
+    LabelFormat("dash", tr('Имя через тире'),
                 "{actor} — {text}"),
-    LabelFormat("custom", "Свой шаблон", "",
-                "Задаётся в настройках. Доступны {actor} и {text}."),
+    LabelFormat("custom", tr('Свой шаблон'), "",
+                tr('Задаётся в настройках. Доступны {actor} и {text}.')),
 )
 
 

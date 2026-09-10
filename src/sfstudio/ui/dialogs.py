@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.io.container import CONTAINER_CODEC, MuxOptions, lossy_warning
 from sfstudio.media.probe import SubtitleTrackInfo
 
@@ -40,12 +41,12 @@ class TrackPickerDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Дорожки субтитров")
+        self.setWindowTitle(tr('Дорожки субтитров'))
         self.resize(560, 320)
         self._tracks = tracks
 
         layout = QVBoxLayout(self)
-        header = QLabel(f"В файле «{media_name}» найдено дорожек: {len(tracks)}")
+        header = QLabel(tr('В файле «{0}» найдено дорожек: {1}').format(media_name, len(tracks)))
         header.setWordWrap(True)
         layout.addWidget(header)
 
@@ -66,9 +67,9 @@ class TrackPickerDialog(QDialog):
         layout.addWidget(self.list)
 
         hint = QLabel(
-            "Дорожки-картинки (PGS, VobSub) нельзя открыть на правку без OCR."
+            tr('Дорожки-картинки (PGS, VobSub) нельзя открыть на правку без OCR.')
             if any(t.is_bitmap for t in tracks)
-            else "Выберите дорожку для правки."
+            else tr('Выберите дорожку для правки.')
         )
         hint.setProperty("role", "hint")
         hint.setWordWrap(True)
@@ -77,8 +78,8 @@ class TrackPickerDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.Open | QDialogButtonBox.Cancel, parent=self
         )
-        buttons.button(QDialogButtonBox.Open).setText("Открыть дорожку")
-        buttons.button(QDialogButtonBox.Cancel).setText("Без субтитров")
+        buttons.button(QDialogButtonBox.Open).setText(tr('Открыть дорожку'))
+        buttons.button(QDialogButtonBox.Cancel).setText(tr('Без субтитров'))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -112,39 +113,39 @@ class MuxDialog(QDialog):
         current_index: int | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Сохранить в контейнер")
+        self.setWindowTitle(tr('Сохранить в контейнер'))
         self.resize(520, 300)
 
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
         self.target = QComboBox()
-        self.target.addItem("Добавить новую дорожку", None)
+        self.target.addItem(tr('Добавить новую дорожку'), None)
         for track in tracks:
-            self.target.addItem(f"Заменить: {track.display_name()}", track.index)
+            self.target.addItem(tr('Заменить: {0}').format(track.display_name()), track.index)
         if current_index is not None:
             position = self.target.findData(current_index)
             if position >= 0:
                 self.target.setCurrentIndex(position)
-        form.addRow("Куда:", self.target)
+        form.addRow(tr('Куда:'), self.target)
 
         self.language = QLineEdit("rus")
         self.language.setMaxLength(3)
-        self.language.setPlaceholderText("ISO 639-2, например rus или eng")
-        form.addRow("Язык:", self.language)
+        self.language.setPlaceholderText(tr('ISO 639-2, например rus или eng'))
+        form.addRow(tr('Язык:'), self.language)
 
         self.title = QLineEdit()
-        self.title.setPlaceholderText("Необязательно")
-        form.addRow("Название:", self.title)
+        self.title.setPlaceholderText(tr('Необязательно'))
+        form.addRow(tr('Название:'), self.title)
 
-        self.default = QCheckBox("Дорожка по умолчанию")
-        self.forced = QCheckBox("Forced (только надписи)")
+        self.default = QCheckBox(tr('Дорожка по умолчанию'))
+        self.forced = QCheckBox(tr('Forced (только надписи)'))
         form.addRow("", self.default)
         form.addRow("", self.forced)
         layout.addLayout(form)
 
         codec = CONTAINER_CODEC.get(output.suffix.lower(), "?")
-        codec_label = QLabel(f"Формат субтитров в контейнере: <b>{codec}</b>")
+        codec_label = QLabel(tr('Формат субтитров в контейнере: <b>{0}</b>').format(codec))
         layout.addWidget(codec_label)
 
         warning = lossy_warning(output)
@@ -157,8 +158,8 @@ class MuxDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.Save | QDialogButtonBox.Cancel, parent=self
         )
-        buttons.button(QDialogButtonBox.Save).setText("Записать")
-        buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        buttons.button(QDialogButtonBox.Save).setText(tr('Записать'))
+        buttons.button(QDialogButtonBox.Cancel).setText(tr('Отмена'))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)

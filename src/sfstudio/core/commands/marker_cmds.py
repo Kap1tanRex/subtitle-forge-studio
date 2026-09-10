@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
@@ -24,7 +25,7 @@ class AddMarker(Command):
 
     __slots__ = ("label", "marker")
 
-    def __init__(self, marker: Marker, label: str = "Новый маркер") -> None:
+    def __init__(self, marker: Marker, label: str = tr('Новый маркер')) -> None:
         self.marker = marker
         self.label = label
 
@@ -49,7 +50,7 @@ class RemoveMarker(Command):
 
     __slots__ = ("_removed", "label", "marker")
 
-    def __init__(self, marker: Marker, label: str = "Удаление маркера") -> None:
+    def __init__(self, marker: Marker, label: str = tr('Удаление маркера')) -> None:
         self.marker = marker
         self._removed = False
         self.label = label
@@ -77,7 +78,7 @@ class UpdateMarker(Command):
     __slots__ = ("after", "before", "label")
 
     def __init__(
-        self, before: Marker, after: Marker, label: str = "Правка маркера"
+        self, before: Marker, after: Marker, label: str = tr('Правка маркера')
     ) -> None:
         self.before = before
         self.after = after
@@ -112,7 +113,7 @@ class MoveMarker(UpdateMarker):
     __slots__ = ()
 
     def __init__(self, before: Marker, after: Marker) -> None:
-        super().__init__(before, after, label="Перенос маркера")
+        super().__init__(before, after, label=tr('Перенос маркера'))
 
     def coalesce_with(self, previous: Command) -> Command | None:
         if not isinstance(previous, MoveMarker):
@@ -135,7 +136,7 @@ class ClearMarkers(Command):
 
     def __init__(self) -> None:
         self._before: list[Marker] = []
-        self.label = "Убрать все маркеры"
+        self.label = tr('Убрать все маркеры')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         if not len(doc.markers):

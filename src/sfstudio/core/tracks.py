@@ -34,6 +34,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 
 __all__ = ["TRACK_PALETTE", "Track", "TrackKind", "TrackSet"]
@@ -92,10 +93,10 @@ class Track:
         if self.name:
             return self.name
         if self.kind is TrackKind.VIDEO:
-            return "Видео"
+            return tr('Видео')
         if self.kind is TrackKind.AUDIO:
-            return "Звук"
-        return f"Субтитры {self.layer}"
+            return tr('Звук')
+        return tr('Субтитры {0}').format(self.layer)
 
 
 @dataclass(slots=True)
@@ -182,7 +183,7 @@ class TrackSet:
         """Добавляет дорожку субтитров."""
         target = self.next_layer() if layer is None else layer
         if self.by_layer(target) is not None:
-            raise ValueError(f"дорожка со слоем {target} уже есть")
+            raise ValueError(tr('дорожка со слоем {0} уже есть').format(target))
         track = Track(
             kind=TrackKind.SUBTITLE,
             layer=target,

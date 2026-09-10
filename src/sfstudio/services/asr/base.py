@@ -28,6 +28,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "CancelToken",
     "EngineInfo",
@@ -191,7 +193,7 @@ class CancelToken:
 
     def raise_if_cancelled(self) -> None:
         if self._cancelled:
-            raise RecognitionCancelled("распознавание прервано")
+            raise RecognitionCancelled(tr('распознавание прервано'))
 
 
 class ProgressReporter(Protocol):

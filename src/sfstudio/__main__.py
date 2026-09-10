@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from sfstudio import __version__
+from sfstudio.app.i18n import tr
 
 
 def _versions() -> list[tuple[str, str]]:
@@ -30,13 +31,13 @@ def _versions() -> list[tuple[str, str]]:
             mod = __import__(module)
             rows.append((label, str(getattr(mod, attr, "?"))))
         except ImportError:
-            rows.append((label, "не установлено"))
+            rows.append((label, tr('не установлено')))
         except OSError as exc:
             # python-mpv бросает OSError (не ImportError), если не нашёл
             # libmpv-2.dll. Ловить только ImportError здесь недостаточно:
             # на машине без нативных библиотек падал бы даже --version.
-            rows.append((label, f"нет нативной библиотеки: {_short(exc)}"))
-    rows.append(("проверка орфографии", _spelling_state()))
+            rows.append((label, tr('нет нативной библиотеки: {0}').format(_short(exc))))
+    rows.append((tr('проверка орфографии'), _spelling_state()))
     return rows
 
 
@@ -46,13 +47,13 @@ def _spelling_state() -> str:
     try:
         from sfstudio.services.spelling import SpellChecker, available
     except ImportError:
-        return "не установлена"
+        return tr('не установлена')
     if not available():
-        return "не установлена"
+        return tr('не установлена')
     checker = SpellChecker("ru")
     # Пробуем настоящее слово: библиотека может стоять, а словари — нет.
-    checker.known("проверка")
-    return "недоступна" if checker._failed else "русский, английский"
+    checker.known(tr('проверка'))
+    return tr('недоступна') if checker._failed else tr('русский, английский')
 
 
 def _short(exc: BaseException, limit: int = 60) -> str:
@@ -64,25 +65,25 @@ def cmd_version() -> int:
     rows = _versions()
     from sfstudio.platform.native import diagnose
 
-    rows += [("", ""), ("--- нативные ---", "")]
+    rows += [("", ""), (tr('--- нативные ---'), "")]
     rows += list(diagnose().items())
 
     # Движки распознавания: в собранном виде доставить их через pip нельзя,
     # поэтому важно видеть, что попало внутрь.
-    rows += [("", ""), ("--- распознавание ---", "")]
+    rows += [("", ""), (tr('--- распознавание ---'), "")]
     try:
         from sfstudio.services.asr import engine_infos
 
         for info in engine_infos():
-            rows.append((info.key, "доступен" if info.available else "нет"))
+            rows.append((info.key, tr('доступен') if info.available else tr('нет')))
     except Exception as exc:  # слой необязательный, его отсутствие не ошибка
-        rows.append(("движки", f"недоступны: {_short(exc)}"))
+        rows.append((tr('движки'), tr('недоступны: {0}').format(_short(exc))))
 
     # Путь к журналу: в оконной сборке консоли нет, и найти, куда смотреть
     # при неполадке, иначе неоткуда.
     from sfstudio.platform.paths import logs_dir
 
-    rows += [("", ""), ("журнал", str(logs_dir() / "sfstudio.log"))]
+    rows += [("", ""), (tr('журнал'), str(logs_dir() / "sfstudio.log"))]
 
     width = max(len(name) for name, _ in rows)
     for name, value in rows:
@@ -106,51 +107,51 @@ def cmd_selftest() -> int:
         checks.append((name, condition, detail))
 
     # Время
-    check("таймкод round-trip", parse_timecode(format_ass(1230)) == 1230)
+    check(tr('таймкод round-trip'), parse_timecode(format_ass(1230)) == 1230)
     fps = FpsModel.from_float(23.976023976)
-    check("точная дробь FPS", fps.rate.denominator == 1001, str(fps.rate))
+    check(tr('точная дробь FPS'), fps.rate.denominator == 1001, str(fps.rate))
 
     # Цвет
-    check("инверсия альфы ASS", RGBA(0, 0, 0, 255).to_ass() == "&H00000000")
+    check(tr('инверсия альфы ASS'), RGBA(0, 0, 0, 255).to_ass() == "&H00000000")
 
     # Документ и индекс
     doc = SubtitleDocument.blank()
     for i in range(1000):
-        doc.create_event(i * 1000, i * 1000 + 800, f"Реплика {i}")
-    check("документ построен", len(doc) == 1000)
-    check("активные в точке", [e.text for e in doc.active_at(5100)] == ["Реплика 5"])
-    check("пусто в зазоре", doc.active_at(5900) == [])
+        doc.create_event(i * 1000, i * 1000 + 800, tr('Реплика {0}').format(i))
+    check(tr('документ построен'), len(doc) == 1000)
+    check(tr('активные в точке'), [e.text for e in doc.active_at(5100)] == [tr('Реплика 5')])
+    check(tr('пусто в зазоре'), doc.active_at(5900) == [])
 
     idx = TimeIndex(doc.events)
-    check("диапазон индекса", len(idx.range(0, 10_000)) == 10)
+    check(tr('диапазон индекса'), len(idx.range(0, 10_000)) == 10)
 
     # Команды и отмена
     stack = UndoStack(doc)
     eid = doc.events[0].eid
     before = doc.by_eid(eid).text
-    stack.run(SetText(eid, "Изменено"))
+    stack.run(SetText(eid, tr('Изменено')))
     stack.run(SetPosition(eid, 960, 1010))
-    check("позиция записана", doc.by_eid(eid).position() == (960.0, 1010.0))
+    check(tr('позиция записана'), doc.by_eid(eid).position() == (960.0, 1010.0))
     while stack.can_undo:
         stack.undo()
-    check("отмена восстановила", doc.by_eid(eid).text == before, doc.by_eid(eid).text)
+    check(tr('отмена восстановила'), doc.by_eid(eid).text == before, doc.by_eid(eid).text)
 
     # Форматы
     text = write_ass(doc)
     reread = read_ass(text)
     check("ASS round-trip", write_ass(reread) == text)
-    check("события уцелели", len(reread) == len(doc))
+    check(tr('события уцелели'), len(reread) == len(doc))
 
     width = max(len(name) for name, _, _ in checks)
     failed = 0
     for name, ok, detail in checks:
-        mark = "ok  " if ok else "СБОЙ"
+        mark = "ok  " if ok else tr('СБОЙ')
         suffix = f"  ({detail})" if detail and not ok else ""
         print(f"[{mark}] {name:<{width}}{suffix}")
         failed += not ok
 
     print()
-    print(f"Проверок: {len(checks)}, сбоев: {failed}")
+    print(tr('Проверок: {0}, сбоев: {1}').format(len(checks), failed))
     return 1 if failed else 0
 
 
@@ -158,8 +159,8 @@ def cmd_gui(path: Path | None) -> int:
     try:
         from sfstudio.ui.app import run
     except ImportError as exc:
-        print(f"GUI недоступен: {exc}", file=sys.stderr)
-        print('Установите зависимости: pip install -e ".[gui]"', file=sys.stderr)
+        print(tr('GUI недоступен: {0}').format(exc), file=sys.stderr)
+        print(tr('Установите зависимости: pip install -e ".[gui]"'), file=sys.stderr)
         return 2
     return run(path)
 
@@ -178,11 +179,11 @@ def cmd_asr_test(
 
     engine = get_engine("faster-whisper")
     if engine is None:
-        print("движок faster-whisper не зарегистрирован", file=sys.stderr)
+        print(tr('движок faster-whisper не зарегистрирован'), file=sys.stderr)
         return 2
 
     info = engine.info()
-    print(f"движок: {info.title}, доступен: {info.available}")
+    print(tr('движок: {0}, доступен: {1}').format(info.title, info.available))
     if not info.available:
         print(info.hint, file=sys.stderr)
         return 2
@@ -205,12 +206,12 @@ def cmd_asr_test(
     try:
         result = engine.transcribe(request, progress=report)
     except RecognitionError as exc:
-        print(f"ошибка: {exc}", file=sys.stderr)
+        print(tr('ошибка: {0}').format(exc), file=sys.stderr)
         return 1
 
     events = to_events(result.segments)
-    print(f"язык: {result.language}  сегментов: {len(result.segments)}  "
-          f"реплик: {len(events)}  время: {result.elapsed_s:.1f} с")
+    print(tr('язык: {0}  сегментов: {1}  реплик: {2}  время: {3:.1f} '
+           'с').format(result.language, len(result.segments), len(events), result.elapsed_s))
     for event in events[:5]:
         print(f"  [{event.start:6d} → {event.end:6d}] "
               f"{event.text.replace(chr(92) + 'N', ' | ')[:70]}")
@@ -233,16 +234,16 @@ def cmd_plugins() -> int:
     folder = plugins_dir(settings)
     enabled = bool(settings.get("plugins.enabled", False))
 
-    print(f"каталог плагинов: {folder}")
-    print(f"загрузка плагинов: {'включена' if enabled else 'выключена'}")
+    print(tr('каталог плагинов: {0}').format(folder))
+    print(tr('загрузка плагинов: {0}').format('включена' if enabled else 'выключена'))
     if not enabled:
-        print("  (в этом режиме плагины перечисляются, но не выполняются)")
+        print(tr('  (в этом режиме плагины перечисляются, но не выполняются)'))
     print()
 
     manager = PluginManager(folder, settings)
     found = manager.load_all(enabled=enabled)
     if not found:
-        print("плагинов не найдено")
+        print(tr('плагинов не найдено'))
         return 0
 
     for plugin in found:
@@ -255,14 +256,14 @@ def cmd_plugins() -> int:
     added = manager.install()
     if added:
         print()
-        print("зарегистрировано:")
+        print(tr('зарегистрировано:'))
         for line in added:
             print(f"  {line}")
 
     actions = manager.actions()
     if actions:
         print()
-        print("пункты меню:")
+        print(tr('пункты меню:'))
         for action in actions:
             print(f"  {action.title}")
 
@@ -285,7 +286,7 @@ def cmd_batch(args) -> int:
         from sfstudio.io.registry import FORMATS
 
         if args.to not in FORMATS:
-            print(f"неизвестный формат: {args.to}. Есть: {', '.join(FORMATS)}")
+            print(tr('неизвестный формат: {0}. Есть: {1}').format(args.to, ', '.join(FORMATS)))
             return 2
         tasks.append(convert(args.to))
     if args.check:
@@ -295,7 +296,7 @@ def cmd_batch(args) -> int:
         tasks.append(run_checks(profile, args.out or Path.cwd()))
 
     if not tasks:
-        print("нечего делать: укажите --shift, --to или --check")
+        print(tr('нечего делать: укажите --shift, --to или --check'))
         return 2
 
     def report(index: int, total: int, path: Path) -> None:
@@ -312,43 +313,61 @@ def cmd_batch(args) -> int:
     for result in results:
         if result.ok:
             notes = "; ".join(result.notes)
-            print(f"  готово: {result.written} ({notes})")
+            print(tr('  готово: {0} ({1})').format(result.written, notes))
         else:
-            print(f"  не вышло: {result.source.name} — {result.error}")
+            print(tr('  не вышло: {0} — {1}').format(result.source.name, result.error))
 
     print(describe(results))
     return 0 if all(result.ok for result in results) else 1
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="sfstudio", description="Редактор субтитров")
-    parser.add_argument("file", nargs="?", type=Path, help="файл субтитров или видео")
-    parser.add_argument("--version", action="store_true", help="версии компонентов")
-    parser.add_argument("--selftest", action="store_true", help="самопроверка ядра")
-    parser.add_argument("--plugins", action="store_true",
-                        help="список плагинов и что каждый добавил")
-    parser.add_argument("--asr-test", metavar="ФАЙЛ", type=Path,
-                        help="прогнать распознавание речи на файле, без графики")
-    parser.add_argument("--asr-model", default="small", help="размер модели")
-    parser.add_argument("--asr-models-dir", type=Path, help="каталог моделей")
-    parser.add_argument("--asr-seconds", type=int, default=30,
-                        help="сколько секунд распознать (0 — весь файл)")
+def _use_saved_language() -> None:
+    """Ставит язык до разбора команд.
 
-    batch = parser.add_argument_group("пакетная обработка")
-    batch.add_argument("--batch", nargs="+", metavar="ФАЙЛ", type=Path,
-                       help="файлы субтитров для обработки без графики")
-    batch.add_argument("--shift", type=int, metavar="МС", default=0,
-                       help="сдвинуть тайминги на столько миллисекунд")
-    batch.add_argument("--to", metavar="ФОРМАТ",
-                       help="перевести в формат: ass, srt, vtt, ttml")
-    batch.add_argument("--check", metavar="ПРОФИЛЬ", nargs="?", const="general",
-                       help="прогнать проверки и положить отчёт рядом")
-    batch.add_argument("--out", type=Path, metavar="ПАПКА",
-                       help="куда класть результат")
-    batch.add_argument("--suffix", default="", metavar="ТЕКСТ",
-                       help="приписка к имени файла")
+    Командные режимы — тоже интерфейс: подсказки ``--help``, отчёт самопроверки
+    и сообщения пакетной обработки читает тот же человек, что и окна. Читаем
+    настройки молча: испорченный файл не должен мешать запуску с ключом
+    ``--version``, которым как раз и выясняют, что сломалось.
+    """
+    try:
+        from sfstudio.app.i18n import set_language
+        from sfstudio.app.settings import Settings
+
+        set_language(Settings().get("ui.language", "ru"))
+    except Exception:
+        pass
+
+
+def main(argv: list[str] | None = None) -> int:
+    _use_saved_language()
+    parser = argparse.ArgumentParser(prog="sfstudio", description=tr('Редактор субтитров'))
+    parser.add_argument("file", nargs="?", type=Path, help=tr('файл субтитров или видео'))
+    parser.add_argument("--version", action="store_true", help=tr('версии компонентов'))
+    parser.add_argument("--selftest", action="store_true", help=tr('самопроверка ядра'))
+    parser.add_argument("--plugins", action="store_true",
+                        help=tr('список плагинов и что каждый добавил'))
+    parser.add_argument("--asr-test", metavar=tr('ФАЙЛ'), type=Path,
+                        help=tr('прогнать распознавание речи на файле, без графики'))
+    parser.add_argument("--asr-model", default="small", help=tr('размер модели'))
+    parser.add_argument("--asr-models-dir", type=Path, help=tr('каталог моделей'))
+    parser.add_argument("--asr-seconds", type=int, default=30,
+                        help=tr('сколько секунд распознать (0 — весь файл)'))
+
+    batch = parser.add_argument_group(tr('пакетная обработка'))
+    batch.add_argument("--batch", nargs="+", metavar=tr('ФАЙЛ'), type=Path,
+                       help=tr('файлы субтитров для обработки без графики'))
+    batch.add_argument("--shift", type=int, metavar=tr('МС'), default=0,
+                       help=tr('сдвинуть тайминги на столько миллисекунд'))
+    batch.add_argument("--to", metavar=tr('ФОРМАТ'),
+                       help=tr('перевести в формат: ass, srt, vtt, ttml'))
+    batch.add_argument("--check", metavar=tr('ПРОФИЛЬ'), nargs="?", const="general",
+                       help=tr('прогнать проверки и положить отчёт рядом'))
+    batch.add_argument("--out", type=Path, metavar=tr('ПАПКА'),
+                       help=tr('куда класть результат'))
+    batch.add_argument("--suffix", default="", metavar=tr('ТЕКСТ'),
+                       help=tr('приписка к имени файла'))
     batch.add_argument("--overwrite", action="store_true",
-                       help="разрешить перезапись исходников")
+                       help=tr('разрешить перезапись исходников'))
     args = parser.parse_args(argv)
 
     if args.version:

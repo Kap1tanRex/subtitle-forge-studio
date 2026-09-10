@@ -30,6 +30,8 @@ from enum import Enum
 from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtWidgets import QDockWidget, QMainWindow, QWidget
 
+from sfstudio.app.i18n import tr
+
 __all__ = ["DockSpec", "LayoutManager", "LayoutPreset"]
 
 
@@ -45,11 +47,11 @@ class LayoutPreset(Enum):
     @property
     def title(self) -> str:
         return {
-            LayoutPreset.DEFAULT: "Обычная",
-            LayoutPreset.STUDIO: "Монтажная",
-            LayoutPreset.TIMING: "Тайминг",
-            LayoutPreset.TRANSLATION: "Перевод",
-            LayoutPreset.STYLING: "Оформление",
+            LayoutPreset.DEFAULT: tr('Обычная'),
+            LayoutPreset.STUDIO: tr('Монтажная'),
+            LayoutPreset.TIMING: tr('Тайминг'),
+            LayoutPreset.TRANSLATION: tr('Перевод'),
+            LayoutPreset.STYLING: tr('Оформление'),
         }[self]
 
 

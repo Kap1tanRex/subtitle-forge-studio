@@ -151,21 +151,74 @@ class TestExtractor:
         data = json.loads((tmp_path / "en.json").read_text(encoding="utf-8"))
         assert "gone" in data.get("__устаревшие__", "")
 
-    def test_docstrings_are_not_collected(self, tmp_path) -> None:
+    def test_only_tr_arguments_are_collected(self, tmp_path) -> None:
+        """Каталог должен совпадать с тем, что программа ищет в нём.
+
+        Строка, не прошедшая через ``tr``, не переведётся никогда, и её
+        перевод в каталоге — обещание, которого никто не выполнит.
+        """
         import tools.extract_strings as extractor
 
         source = tmp_path / "модуль.py"
         source.write_text(
-            '"""Это докстрока, её переводить не надо."""\n'
-            'подпись = "А это подпись"\n',
+            '"""Докстрока: её переводить не надо."""\n'
+            'подпись = tr("А это подпись")\n'
+            'мимо = "Эту строку никто не переведёт"\n',
             encoding="utf-8",
         )
-        found = extractor.collect(source)
-        assert found == ["А это подпись"]
+        assert extractor.collect(source) == ["А это подпись"]
 
-    def test_strings_without_cyrillic_are_skipped(self, tmp_path) -> None:
+    def test_strings_without_tr_are_skipped(self, tmp_path) -> None:
         import tools.extract_strings as extractor
 
         source = tmp_path / "модуль.py"
         source.write_text('key = "layout_state"\n', encoding="utf-8")
         assert extractor.collect(source) == []
+
+
+class TestEnglishCatalogue:
+    """Английский каталог как часть поставки, а не как черновик."""
+
+    def catalogue(self) -> dict:
+        path = i18n.locale_dir() / "en.json"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_catalogue_is_complete(self) -> None:
+        """Полупереведённый интерфейс — смесь двух языков в одном окне."""
+        empty = [
+            key for key, value in self.catalogue().items()
+            if not key.startswith("__") and not str(value).strip()
+        ]
+        assert not empty, f"без перевода осталось {len(empty)}: {empty[:5]}"
+
+    def test_every_string_in_code_is_in_the_catalogue(self) -> None:
+        """Новая подпись без перевода должна ловиться здесь, а не глазами."""
+        import tools.extract_strings as extractor
+
+        catalogue = self.catalogue()
+        missing = [text for text in extractor.scan() if text not in catalogue]
+        assert not missing, (
+            f"нет в каталоге {len(missing)} строк: {missing[:5]}. "
+            "Соберите каталог: python tools/extract_strings.py en"
+        )
+
+    def test_placeholders_survive_translation(self) -> None:
+        """Потерянный {0} — это исключение при форматировании, а не опечатка."""
+        broken = []
+        for key, value in self.catalogue().items():
+            if key.startswith("__") or not isinstance(value, str):
+                continue
+            for index in range(4):
+                mark = "{" + str(index)
+                if mark in key and mark not in value:
+                    broken.append((key, value))
+                    break
+        assert not broken, f"плейсхолдеры потеряны: {broken[:3]}"
+
+    def test_translation_is_reported_as_complete(self) -> None:
+        assert i18n.translation_progress("en") == 1.0
+
+    def test_switching_to_english_changes_the_menu(self) -> None:
+        i18n.set_language("en")
+        assert i18n.tr("Файл") == "File"
+        assert i18n.tr("Маркеры") == "Markers"

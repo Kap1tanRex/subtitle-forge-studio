@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core import time as timemod
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands import DeleteEvents, DuplicateEvents
@@ -57,8 +58,9 @@ COL_REFERENCE = 8
 #: рядом с номером — там же, где взгляд ищет состояние строки.
 COL_STATUS = 9
 
-HEADERS = ("#", "Начало", "Конец", "Длит.", "CPS", "Стиль", "Актёр", "Текст",
-           "Оригинал", "Пометка")
+HEADERS = ("#", tr('Начало'), tr('Конец'), tr('Длит.'), "CPS", tr('Стиль'), tr('Актёр'),
+    tr('Текст'),
+           tr('Оригинал'), tr('Пометка'))
 
 #: Порог CPS, выше которого строка подсвечивается как «слишком быстрая».
 CPS_WARNING = 17.0
@@ -705,7 +707,7 @@ class EventTableView(QTableView):
                 lambda checked, c=column: self._set_column(c, checked)
             )
         menu.addSeparator()
-        reset = menu.addAction("Подбирать автоматически")
+        reset = menu.addAction(tr('Подбирать автоматически'))
         reset.triggered.connect(self._unpin_all)
         menu.exec(self.horizontalHeader().mapToGlobal(point))
 
@@ -752,7 +754,7 @@ class EventTableView(QTableView):
         def run(command) -> None:
             undo.run(command)
 
-        insert = menu.addAction("Новая реплика")
+        insert = menu.addAction(tr('Новая реплика'))
         insert.triggered.connect(lambda: self.insert_requested.emit())
 
         if eids:
@@ -764,16 +766,16 @@ class EventTableView(QTableView):
                 )
             )
             menu.addMenu(status_submenu(self, doc, eids, run))
-            note = menu.addAction("Заметка…")
+            note = menu.addAction(tr('Заметка…'))
             note.setEnabled(len(eids) == 1)
             if len(eids) == 1:
                 note.triggered.connect(note_action(self, doc, eids[0], run))
 
             menu.addSeparator()
             what = plural_events(len(eids))
-            duplicate = menu.addAction(f"Дублировать {what}")
+            duplicate = menu.addAction(tr('Дублировать {0}').format(what))
             duplicate.triggered.connect(lambda: run(DuplicateEvents(list(eids))))
-            delete = menu.addAction(f"Удалить {what}")
+            delete = menu.addAction(tr('Удалить {0}').format(what))
             delete.setShortcut("Del")
             delete.triggered.connect(lambda: run(DeleteEvents(list(eids))))
 

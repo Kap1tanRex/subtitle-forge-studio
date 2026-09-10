@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
+from sfstudio.app.i18n import tr
+
 __all__ = ["NativeLibrary", "libass_spec", "libmpv_spec", "platform_tag", "vendor_dir"]
 
 
@@ -171,8 +173,8 @@ def libass_spec() -> NativeLibrary:
 
 def diagnose() -> dict[str, str]:
     """Состояние нативных зависимостей — для ``--version`` и меню «Диагностика»."""
-    report: dict[str, str] = {"платформа": platform_tag(), "каталог": str(vendor_dir())}
+    report: dict[str, str] = {tr('платформа'): platform_tag(), tr('каталог'): str(vendor_dir())}
     for spec in (libmpv_spec(), libass_spec()):
         path = spec.locate()
-        report[spec.name] = str(path) if path else "не найдена"
+        report[spec.name] = str(path) if path else tr('не найдена')
     return report

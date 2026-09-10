@@ -1,9 +1,14 @@
 """Сбор строк интерфейса в каталог перевода.
 
-Обходит исходники, собирает строковые литералы с кириллицей и складывает их в
+Обходит исходники, собирает **аргументы вызовов** ``tr()`` и складывает их в
 JSON, где ключ — русская строка, а значение — перевод. Уже переведённое
 сохраняется: файл дополняется, а не переписывается, иначе каждый запуск
 стирал бы чужую работу.
+
+Именно ``tr()``, а не всякая кириллица в исходниках. Каталог должен точно
+соответствовать тому, что программа действительно ищет в нём во время работы:
+строка, не прошедшая через ``tr``, не переведётся никогда, и её перевод в
+каталоге — обещание, которого никто не выполнит.
 
 Запуск::
 
@@ -64,17 +69,20 @@ def collect(path: Path) -> list[str]:
     except (OSError, SyntaxError):
         return []
 
-    skip = docstrings(tree)
     found: list[str] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+        if not isinstance(node, ast.Call):
             continue
-        if id(node) in skip:
+        name = node.func
+        if not (isinstance(name, ast.Name) and name.id == "tr" and node.args):
             continue
-        text = node.value
-        if not CYRILLIC.search(text) or len(text) > MAX_LENGTH:
+        argument = node.args[0]
+        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+            found.append(argument.value)
             continue
-        found.append(text)
+        # tr(a + b) и подобное собрать нельзя: ключом каталога должна быть
+        # ровно та строка, которую программа будет искать во время работы.
+        print(f"{path.name}:{node.lineno}: tr() не от литерала — не собрано")
     return found
 
 

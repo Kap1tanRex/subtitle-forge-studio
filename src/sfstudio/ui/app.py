@@ -24,7 +24,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
-from sfstudio.app.i18n import set_language
+from sfstudio.app.i18n import set_language, tr
 from sfstudio.app.settings import Settings
 from sfstudio.core.project import PROJECT_SUFFIX
 from sfstudio.ui.appearance import apply as apply_appearance
@@ -104,7 +104,7 @@ def _decide(path: Path | None, settings: Settings) -> _Plan | None:
         # так, и дальше он работает как при обычном запуске. Раньше здесь
         # вылетало необработанное исключение, и программа падала целиком —
         # достаточно было передать имя папки вместо файла.
-        QMessageBox.warning(None, "Не удалось открыть", problem)
+        QMessageBox.warning(None, tr('Не удалось открыть'), problem)
 
     if bool(settings.get("project.restore_last_on_start", False)):
         recent = settings.recent("projects")
@@ -221,8 +221,8 @@ def _ask(settings: Settings):
 
     if dialog.action == ACTION_OPEN:
         chosen, _ = QFileDialog.getOpenFileName(
-            None, "Открыть проект", _default_folder(settings),
-            f"Проект SubtitleForge (*{PROJECT_SUFFIX});;Все файлы (*)",
+            None, tr('Открыть проект'), _default_folder(settings),
+            tr('Проект SubtitleForge (*{0});;Все файлы (*)').format(PROJECT_SUFFIX),
         )
         if not chosen:
             return _RETRY
@@ -233,7 +233,7 @@ def _ask(settings: Settings):
         from sfstudio.ui.main_window import SUBTITLE_FILTER
 
         chosen, _ = QFileDialog.getOpenFileName(
-            None, "Импорт субтитров", "", SUBTITLE_FILTER
+            None, tr('Импорт субтитров'), "", SUBTITLE_FILTER
         )
         if not chosen:
             return _RETRY
@@ -243,7 +243,7 @@ def _ask(settings: Settings):
             plan.document = registry.load(Path(chosen))
         except Exception as exc:
             QMessageBox.critical(
-                None, "Не удалось открыть", f"{type(exc).__name__}: {exc}"
+                None, tr('Не удалось открыть'), f"{type(exc).__name__}: {exc}"
             )
             return _RETRY
         return plan
@@ -269,7 +269,7 @@ def _ask_new_project(settings: Settings):
 
     target = dialog.project_path()
     if target is None:
-        QMessageBox.warning(None, "Новый проект", "Укажите название и папку.")
+        QMessageBox.warning(None, tr('Новый проект'), tr('Укажите название и папку.'))
         return None
 
     project = dialog.build()

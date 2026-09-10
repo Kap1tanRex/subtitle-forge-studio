@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.ui.actions import ActionRegistry, ActionSpec
 
 __all__ = ["CommandPalette"]
@@ -31,7 +32,7 @@ class CommandPalette(QDialog):
 
     def __init__(self, registry: ActionRegistry, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Команды")
+        self.setWindowTitle(tr('Команды'))
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.resize(640, 420)
         self._registry = registry
@@ -42,7 +43,7 @@ class CommandPalette(QDialog):
         layout.setSpacing(8)
 
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Начните вводить название команды…")
+        self.search.setPlaceholderText(tr('Начните вводить название команды…'))
         self.search.textChanged.connect(self._refresh)
         # Стрелки должны листать список, не двигая курсор в поле ввода:
         # руки остаются на клавиатуре, и палитра работает без мыши.
@@ -54,7 +55,7 @@ class CommandPalette(QDialog):
         self.list.itemDoubleClicked.connect(self._accept_item)
         layout.addWidget(self.list, 1)
 
-        self.hint = QLabel("↑↓ — выбор · Enter — выполнить · Esc — закрыть")
+        self.hint = QLabel(tr('↑↓ — выбор · Enter — выполнить · Esc — закрыть'))
         self.hint.setProperty("role", "hint")
         layout.addWidget(self.hint)
 

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.time import format_ass
 from sfstudio.services.qc import PROFILES, QcRunner, Severity
@@ -52,25 +53,25 @@ class QcPanel(QWidget):
         layout.setSpacing(6)
 
         controls = QHBoxLayout()
-        controls.addWidget(QLabel("Профиль:"))
+        controls.addWidget(QLabel(tr('Профиль:')))
         self.profile_box = QComboBox()
         for key, profile in PROFILES.items():
             self.profile_box.addItem(profile.name, key)
         self.profile_box.currentIndexChanged.connect(self._on_profile)
         controls.addWidget(self.profile_box, 1)
 
-        controls.addWidget(QLabel("Показывать:"))
+        controls.addWidget(QLabel(tr('Показывать:')))
         self.filter_box = QComboBox()
-        self.filter_box.addItem("всё", Severity.INFO)
-        self.filter_box.addItem("внимание и ошибки", Severity.WARNING)
-        self.filter_box.addItem("только ошибки", Severity.ERROR)
+        self.filter_box.addItem(tr('всё'), Severity.INFO)
+        self.filter_box.addItem(tr('внимание и ошибки'), Severity.WARNING)
+        self.filter_box.addItem(tr('только ошибки'), Severity.ERROR)
         self.filter_box.currentIndexChanged.connect(self._on_filter)
         controls.addWidget(self.filter_box, 1)
         layout.addLayout(controls)
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(3)
-        self.tree.setHeaderLabels(["Время", "Правило", "Что не так"])
+        self.tree.setHeaderLabels([tr('Время'), tr('Правило'), tr('Что не так')])
         self.tree.setRootIsDecorated(False)
         self.tree.setAlternatingRowColors(True)
         self.tree.setUniformRowHeights(True)
@@ -119,7 +120,7 @@ class QcPanel(QWidget):
                 item.setData(0, Qt.UserRole, issue.eid)
                 colour = getattr(self._palette, _SEVERITY_COLOR[issue.severity])
                 item.setForeground(2, QColor(colour))
-                item.setToolTip(2, event.plain or "(пусто)")
+                item.setToolTip(2, event.plain or tr('(пусто)'))
                 self.tree.addTopLevelItem(item)
         finally:
             self.tree.setUpdatesEnabled(True)

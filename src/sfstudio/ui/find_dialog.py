@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.commands import CompositeCommand, SetText
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.time import format_srt
@@ -67,7 +68,7 @@ class FindDialog(QDialog):
         cursor_eid: int | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Найти и заменить")
+        self.setWindowTitle(tr('Найти и заменить'))
         self.resize(560, 420)
         # Немодальное: искать надо по ходу правки.
         self.setModal(False)
@@ -92,22 +93,22 @@ class FindDialog(QDialog):
         form.setContentsMargins(0, 0, 0, 0)
 
         self.find_edit = QLineEdit()
-        self.find_edit.setPlaceholderText("что искать")
+        self.find_edit.setPlaceholderText(tr('что искать'))
         self.find_edit.textChanged.connect(self._refresh)
-        form.addRow("Найти", self.find_edit)
+        form.addRow(tr('Найти'), self.find_edit)
 
         self.replace_edit = QLineEdit()
-        self.replace_edit.setPlaceholderText("чем заменить")
-        form.addRow("Заменить на", self.replace_edit)
+        self.replace_edit.setPlaceholderText(tr('чем заменить'))
+        form.addRow(tr('Заменить на'), self.replace_edit)
 
         options = QHBoxLayout()
-        self.case_check = QCheckBox("Учитывать регистр")
-        self.word_check = QCheckBox("Слово целиком")
-        self.regex_check = QCheckBox("Регулярное выражение")
-        self.tags_check = QCheckBox("Искать и в разметке")
+        self.case_check = QCheckBox(tr('Учитывать регистр'))
+        self.word_check = QCheckBox(tr('Слово целиком'))
+        self.regex_check = QCheckBox(tr('Регулярное выражение'))
+        self.tags_check = QCheckBox(tr('Искать и в разметке'))
         self.tags_check.setToolTip(
-            "По умолчанию содержимое фигурных скобок пропускается: там теги "
-            "оформления, а не речь"
+            tr('По умолчанию содержимое фигурных скобок пропускается: там теги оформления, '
+                   'а не речь')
         )
         for check in (self.case_check, self.word_check, self.regex_check,
                       self.tags_check):
@@ -120,7 +121,7 @@ class FindDialog(QDialog):
         for scope in SearchScope:
             self.scope_box.addItem(scope.title, scope)
         self.scope_box.currentIndexChanged.connect(self._refresh)
-        form.addRow("Область", self.scope_box)
+        form.addRow(tr('Область'), self.scope_box)
         return box
 
     def _results(self) -> QWidget:
@@ -140,10 +141,10 @@ class FindDialog(QDialog):
 
     def _buttons(self) -> QWidget:
         buttons = QDialogButtonBox()
-        self.replace_button = buttons.addButton("Заменить всё",
+        self.replace_button = buttons.addButton(tr('Заменить всё'),
                                                 QDialogButtonBox.ActionRole)
         self.replace_button.clicked.connect(self._replace_all)
-        close = buttons.addButton("Закрыть", QDialogButtonBox.RejectRole)
+        close = buttons.addButton(tr('Закрыть'), QDialogButtonBox.RejectRole)
         close.clicked.connect(self.close)
         return buttons
 
@@ -187,19 +188,19 @@ class FindDialog(QDialog):
 
     def _update_status(self, query: SearchQuery) -> None:
         if not query.text:
-            self.status.setText("Введите, что искать.")
+            self.status.setText(tr('Введите, что искать.'))
             return
         if query.compile() is None:
             # Незаконченное выражение — обычное состояние поля при наборе.
-            self.status.setText("Выражение пока незакончено.")
+            self.status.setText(tr('Выражение пока незакончено.'))
             return
         if not self._matches:
-            self.status.setText("Ничего не найдено.")
+            self.status.setText(tr('Ничего не найдено.'))
             return
 
         shown = len(self._matches)
-        tail = f" (показаны первые {MAX_SHOWN})" if shown >= MAX_SHOWN else ""
-        self.status.setText(f"Найдено: {shown}{tail}")
+        tail = tr(' (показаны первые {0})').format(MAX_SHOWN) if shown >= MAX_SHOWN else ""
+        self.status.setText(tr('Найдено: {0}{1}').format(shown, tail))
 
     def _go_to(self, item: QListWidgetItem | None) -> None:
         if item is None:
@@ -221,12 +222,12 @@ class FindDialog(QDialog):
             )
         )
         if not changes:
-            self.status.setText("Заменять нечего.")
+            self.status.setText(tr('Заменять нечего.'))
             return
 
         answer = QMessageBox.question(
             self,
-            "Заменить всё",
+            tr('Заменить всё'),
             f"Изменить реплик: {len(changes)}.\n\n"
             f"Например:\n«{_shorten(changes[0][1])}»\nстанет\n«{_shorten(changes[0][2])}»"
             "\n\nПродолжить?",
@@ -238,12 +239,12 @@ class FindDialog(QDialog):
         # Ctrl+Z, сколько реплик задето.
         command = CompositeCommand(
             [SetText(eid, updated) for eid, _before, updated in changes],
-            label=f"Замена в {len(changes)} репликах",
+            label=tr('Замена в {0} репликах').format(len(changes)),
         )
         self._undo.run(command)
         self.document_edited.emit()
         self._refresh()
-        self.status.setText(f"Заменено в {len(changes)} репликах.")
+        self.status.setText(tr('Заменено в {0} репликах.').format(len(changes)))
 
 
 def _wrap(layout) -> QWidget:

@@ -27,6 +27,8 @@ import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
+
 __all__ = ["Glossary", "Term", "stem"]
 
 #: Сколько букв слова считать неизменяемой частью. Четыре — компромисс:
@@ -144,10 +146,10 @@ class Glossary:
         """CSV с заголовком: в таком виде глоссарии и передают."""
         buffer = io.StringIO()
         writer = csv.writer(buffer, delimiter=";", lineterminator="\n")
-        writer.writerow(["оригинал", "перевод", "обязательно", "заметка"])
+        writer.writerow([tr('оригинал'), tr('перевод'), tr('обязательно'), tr('заметка')])
         for term in self._terms:
             writer.writerow([
-                term.source, term.target, "да" if term.required else "нет", term.note,
+                term.source, term.target, tr('да') if term.required else tr('нет'), term.note,
             ])
         return buffer.getvalue()
 
@@ -173,11 +175,11 @@ class Glossary:
             source, target = row[0].strip(), row[1].strip()
             if not source or not target:
                 continue
-            if index == 0 and source.lower() in ("оригинал", "source", "term", "термин"):
+            if index == 0 and source.lower() in (tr('оригинал'), "source", "term", tr('термин')):
                 continue
             required = True
             if len(row) > 2:
-                required = row[2].strip().lower() not in ("нет", "no", "false", "0")
+                required = row[2].strip().lower() not in (tr('нет'), "no", "false", "0")
             note = row[3].strip() if len(row) > 3 else ""
             terms.append(Term(source, target, required, note))
         return cls(terms)

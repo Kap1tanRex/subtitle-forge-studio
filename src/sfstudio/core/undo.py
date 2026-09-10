@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command, CompositeCommand
 from sfstudio.core.document import SubtitleDocument
@@ -149,7 +150,7 @@ class UndoStack:
         отката неочевидной. Попытка вложить — ошибка, а не тихое поведение.
         """
         if self._txn is not None:
-            raise RuntimeError("вложенные транзакции не поддерживаются")
+            raise RuntimeError(tr('вложенные транзакции не поддерживаются'))
         self._txn = []
         self._txn_label = label
         try:

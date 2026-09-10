@@ -28,6 +28,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
+from sfstudio.app.i18n import tr
 from sfstudio.platform.native import libass_spec
 
 __all__ = [
@@ -130,7 +131,7 @@ class AssContext:
         self._lib = self._load()
         self._library = self._lib.ass_library_init()
         if not self._library:
-            raise AssLibraryError("ass_library_init вернула NULL")
+            raise AssLibraryError(tr('ass_library_init вернула NULL'))
 
         # Держим ссылку на колбэк: если её потерять, ctypes соберёт объект,
         # и libass вызовет освобождённую память.
@@ -141,7 +142,7 @@ class AssContext:
         self._renderer = self._lib.ass_renderer_init(self._library)
         if not self._renderer:
             self._lib.ass_library_done(self._library)
-            raise AssLibraryError("ass_renderer_init вернула NULL")
+            raise AssLibraryError(tr('ass_renderer_init вернула NULL'))
 
         self._track: Any = None
         self._fonts_ready = False
@@ -239,7 +240,7 @@ class AssContext:
             self._library, buffer, len(payload), None
         )
         if not self._track:
-            raise AssLibraryError("ass_read_memory вернула NULL")
+            raise AssLibraryError(tr('ass_read_memory вернула NULL'))
 
     def free_track(self) -> None:
         if self._track:

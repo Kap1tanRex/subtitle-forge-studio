@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.actors import Actor
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.color import RGBA
@@ -29,7 +30,7 @@ class AddActor(Command):
         self.color = color
         self.note = note
         self._added: Actor | None = None
-        self.label = "Новый актор"
+        self.label = tr('Новый актор')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         if not self.name or self.name in doc.actors:
@@ -63,7 +64,7 @@ class RemoveActor(Command):
     def __init__(self, name: str) -> None:
         self.name = name
         self._removed: Actor | None = None
-        self.label = "Удаление актора"
+        self.label = tr('Удаление актора')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         self._removed = doc.actors.remove(self.name)
@@ -89,7 +90,7 @@ class RenameActor(Command):
         self.old_name = old_name
         self.new_name = new_name.strip()
         self._touched: list[int] = []
-        self.label = "Переименование актора"
+        self.label = tr('Переименование актора')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         if not self.new_name or self.old_name not in doc.actors:
@@ -129,7 +130,7 @@ class UpdateActor(Command):
         self.color = color
         self.note = note
         self._before: Actor | None = None
-        self.label = "Правка актора"
+        self.label = tr('Правка актора')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         current = doc.actors.get(self.name)
@@ -184,7 +185,7 @@ class AssignActor(Command):
         self.eids = eids
         self.name = name.strip()
         self._before: list[tuple[int, str]] = []
-        self.label = "Назначение актора" if self.name else "Снятие актора"
+        self.label = tr('Назначение актора') if self.name else tr('Снятие актора')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         self._before = []

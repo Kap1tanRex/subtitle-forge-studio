@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.document import SubtitleDocument
 
@@ -19,7 +20,7 @@ class Command(ABC):
     """Атомарное изменение документа."""
 
     #: Текст для меню «Отменить: …»
-    label: str = "Изменение"
+    label: str = tr('Изменение')
 
     @abstractmethod
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
@@ -48,7 +49,7 @@ class CompositeCommand(Command):
 
     __slots__ = ("commands", "label")
 
-    def __init__(self, commands: list[Command], label: str = "Изменение") -> None:
+    def __init__(self, commands: list[Command], label: str = tr('Изменение')) -> None:
         self.commands = commands
         self.label = label
 

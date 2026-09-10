@@ -52,6 +52,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 from sfstudio.core.commands import (
     AssignActor,
@@ -143,10 +144,10 @@ class Inspector(QTabWidget):
         self._qc_notes: list[str] = []
         self._panels: dict[str, PanelSlot] = {}
 
-        self.add_panel("event", "Реплика", self._build_event_tab(), event_bound=True)
-        self.add_panel("format", "Формат", self._build_text_tab(), event_bound=True)
-        self.add_panel("frame", "Кадр", self._build_frame_tab(), event_bound=True)
-        self.add_panel("checks", "Проверки", self._build_checks_tab(), event_bound=True)
+        self.add_panel("event", tr('Реплика'), self._build_event_tab(), event_bound=True)
+        self.add_panel("format", tr('Формат'), self._build_text_tab(), event_bound=True)
+        self.add_panel("frame", tr('Кадр'), self._build_frame_tab(), event_bound=True)
+        self.add_panel("checks", tr('Проверки'), self._build_checks_tab(), event_bound=True)
         self.setDocumentMode(True)
         # Вкладок семь, а колонка узкая. Сокращать подписи нельзя: «Ре…» и
         # «Т…» не различить, а выбирать приходится именно по ним. Поэтому
@@ -285,22 +286,22 @@ class Inspector(QTabWidget):
 
         self.start_edit = QLineEdit()
         self.start_edit.editingFinished.connect(lambda: self._commit_time("start"))
-        form.addRow("Начало", self.start_edit)
+        form.addRow(tr('Начало'), self.start_edit)
 
         self.end_edit = QLineEdit()
         self.end_edit.editingFinished.connect(lambda: self._commit_time("end"))
-        form.addRow("Конец", self.end_edit)
+        form.addRow(tr('Конец'), self.end_edit)
 
         self.duration_label = QLabel("—")
-        form.addRow("Длительность", self.duration_label)
+        form.addRow(tr('Длительность'), self.duration_label)
 
         self.style_box = QComboBox()
         self.style_box.currentTextChanged.connect(self._commit_style)
-        form.addRow("Стиль", self.style_box)
+        form.addRow(tr('Стиль'), self.style_box)
 
         self.track_box = QComboBox()
         self.track_box.currentIndexChanged.connect(self._commit_track)
-        form.addRow("Дорожка", self.track_box)
+        form.addRow(tr('Дорожка'), self.track_box)
 
         actor_row = QHBoxLayout()
         self.actor_box = QComboBox()
@@ -309,10 +310,10 @@ class Inspector(QTabWidget):
         actor_row.addWidget(self.actor_box, 1)
         manage = QPushButton("…")
         manage.setFixedWidth(28)
-        manage.setToolTip("Управление акторами")
+        manage.setToolTip(tr('Управление акторами'))
         manage.clicked.connect(self.actors_requested)
         actor_row.addWidget(manage)
-        form.addRow("Актор", actor_row)
+        form.addRow(tr('Актор'), actor_row)
 
         self.actor_swatch = QLabel("")
         self.actor_swatch.setFixedHeight(4)
@@ -329,19 +330,19 @@ class Inspector(QTabWidget):
         self.font_box.currentFontChanged.connect(
             lambda f: self._set_tag("fn", f.family())
         )
-        form.addRow("Шрифт", self.font_box)
+        form.addRow(tr('Шрифт'), self.font_box)
 
         self.size_spin = QDoubleSpinBox()
         self.size_spin.setRange(1.0, 800.0)
         self.size_spin.setDecimals(0)
         self.size_spin.valueChanged.connect(lambda v: self._set_tag("fs", v))
-        form.addRow("Кегль", self.size_spin)
+        form.addRow(tr('Кегль'), self.size_spin)
 
         flags = QHBoxLayout()
-        self.bold_check = QCheckBox("Ж")
-        self.italic_check = QCheckBox("К")
-        self.underline_check = QCheckBox("Ч")
-        self.strike_check = QCheckBox("З")
+        self.bold_check = QCheckBox(tr('Ж'))
+        self.italic_check = QCheckBox(tr('К'))
+        self.underline_check = QCheckBox(tr('Ч'))
+        self.strike_check = QCheckBox(tr('З'))
         for box, tag in (
             (self.bold_check, "b"), (self.italic_check, "i"),
             (self.underline_check, "u"), (self.strike_check, "s"),
@@ -351,21 +352,21 @@ class Inspector(QTabWidget):
             )
             flags.addWidget(box)
         flags.addStretch(1)
-        form.addRow("Начертание", flags)
+        form.addRow(tr('Начертание'), flags)
 
-        self.primary_button = QPushButton("Основной")
+        self.primary_button = QPushButton(tr('Основной'))
         self.primary_button.clicked.connect(lambda: self._pick_color("c"))
-        form.addRow("Цвет текста", self.primary_button)
+        form.addRow(tr('Цвет текста'), self.primary_button)
 
-        self.outline_button = QPushButton("Обводка")
+        self.outline_button = QPushButton(tr('Обводка'))
         self.outline_button.clicked.connect(lambda: self._pick_color("3c"))
-        form.addRow("Цвет обводки", self.outline_button)
+        form.addRow(tr('Цвет обводки'), self.outline_button)
 
         self.spacing_spin = QDoubleSpinBox()
         self.spacing_spin.setRange(-50.0, 50.0)
         self.spacing_spin.setDecimals(1)
         self.spacing_spin.valueChanged.connect(lambda v: self._set_tag("fsp", v))
-        form.addRow("Разрядка", self.spacing_spin)
+        form.addRow(tr('Разрядка'), self.spacing_spin)
 
         scale_row = QHBoxLayout()
         self.scale_x_spin = QDoubleSpinBox()
@@ -380,7 +381,7 @@ class Inspector(QTabWidget):
         self.scale_y_spin.valueChanged.connect(lambda v: self._set_tag("fscy", v))
         scale_row.addWidget(self.scale_x_spin)
         scale_row.addWidget(self.scale_y_spin)
-        form.addRow("Масштаб", scale_row)
+        form.addRow(tr('Масштаб'), scale_row)
 
         self.text_hint = QLabel("")
         self.text_hint.setProperty("role", "hint")
@@ -397,7 +398,7 @@ class Inspector(QTabWidget):
         for value, title in sorted(ALIGNMENT_NAMES.items()):
             self.align_box.addItem(f"{value} — {title}", value)
         self.align_box.currentIndexChanged.connect(self._commit_alignment)
-        form.addRow("Выравнивание", self.align_box)
+        form.addRow(tr('Выравнивание'), self.align_box)
 
         pos_row = QHBoxLayout()
         self.pos_x_spin = QSpinBox()
@@ -408,10 +409,10 @@ class Inspector(QTabWidget):
             spin.valueChanged.connect(self._commit_position)
         pos_row.addWidget(self.pos_x_spin)
         pos_row.addWidget(self.pos_y_spin)
-        form.addRow("Положение", pos_row)
+        form.addRow(tr('Положение'), pos_row)
 
         self.clear_pos_button = QPushButton("Убрать \\pos")
-        self.clear_pos_button.setToolTip("Вернуть реплику на место по умолчанию")
+        self.clear_pos_button.setToolTip(tr('Вернуть реплику на место по умолчанию'))
         self.clear_pos_button.clicked.connect(lambda: self._set_tag("pos", None))
         form.addRow("", self.clear_pos_button)
 
@@ -420,7 +421,7 @@ class Inspector(QTabWidget):
         self.angle_spin.setDecimals(1)
         self.angle_spin.setSuffix("°")
         self.angle_spin.valueChanged.connect(lambda v: self._set_tag("frz", v))
-        form.addRow("Поворот", self.angle_spin)
+        form.addRow(tr('Поворот'), self.angle_spin)
 
         margins = QHBoxLayout()
         self.margin_l_spin = QSpinBox()
@@ -430,7 +431,7 @@ class Inspector(QTabWidget):
             spin.setRange(0, 10000)
             spin.valueChanged.connect(self._commit_margins)
             margins.addWidget(spin)
-        form.addRow("Поля Л/П/В", margins)
+        form.addRow(tr('Поля Л/П/В'), margins)
         return page
 
     def _build_checks_tab(self) -> QWidget:
@@ -440,13 +441,13 @@ class Inspector(QTabWidget):
         form.setLabelAlignment(Qt.AlignRight)
 
         self.cps_label = QLabel("—")
-        form.addRow("Знаков в секунду", self.cps_label)
+        form.addRow(tr('Знаков в секунду'), self.cps_label)
         self.chars_label = QLabel("—")
-        form.addRow("Символов", self.chars_label)
+        form.addRow(tr('Символов'), self.chars_label)
         self.lines_label = QLabel("—")
-        form.addRow("Строк", self.lines_label)
+        form.addRow(tr('Строк'), self.lines_label)
         self.longest_label = QLabel("—")
-        form.addRow("Длиннейшая строка", self.longest_label)
+        form.addRow(tr('Длиннейшая строка'), self.longest_label)
         layout.addLayout(form)
 
         self.qc_label = QLabel("")
@@ -507,7 +508,7 @@ class Inspector(QTabWidget):
         try:
             self.start_edit.setText(format_srt(event.start))
             self.end_edit.setText(format_srt(event.end))
-            self.duration_label.setText(f"{event.duration / 1000:.3f} с")
+            self.duration_label.setText(tr('{0:.3f} с').format(event.duration / 1000))
 
             self._fill_combo(self.style_box, list(self._doc.styles), event.style)
             self._fill_tracks(event.layer)
@@ -522,8 +523,8 @@ class Inspector(QTabWidget):
             self.spacing_spin.setValue(eff.spacing)
             self.scale_x_spin.setValue(eff.scale_x)
             self.scale_y_spin.setValue(eff.scale_y)
-            self._paint_button(self.primary_button, eff.primary, "Основной")
-            self._paint_button(self.outline_button, eff.outline_color, "Обводка")
+            self._paint_button(self.primary_button, eff.primary, tr('Основной'))
+            self._paint_button(self.outline_button, eff.outline_color, tr('Обводка'))
 
             index = index_of_data(self.align_box, eff.alignment)
             if index >= 0:
@@ -545,8 +546,8 @@ class Inspector(QTabWidget):
 
             mixed = sorted(eff.mixed)
             self.text_hint.setText(
-                "Внутри реплики меняется: " + ", ".join("\\" + n for n in mixed)
-                + ". Значения показаны для её начала."
+                tr('Внутри реплики меняется: ') + ", ".join("\\" + n for n in mixed)
+                + tr('. Значения показаны для её начала.')
                 if mixed
                 else ""
             )
@@ -613,7 +614,7 @@ class Inspector(QTabWidget):
         self.qc_label.setText(
             "\n".join(f"• {note}" for note in self._qc_notes)
             if self._qc_notes
-            else "Замечаний нет."
+            else tr('Замечаний нет.')
         )
 
     # -- запись ------------------------------------------------------------------- #
@@ -699,7 +700,7 @@ class Inspector(QTabWidget):
         event = self._doc.by_eid(self._eid)
         eff = effective_style(event, self._doc.style_for(event))
         current = eff.primary if tag == "c" else eff.outline_color
-        chosen = QColorDialog.getColor(QColor(current.to_hex()), self, "Цвет")
+        chosen = QColorDialog.getColor(QColor(current.to_hex()), self, tr('Цвет'))
         if not chosen.isValid():
             return
         picked = RGBA(chosen.red(), chosen.green(), chosen.blue(), 255)

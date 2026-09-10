@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.project import (
     FPS_PRESETS,
     PROJECT_SUFFIX,
@@ -43,7 +44,7 @@ from sfstudio.ui.font_box import FontComboBox
 
 __all__ = ["NewProjectDialog"]
 
-CUSTOM = "Произвольное…"
+CUSTOM = tr('Произвольное…')
 
 
 class NewProjectDialog(QDialog):
@@ -59,7 +60,7 @@ class NewProjectDialog(QDialog):
         default_size: float = 54.0,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Новый проект")
+        self.setWindowTitle(tr('Новый проект'))
         self.setMinimumWidth(520)
         self._folder = Path(default_folder)
         self._media = media_path
@@ -70,19 +71,19 @@ class NewProjectDialog(QDialog):
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight)
 
-        self.name_edit = QLineEdit("Новый проект")
+        self.name_edit = QLineEdit(tr('Новый проект'))
         self.name_edit.textChanged.connect(self._refresh_path_hint)
-        form.addRow("Название", self.name_edit)
+        form.addRow(tr('Название'), self.name_edit)
 
         # -- место хранения ------------------------------------------------- #
         folder_row = QHBoxLayout()
         self.folder_edit = QLineEdit(str(self._folder))
         self.folder_edit.textChanged.connect(self._refresh_path_hint)
         folder_row.addWidget(self.folder_edit, 1)
-        browse = QPushButton("Обзор…")
+        browse = QPushButton(tr('Обзор…'))
         browse.clicked.connect(self._choose_folder)
         folder_row.addWidget(browse)
-        form.addRow("Папка", folder_row)
+        form.addRow(tr('Папка'), folder_row)
 
         self.path_hint = QLabel("")
         self.path_hint.setProperty("role", "hint")
@@ -95,7 +96,7 @@ class NewProjectDialog(QDialog):
             self.resolution_box.addItem(title, (width, height))
         self.resolution_box.addItem(CUSTOM, None)
         self.resolution_box.currentIndexChanged.connect(self._on_resolution)
-        form.addRow("Разрешение", self.resolution_box)
+        form.addRow(tr('Разрешение'), self.resolution_box)
 
         size_row = QHBoxLayout()
         self.width_spin = QSpinBox()
@@ -113,8 +114,8 @@ class NewProjectDialog(QDialog):
         form.addRow("", size_row)
 
         note = QLabel(
-            "Разрешение задаёт систему координат субтитров (PlayRes). "
-            "Менять его после расстановки реплик — значит сдвинуть их все."
+            tr('Разрешение задаёт систему координат субтитров (PlayRes). Менять его после '
+                   'расстановки реплик — значит сдвинуть их все.')
         )
         note.setProperty("role", "hint")
         note.setWordWrap(True)
@@ -125,41 +126,39 @@ class NewProjectDialog(QDialog):
         for title, value in FPS_PRESETS:
             self.fps_box.addItem(title, value)
         self.fps_box.setCurrentIndex(2)  # 25
-        form.addRow("Частота кадров", self.fps_box)
+        form.addRow(tr('Частота кадров'), self.fps_box)
 
         # -- оформление ---------------------------------------------------- #
         self.font_box = FontComboBox()
         self.font_box.setToolTip(
-            "Наведите на шрифт в списке — появится образец русского и "
-            "английского текста"
+            tr('Наведите на шрифт в списке — появится образец русского и английского текста')
         )
-        form.addRow("Шрифт субтитров", self.font_box)
+        form.addRow(tr('Шрифт субтитров'), self.font_box)
 
         # -- медиа ------------------------------------------------------------- #
         media_row = QHBoxLayout()
         self.media_edit = QLineEdit(str(media_path) if media_path else "")
-        self.media_edit.setPlaceholderText("необязательно — можно открыть позже")
+        self.media_edit.setPlaceholderText(tr('необязательно — можно открыть позже'))
         media_row.addWidget(self.media_edit, 1)
-        pick_media = QPushButton("Выбрать…")
+        pick_media = QPushButton(tr('Выбрать…'))
         pick_media.clicked.connect(self._choose_media)
         media_row.addWidget(pick_media)
-        form.addRow("Видео", media_row)
+        form.addRow(tr('Видео'), media_row)
 
         self.match_media = QCheckBox(
-            "Взять разрешение и частоту кадров из видео"
+            tr('Взять разрешение и частоту кадров из видео')
         )
         self.match_media.setChecked(True)
         self.match_media.setToolTip(
-            "Параметры будут уточнены при открытии файла — так они точно "
-            "совпадут с исходником"
+            tr('Параметры будут уточнены при открытии файла — так они точно совпадут с исходником')
         )
         form.addRow("", self.match_media)
 
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.button(QDialogButtonBox.Ok).setText("Создать")
-        buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
+        buttons.button(QDialogButtonBox.Ok).setText(tr('Создать'))
+        buttons.button(QDialogButtonBox.Cancel).setText(tr('Отмена'))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -180,7 +179,7 @@ class NewProjectDialog(QDialog):
 
     def _choose_folder(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
-            self, "Папка проекта", self.folder_edit.text()
+            self, tr('Папка проекта'), self.folder_edit.text()
         )
         if chosen:
             self.folder_edit.setText(chosen)
@@ -189,7 +188,7 @@ class NewProjectDialog(QDialog):
         from sfstudio.ui.main_window import MEDIA_FILTER
 
         chosen, _ = QFileDialog.getOpenFileName(
-            self, "Видео проекта", self.folder_edit.text(), MEDIA_FILTER
+            self, tr('Видео проекта'), self.folder_edit.text(), MEDIA_FILTER
         )
         if chosen:
             self.media_edit.setText(chosen)
@@ -197,10 +196,10 @@ class NewProjectDialog(QDialog):
     def _refresh_path_hint(self) -> None:
         path = self.project_path()
         if path is None:
-            self.path_hint.setText("Укажите название и папку.")
+            self.path_hint.setText(tr('Укажите название и папку.'))
             return
-        exists = " — файл уже существует и будет перезаписан" if path.exists() else ""
-        self.path_hint.setText(f"Файл: {path}{exists}")
+        exists = tr(' — файл уже существует и будет перезаписан') if path.exists() else ""
+        self.path_hint.setText(tr('Файл: {0}{1}').format(path, exists))
 
     # -- результат ----------------------------------------------------------------- #
 
@@ -243,7 +242,7 @@ class NewProjectDialog(QDialog):
     def build(self) -> Project:
         """Собирает проект по введённым параметрам."""
         project = Project.new(
-            name=self.name_edit.text().strip() or "Новый проект",
+            name=self.name_edit.text().strip() or tr('Новый проект'),
             resolution=self.resolution(),
             fps=self.fps(),
             media_path=self.media_path(),

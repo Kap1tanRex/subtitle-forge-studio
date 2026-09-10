@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from sfstudio.app.i18n import tr
 from sfstudio.ui.motion import install_effects, resolve
 from sfstudio.ui.theme import Palette, build_qss
 from sfstudio.ui.theme_pack import ThemePack, available, palette_of
@@ -38,7 +39,7 @@ def current_pack(settings) -> ThemePack:
     name = str(settings.get("ui.theme", "dark") or "dark")
     pack = packs.get(name)
     if pack is None or pack.error:
-        return packs.get("dark") or ThemePack(name="dark", title="Тёмная", base="dark")
+        return packs.get("dark") or ThemePack(name="dark", title=tr('Тёмная'), base="dark")
     return pack
 
 

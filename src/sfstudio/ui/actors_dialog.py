@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 from sfstudio.core.commands import (
     AddActor,
@@ -75,7 +76,7 @@ class ActorsPanel(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
 
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Цвет", "Имя", "Реплик", "Заметка"])
+        self.table.setHorizontalHeaderLabels([tr('Цвет'), tr('Имя'), tr('Реплик'), tr('Заметка')])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -91,11 +92,11 @@ class ActorsPanel(QWidget):
 
         buttons = QHBoxLayout()
         for caption, slot in (
-            ("Добавить", self._add),
-            ("Переименовать", self._rename),
-            ("Цвет…", self._recolor),
-            ("Заметка…", self._set_note),
-            ("Удалить", self._remove),
+            (tr('Добавить'), self._add),
+            (tr('Переименовать'), self._rename),
+            (tr('Цвет…'), self._recolor),
+            (tr('Заметка…'), self._set_note),
+            (tr('Удалить'), self._remove),
         ):
             button = QPushButton(caption)
             button.clicked.connect(slot)
@@ -103,14 +104,14 @@ class ActorsPanel(QWidget):
         buttons.addStretch(1)
         layout.addLayout(buttons)
 
-        self.assign_button = QPushButton("Назначить выделенным репликам")
+        self.assign_button = QPushButton(tr('Назначить выделенным репликам'))
         self.assign_button.setToolTip(
-            "Выберите реплики в таблице или на таймлайне, затем актора здесь"
+            tr('Выберите реплики в таблице или на таймлайне, затем актора здесь')
         )
         self.assign_button.clicked.connect(self._assign)
         layout.addWidget(self.assign_button)
 
-        self.import_button = QPushButton("Занести встреченных")
+        self.import_button = QPushButton(tr('Занести встреченных'))
         self.import_button.clicked.connect(self._import_used)
         layout.addWidget(self.import_button)
 
@@ -161,13 +162,13 @@ class ActorsPanel(QWidget):
         self.import_button.setEnabled(bool(unregistered))
         if unregistered:
             preview = ", ".join(unregistered[:6])
-            more = f" и ещё {len(unregistered) - 6}" if len(unregistered) > 6 else ""
+            more = tr(' и ещё {0}').format(len(unregistered) - 6) if len(unregistered) > 6 else ""
             self.hint.setText(
-                f"В репликах встречается {len(unregistered)} имён без цвета: "
-                f"{preview}{more}."
+                tr('В репликах встречается {0} имён без цвета: '
+                       '{1}{2}.').format(len(unregistered), preview, more)
             )
         else:
-            self.hint.setText("Все встречающиеся имена заведены.")
+            self.hint.setText(tr('Все встречающиеся имена заведены.'))
 
     def _selected_name(self) -> str | None:
         row = self.table.currentRow()
@@ -184,11 +185,12 @@ class ActorsPanel(QWidget):
         self.refresh()
 
     def _add(self) -> None:
-        name, ok = QInputDialog.getText(self, "Новый актор", "Имя:")
+        name, ok = QInputDialog.getText(self, tr('Новый актор'), tr('Имя:'))
         if not ok or not name.strip():
             return
         if name.strip() in self._doc.actors:
-            QMessageBox.information(self, "Актор есть", f"«{name.strip()}» уже в списке.")
+            QMessageBox.information(self, tr('Актор '
+                   'есть'), tr('«{0}» уже в списке.').format(name.strip()))
             return
         self._run(AddActor(name))
 
@@ -196,18 +198,19 @@ class ActorsPanel(QWidget):
         current = self._selected_name()
         if current is None:
             return
-        name, ok = QInputDialog.getText(self, "Переименовать", "Имя:", text=current)
+        name, ok = QInputDialog.getText(self, tr('Переименовать'), tr('Имя:'), text=current)
         if not ok or not name.strip() or name.strip() == current:
             return
         if name.strip() in self._doc.actors:
-            QMessageBox.information(self, "Актор есть", f"«{name.strip()}» уже в списке.")
+            QMessageBox.information(self, tr('Актор '
+                   'есть'), tr('«{0}» уже в списке.').format(name.strip()))
             return
         # Переименование меняет и реплики — предупреждаем, если их много.
         count = self._doc.actors_in_use().get(current, 0)
         if count > 20:
             answer = QMessageBox.question(
-                self, "Переименовать",
-                f"Имя изменится в {count} репликах. Продолжить?",
+                self, tr('Переименовать'),
+                tr('Имя изменится в {0} репликах. Продолжить?').format(count),
             )
             if answer != QMessageBox.Yes:
                 return
@@ -220,7 +223,7 @@ class ActorsPanel(QWidget):
         actor = self._doc.actors.get(name)
         if actor is None:
             return
-        chosen = QColorDialog.getColor(QColor(actor.color.to_hex()), self, "Цвет актора")
+        chosen = QColorDialog.getColor(QColor(actor.color.to_hex()), self, tr('Цвет актора'))
         if not chosen.isValid():
             return
         self._run(
@@ -234,7 +237,7 @@ class ActorsPanel(QWidget):
         actor = self._doc.actors.get(name)
         if actor is None:
             return
-        note, ok = QInputDialog.getText(self, "Заметка", "Заметка:", text=actor.note)
+        note, ok = QInputDialog.getText(self, tr('Заметка'), tr('Заметка:'), text=actor.note)
         if ok:
             self._run(UpdateActor(name, note=note))
 
@@ -245,11 +248,11 @@ class ActorsPanel(QWidget):
         count = self._doc.actors_in_use().get(name, 0)
         answer = QMessageBox.question(
             self,
-            "Удалить актора",
+            tr('Удалить актора'),
             f"Убрать «{name}» из списка?\n\n"
             f"Имя останется в {count} репликах — удаляется только цвет."
             if count
-            else f"Убрать «{name}» из списка?",
+            else tr('Убрать «{0}» из списка?').format(name),
         )
         if answer == QMessageBox.Yes:
             self._run(RemoveActor(name))
@@ -261,7 +264,7 @@ class ActorsPanel(QWidget):
             return
         commands = [AddActor(name) for name in unregistered]
         self._run(
-            CompositeCommand(commands, label=f"Занесено акторов: {len(commands)}")
+            CompositeCommand(commands, label=tr('Занесено акторов: {0}').format(len(commands)))
         )
 
     def _on_double_click(self, _row: int, column: int) -> None:
@@ -289,7 +292,7 @@ class ActorsDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Акторы")
+        self.setWindowTitle(tr('Акторы'))
         self.resize(560, 420)
 
         self.panel = ActorsPanel(doc, undo, self)
@@ -302,7 +305,7 @@ class ActorsDialog(QDialog):
 
         box = QDialogButtonBox(QDialogButtonBox.Close)
         box.rejected.connect(self.reject)
-        box.button(QDialogButtonBox.Close).setText("Закрыть")
+        box.button(QDialogButtonBox.Close).setText(tr('Закрыть'))
         layout.addWidget(box)
 
     # -- то, чем пользуются снаружи ------------------------------------------ #

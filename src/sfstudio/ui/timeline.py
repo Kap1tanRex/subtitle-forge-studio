@@ -50,6 +50,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QInputDialog, QMenu, QToolTip, QWidget
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.commands import (
     AddMarker,
     AddTrack,
@@ -273,7 +274,7 @@ class TimelineWidget(QWidget):
         self._palette = palette
 
         self._peaks: object | None = None
-        self._peaks_note = "аудио не загружено"
+        self._peaks_note = tr('аудио не загружено')
         self._keyframes: KeyframeIndex | None = None
         self._fps: FpsModel | None = None
         self._media_name = ""
@@ -724,7 +725,7 @@ class TimelineWidget(QWidget):
             font = QFont("Segoe UI")
             font.setPixelSize(11)
             painter.setFont(font)
-            note = "звук отключён" if row.track.muted else self._peaks_note
+            note = tr('звук отключён') if row.track.muted else self._peaks_note
             painter.drawText(area.adjusted(10, 0, -10, 0), Qt.AlignCenter, note)
             return
 
@@ -735,7 +736,7 @@ class TimelineWidget(QWidget):
             )
         except Exception:  # повреждённый кэш не должен ронять окно
             painter.setPen(QColor(self._palette.danger))
-            painter.drawText(area, Qt.AlignCenter, "не удалось прочитать пики")
+            painter.drawText(area, Qt.AlignCenter, tr('не удалось прочитать пики'))
             return
 
         half = height / 2 * 0.92 * self._gain
@@ -1294,7 +1295,7 @@ class TimelineWidget(QWidget):
         self._undo.run(UpdateTrack(track.layer, updated))
         self.document_edited.emit()
         self.status_message.emit(
-            f"{track.display_name()}: высота {final} px"
+            tr('{0}: высота {1} px').format(track.display_name(), final)
         )
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:  # noqa: N802
@@ -1376,7 +1377,7 @@ class TimelineWidget(QWidget):
             else self._default_layer()
         )
         editable = self._layer_is_editable(target_layer)
-        new_event = QAction(f"Новая реплика с {_short_time(where_ms)}", menu)
+        new_event = QAction(tr('Новая реплика с {0}').format(_short_time(where_ms)), menu)
         new_event.setEnabled(editable)
         new_event.triggered.connect(
             lambda: self.create_event_at(where_ms, target_layer)
@@ -1385,7 +1386,7 @@ class TimelineWidget(QWidget):
 
         clipboard = QGuiApplication.clipboard()
         clip = clipboard.text().strip() if clipboard is not None else ""
-        paste = QAction("Вставить из буфера сюда", menu)
+        paste = QAction(tr('Вставить из буфера сюда'), menu)
         paste.setEnabled(editable and bool(clip))
         paste.triggered.connect(
             lambda: self.create_event_with_text(where_ms, clip, target_layer)
@@ -1401,7 +1402,7 @@ class TimelineWidget(QWidget):
                 )
             )
             menu.addMenu(status_submenu(self, self._doc, targets, self._run_edit))
-            note = QAction("Заметка…", menu)
+            note = QAction(tr('Заметка…'), menu)
             note.setEnabled(len(targets) == 1)
             if len(targets) == 1:
                 note.triggered.connect(
@@ -1411,13 +1412,13 @@ class TimelineWidget(QWidget):
 
             menu.addSeparator()
             what = plural_events(len(targets))
-            duplicate = QAction(f"Дублировать {what}", menu)
+            duplicate = QAction(tr('Дублировать {0}').format(what), menu)
             duplicate.triggered.connect(
                 lambda: self._run_edit(DuplicateEvents(list(targets)))
             )
             menu.addAction(duplicate)
 
-            delete = QAction(f"Удалить {what}", menu)
+            delete = QAction(tr('Удалить {0}').format(what), menu)
             delete.setShortcut("Del")
             delete.triggered.connect(
                 lambda: self._run_edit(DeleteEvents(list(targets)))
@@ -1425,7 +1426,7 @@ class TimelineWidget(QWidget):
             menu.addAction(delete)
 
         menu.addSeparator()
-        add = QAction("Новая дорожка субтитров", menu)
+        add = QAction(tr('Новая дорожка субтитров'), menu)
         add.triggered.connect(self._add_track)
         menu.addAction(add)
 
@@ -1433,11 +1434,12 @@ class TimelineWidget(QWidget):
             track = row.track
             menu.addSeparator()
 
-            rename = QAction(f"Переименовать «{menu_label(track.display_name())}»…", menu)
+            rename = QAction(tr('Переименовать '
+                   '«{0}»…').format(menu_label(track.display_name())), menu)
             rename.triggered.connect(lambda: self._rename_track(track))
             menu.addAction(rename)
 
-            visible = QAction("Показывать в кадре", menu)
+            visible = QAction(tr('Показывать в кадре'), menu)
             visible.setCheckable(True)
             visible.setChecked(track.visible)
             visible.triggered.connect(
@@ -1445,7 +1447,7 @@ class TimelineWidget(QWidget):
             )
             menu.addAction(visible)
 
-            locked = QAction("Заблокировать", menu)
+            locked = QAction(tr('Заблокировать'), menu)
             locked.setCheckable(True)
             locked.setChecked(track.locked)
             locked.triggered.connect(
@@ -1453,7 +1455,7 @@ class TimelineWidget(QWidget):
             )
             menu.addAction(locked)
 
-            remove = QAction("Удалить дорожку", menu)
+            remove = QAction(tr('Удалить дорожку'), menu)
             remove.setEnabled(len(self._doc.tracks.subtitles) > 1)
             remove.triggered.connect(lambda: self._remove_track(track))
             menu.addAction(remove)
@@ -1467,7 +1469,7 @@ class TimelineWidget(QWidget):
             # нечего.
             if hit is not None and others:
                 menu.addSeparator()
-                move = menu.addMenu("Перенести реплику на дорожку")
+                move = menu.addMenu(tr('Перенести реплику на дорожку'))
                 for other in others:
                     action = QAction(menu_label(other.display_name()), move)
                     action.triggered.connect(
@@ -1487,11 +1489,11 @@ class TimelineWidget(QWidget):
         marker = self._marker_at(x)
 
         if marker is not None:
-            edit = QAction(f"Правка маркера «{menu_label(marker.title())}»", menu)
+            edit = QAction(tr('Правка маркера «{0}»').format(menu_label(marker.title())), menu)
             edit.triggered.connect(lambda: self.edit_marker(marker))
             menu.addAction(edit)
 
-            colors = menu.addMenu("Цвет маркера")
+            colors = menu.addMenu(tr('Цвет маркера'))
             for key, title, _value in MARKER_COLORS:
                 action = QAction(title, colors)
                 action.setCheckable(True)
@@ -1501,28 +1503,28 @@ class TimelineWidget(QWidget):
                 )
                 colors.addAction(action)
 
-            remove = QAction("Удалить маркер", menu)
+            remove = QAction(tr('Удалить маркер'), menu)
             remove.triggered.connect(lambda: self.remove_marker(marker))
             menu.addAction(remove)
             menu.addSeparator()
         else:
-            new = QAction(f"Новый маркер на {_short_time(ms)}", menu)
+            new = QAction(tr('Новый маркер на {0}').format(_short_time(ms)), menu)
             new.triggered.connect(lambda: self.add_marker_at(ms))
             menu.addAction(new)
             menu.addSeparator()
 
-        previous = QAction("Предыдущий маркер", menu)
+        previous = QAction(tr('Предыдущий маркер'), menu)
         previous.setEnabled(self._doc.markers.before(self._time_ms) is not None)
         previous.triggered.connect(self.goto_previous_marker)
         menu.addAction(previous)
 
-        following = QAction("Следующий маркер", menu)
+        following = QAction(tr('Следующий маркер'), menu)
         following.setEnabled(self._doc.markers.after(self._time_ms) is not None)
         following.triggered.connect(self.goto_next_marker)
         menu.addAction(following)
 
         total = len(self._doc.markers)
-        clear = QAction(f"Убрать все маркеры ({total})", menu)
+        clear = QAction(tr('Убрать все маркеры ({0})').format(total), menu)
         clear.setEnabled(total > 0)
         clear.triggered.connect(self.clear_markers)
         menu.addAction(clear)
@@ -1700,7 +1702,7 @@ class TimelineWidget(QWidget):
         """
         layer = self._default_layer() if layer is None else layer
         if not self._layer_is_editable(layer):
-            self.status_message.emit("Дорожка заблокирована")
+            self.status_message.emit(tr('Дорожка заблокирована'))
             return None
 
         start = max(0, ms)
@@ -1718,7 +1720,7 @@ class TimelineWidget(QWidget):
         self.document_edited.emit()
         self._ensure_visible(start)
         self.update()
-        self.status_message.emit(f"Новая реплика с {format_srt(start)}")
+        self.status_message.emit(tr('Новая реплика с {0}').format(format_srt(start)))
         return created
 
     def _remember_mouse(self, x: float, y: float) -> None:
@@ -1775,7 +1777,7 @@ class TimelineWidget(QWidget):
                     SetText(created, text),
                     SetTiming(created, end=event.start + span),
                 ],
-                label="Вставка реплики",
+                label=tr('Вставка реплики'),
             )
         )
         self.document_edited.emit()
@@ -1818,7 +1820,7 @@ class TimelineWidget(QWidget):
 
     def _rename_track(self, track: Track) -> None:
         name, ok = QInputDialog.getText(
-            self, "Имя дорожки", "Название:", text=track.name or track.display_name()
+            self, tr('Имя дорожки'), tr('Название:'), text=track.name or track.display_name()
         )
         if not ok:
             return
@@ -1889,10 +1891,10 @@ class TimelineWidget(QWidget):
 
         if self._drag.mode == DragMode.START:
             new_start = min(ms, end - MIN_EVENT_MS)
-            self._undo.run(SetTiming(event.eid, start=new_start, label="Начало реплики"))
+            self._undo.run(SetTiming(event.eid, start=new_start, label=tr('Начало реплики')))
         elif self._drag.mode == DragMode.END:
             new_end = max(ms, start + MIN_EVENT_MS)
-            self._undo.run(SetTiming(event.eid, end=new_end, label="Конец реплики"))
+            self._undo.run(SetTiming(event.eid, end=new_end, label=tr('Конец реплики')))
         else:
             shifted = ms - self._drag.grab_offset_ms
             duration = end - start
@@ -1903,7 +1905,7 @@ class TimelineWidget(QWidget):
             else:
                 self._undo.run(
                     SetTiming(event.eid, start=new_start, end=new_start + duration,
-                              label="Сдвиг реплики")
+                              label=tr('Сдвиг реплики'))
                 )
                 self._maybe_change_layer(event, y)
 
@@ -1944,7 +1946,7 @@ class TimelineWidget(QWidget):
             for e in events
         )
         self._undo.run(
-            CompositeCommand(moves, label=f"Сдвиг {len(moves)} реплик")
+            CompositeCommand(moves, label=tr('Сдвиг {0} реплик').format(len(moves)))
         )
 
     def _maybe_change_layer(self, event: SubtitleEvent, y: float) -> None:
@@ -1984,18 +1986,23 @@ class TimelineWidget(QWidget):
         if end - start < MIN_EVENT_MS:
             end = start + MIN_EVENT_MS
         self._undo.run(
-            SetTiming(self._drag.eid, start=start, end=end, label="Новая реплика")
+            SetTiming(self._drag.eid, start=start, end=end, label=tr('Новая реплика'))
         )
         self.document_edited.emit()
 
     def _emit_drag_status(self, event: SubtitleEvent) -> None:
-        suffix = {"keyframe": " · ключевой кадр", "event": " · стык реплик",
+        suffix = {"keyframe": tr(' · ключевой кадр'), "event": tr(' · стык реплик'),
                   "frame": "", "": ""}[self._last_snap_kind]
         track = self._doc.tracks.by_layer(event.layer)
         where = f" · {track.display_name()}" if track is not None else ""
         self.status_message.emit(
-            f"{format_srt(event.start)} → {format_srt(event.end)}  "
-            f"({event.duration / 1000:.2f} с){suffix}{where}"
+            tr('{0} → {1}  ({2:.2f} '
+                   'с){3}{4}').format(
+                       format_srt(event.start),
+                       format_srt(event.end),
+                       event.duration / 1000,
+                       suffix,
+                       where)
         )
 
     # -- хит-тест ------------------------------------------------------------- #
@@ -2089,14 +2096,15 @@ class TimelineWidget(QWidget):
             return ""
         target, _edge = hit
         lines = [
-            f"{format_srt(target.start)} → {format_srt(target.end)}"
-            f"   ({target.duration / 1000:.1f} с)",
-            target.plain or "(пусто)",
+            tr('{0} → {1}   ({2:.1f} '
+                   'с)').format(
+                       format_srt(target.start), format_srt(target.end), target.duration / 1000),
+            target.plain or tr('(пусто)'),
         ]
         if target.name:
-            lines.insert(1, f"Говорит: {target.name}")
+            lines.insert(1, tr('Говорит: {0}').format(target.name))
         if target.comment:
-            lines.append("Комментарий — в кадре не показывается")
+            lines.append(tr('Комментарий — в кадре не показывается'))
         # Текст реплики пришёл из файла: показывать его как разметку нельзя.
         return plain_tooltip("\n".join(lines))
 
@@ -2105,17 +2113,17 @@ class TimelineWidget(QWidget):
         marker = self._marker_at(x)
         if marker is None:
             if not len(self._doc.markers):
-                return "Щелчок ставит маркер. Флажок слева — на курсоре времени"
+                return tr('Щелчок ставит маркер. Флажок слева — на курсоре времени')
             return ""
 
         lines = [f"{format_srt(marker.time)}   {marker.title()}"]
         if marker.duration:
-            lines[0] += f"   ({marker.duration / 1000:.1f} с)"
+            lines[0] += tr('   ({0:.1f} с)').format(marker.duration / 1000)
         if marker.keyword:
-            lines.append(f"Ключевое слово: {marker.keyword}")
+            lines.append(tr('Ключевое слово: {0}').format(marker.keyword))
         if marker.note:
             lines.append(marker.note)
-        lines.append("Щелчок — правка, перетаскивание — перенос")
+        lines.append(tr('Щелчок — правка, перетаскивание — перенос'))
         # Имя и примечание пришли из файла: показывать их как разметку нельзя.
         return plain_tooltip("\n".join(lines))
 

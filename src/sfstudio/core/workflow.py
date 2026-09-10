@@ -26,6 +26,8 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Sequence
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "INFO_KEY",
     "STATUSES",
@@ -52,10 +54,10 @@ STATUS_QUESTION = "question"
 #: Состояния и их подписи. Порядок — как в меню: от «ничего не отмечено» к
 #: «требует внимания».
 STATUSES: tuple[tuple[str, str], ...] = (
-    (STATUS_NONE, "Без пометки"),
-    (STATUS_DRAFT, "Черновик"),
-    (STATUS_DONE, "Готово"),
-    (STATUS_QUESTION, "Вопрос"),
+    (STATUS_NONE, tr('Без пометки')),
+    (STATUS_DRAFT, tr('Черновик')),
+    (STATUS_DONE, tr('Готово')),
+    (STATUS_QUESTION, tr('Вопрос')),
 )
 
 _TITLES = dict(STATUSES)

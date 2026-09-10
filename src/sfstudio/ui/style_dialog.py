@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.style import ALIGNMENT_NAMES, SubtitleStyle
@@ -92,7 +93,7 @@ class PreviewStrip(QWidget):
 
         if self._renderer is None:
             painter.setPen(QColor(self._palette.text_muted))
-            painter.drawText(rect, Qt.AlignCenter, "libass недоступна — превью нет")
+            painter.drawText(rect, Qt.AlignCenter, tr('libass недоступна — превью нет'))
             painter.end()
             return
 
@@ -145,7 +146,7 @@ class _ColourButton(QPushButton):
     def _pick(self) -> None:
         current = QColor(self._colour.r, self._colour.g, self._colour.b, self._colour.a)
         chosen = QColorDialog.getColor(
-            current, self, "Выбор цвета", QColorDialog.ShowAlphaChannel
+            current, self, tr('Выбор цвета'), QColorDialog.ShowAlphaChannel
         )
         if chosen.isValid():
             self._colour = RGBA(chosen.red(), chosen.green(), chosen.blue(), chosen.alpha())
@@ -170,7 +171,7 @@ class StylePresetDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Шаблоны оформления")
+        self.setWindowTitle(tr('Шаблоны оформления'))
         self.resize(940, 560)
         self._library = library
         self._result: SubtitleStyle | None = None
@@ -188,9 +189,9 @@ class StylePresetDialog(QDialog):
         left_layout.addWidget(self.list, 1)
 
         buttons_row = QHBoxLayout()
-        self.save_button = QPushButton("Сохранить как…")
+        self.save_button = QPushButton(tr('Сохранить как…'))
         self.save_button.clicked.connect(self._save_as)
-        self.delete_button = QPushButton("Удалить")
+        self.delete_button = QPushButton(tr('Удалить'))
         self.delete_button.clicked.connect(self._delete)
         buttons_row.addWidget(self.save_button)
         buttons_row.addWidget(self.delete_button)
@@ -208,38 +209,38 @@ class StylePresetDialog(QDialog):
         form = QFormLayout()
         self.font_box = QFontComboBox()
         self.font_box.currentFontChanged.connect(self._on_change)
-        form.addRow("Шрифт:", self.font_box)
+        form.addRow(tr('Шрифт:'), self.font_box)
 
         self.size_box = QDoubleSpinBox()
         self.size_box.setRange(4, 400)
         self.size_box.setDecimals(0)
         self.size_box.valueChanged.connect(self._on_change)
-        form.addRow("Размер:", self.size_box)
+        form.addRow(tr('Размер:'), self.size_box)
 
         colours = QHBoxLayout()
         self.primary_button = _ColourButton(RGBA(255, 255, 255))
         self.outline_button = _ColourButton(RGBA(0, 0, 0))
         self.back_button = _ColourButton(RGBA(0, 0, 0, 128))
         for label, button in (
-            ("Текст", self.primary_button),
-            ("Обводка", self.outline_button),
-            ("Плашка", self.back_button),
+            (tr('Текст'), self.primary_button),
+            (tr('Обводка'), self.outline_button),
+            (tr('Плашка'), self.back_button),
         ):
             colours.addWidget(QLabel(label))
             colours.addWidget(button)
             button.changed.connect(self._on_change)
         colours.addStretch(1)
-        form.addRow("Цвета:", _wrap(colours))
+        form.addRow(tr('Цвета:'), _wrap(colours))
 
         flags = QHBoxLayout()
-        self.bold_box = QCheckBox("Жирный")
-        self.italic_box = QCheckBox("Курсив")
-        self.underline_box = QCheckBox("Подчёркнутый")
+        self.bold_box = QCheckBox(tr('Жирный'))
+        self.italic_box = QCheckBox(tr('Курсив'))
+        self.underline_box = QCheckBox(tr('Подчёркнутый'))
         for box in (self.bold_box, self.italic_box, self.underline_box):
             box.stateChanged.connect(self._on_change)
             flags.addWidget(box)
         flags.addStretch(1)
-        form.addRow("Начертание:", _wrap(flags))
+        form.addRow(tr('Начертание:'), _wrap(flags))
 
         edges = QHBoxLayout()
         self.outline_size = QDoubleSpinBox()
@@ -251,32 +252,32 @@ class StylePresetDialog(QDialog):
         self.shadow_size.setDecimals(1)
         self.shadow_size.valueChanged.connect(self._on_change)
         self.border_box = QComboBox()
-        self.border_box.addItem("Обводка и тень", 1)
-        self.border_box.addItem("Непрозрачная плашка", 3)
+        self.border_box.addItem(tr('Обводка и тень'), 1)
+        self.border_box.addItem(tr('Непрозрачная плашка'), 3)
         self.border_box.currentIndexChanged.connect(self._on_change)
-        edges.addWidget(QLabel("Обводка"))
+        edges.addWidget(QLabel(tr('Обводка')))
         edges.addWidget(self.outline_size)
-        edges.addWidget(QLabel("Тень"))
+        edges.addWidget(QLabel(tr('Тень')))
         edges.addWidget(self.shadow_size)
         edges.addWidget(self.border_box, 1)
-        form.addRow("Контур:", _wrap(edges))
+        form.addRow(tr('Контур:'), _wrap(edges))
 
         self.alignment_box = QComboBox()
         for value in range(1, 10):
             self.alignment_box.addItem(f"{value} — {ALIGNMENT_NAMES[value]}", value)
         self.alignment_box.currentIndexChanged.connect(self._on_change)
-        form.addRow("Выравнивание:", self.alignment_box)
+        form.addRow(tr('Выравнивание:'), self.alignment_box)
 
         margins = QHBoxLayout()
         self.margin_l = _margin_spin(self._on_change)
         self.margin_r = _margin_spin(self._on_change)
         self.margin_v = _margin_spin(self._on_change)
-        for label, spin in (("слева", self.margin_l), ("справа", self.margin_r),
-                            ("по вертикали", self.margin_v)):
+        for label, spin in ((tr('слева'), self.margin_l), (tr('справа'), self.margin_r),
+                            (tr('по вертикали'), self.margin_v)):
             margins.addWidget(QLabel(label))
             margins.addWidget(spin)
         margins.addStretch(1)
-        form.addRow("Поля:", _wrap(margins))
+        form.addRow(tr('Поля:'), _wrap(margins))
 
         right_layout.addLayout(form)
         self.description = QLabel("")
@@ -289,8 +290,8 @@ class StylePresetDialog(QDialog):
         root.addWidget(splitter, 1)
 
         box = QDialogButtonBox(QDialogButtonBox.Apply | QDialogButtonBox.Close, parent=self)
-        box.button(QDialogButtonBox.Apply).setText("Применить к выделению")
-        box.button(QDialogButtonBox.Close).setText("Закрыть")
+        box.button(QDialogButtonBox.Apply).setText(tr('Применить к выделению'))
+        box.button(QDialogButtonBox.Close).setText(tr('Закрыть'))
         box.button(QDialogButtonBox.Apply).clicked.connect(self._apply)
         box.rejected.connect(self.reject)
         root.addWidget(box)
@@ -298,7 +299,7 @@ class StylePresetDialog(QDialog):
         self._reload_list()
         if current is not None:
             self._load_style(current)
-            self.description.setText("Текущий стиль документа")
+            self.description.setText(tr('Текущий стиль документа'))
         elif self.list.count():
             self.list.setCurrentRow(0)
 
@@ -322,7 +323,7 @@ class StylePresetDialog(QDialog):
         if preset is None:
             return
         self._load_style(preset.style)
-        self.description.setText(preset.description or "Без описания")
+        self.description.setText(preset.description or tr('Без описания'))
         self.delete_button.setEnabled(not preset.builtin)
 
     # -- форма -------------------------------------------------------------------- #
@@ -387,10 +388,10 @@ class StylePresetDialog(QDialog):
         item = self.list.currentItem()
         if item is not None:
             name = str(item.data(Qt.UserRole))
-            suggested = name if not self._library.is_builtin(name) else f"{name} (мой)"
+            suggested = name if not self._library.is_builtin(name) else tr('{0} (мой)').format(name)
 
         name, ok = QInputDialog.getText(
-            self, "Сохранить шаблон", "Название шаблона:", QLineEdit.Normal, suggested
+            self, tr('Сохранить шаблон'), tr('Название шаблона:'), QLineEdit.Normal, suggested
         )
         if not ok or not name.strip():
             return
@@ -398,8 +399,8 @@ class StylePresetDialog(QDialog):
 
         if self._library.get(name) is not None and not self._library.is_builtin(name):
             answer = QMessageBox.question(
-                self, "Заменить шаблон",
-                f"Шаблон «{name}» уже есть. Заменить?",
+                self, tr('Заменить шаблон'),
+                tr('Шаблон «{0}» уже есть. Заменить?').format(name),
                 QMessageBox.Yes | QMessageBox.No,
             )
             if answer != QMessageBox.Yes:
@@ -409,7 +410,7 @@ class StylePresetDialog(QDialog):
         try:
             self._library.save(preset)
         except Exception as exc:
-            QMessageBox.critical(self, "Не удалось сохранить", str(exc))
+            QMessageBox.critical(self, tr('Не удалось сохранить'), str(exc))
             return
         self._reload_list(select=name)
 
@@ -420,14 +421,13 @@ class StylePresetDialog(QDialog):
         name = str(item.data(Qt.UserRole))
         if self._library.is_builtin(name):
             QMessageBox.information(
-                self, "Встроенный шаблон",
-                "Встроенные шаблоны удалить нельзя — они вернутся при следующем "
-                "запуске. Сохраните свой вариант под тем же именем, и он "
-                "перекроет встроенный.",
+                self, tr('Встроенный шаблон'),
+                tr('Встроенные шаблоны удалить нельзя — они вернутся при следующем запуске. '
+                       'Сохраните свой вариант под тем же именем, и он перекроет встроенный.'),
             )
             return
         if QMessageBox.question(
-            self, "Удалить шаблон", f"Удалить «{name}»?",
+            self, tr('Удалить шаблон'), tr('Удалить «{0}»?').format(name),
             QMessageBox.Yes | QMessageBox.No,
         ) == QMessageBox.Yes:
             self._library.delete(name)

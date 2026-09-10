@@ -26,6 +26,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
 from enum import IntEnum
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.plural import plural
@@ -43,7 +44,11 @@ class Severity(IntEnum):
 
     @property
     def label(self) -> str:
-        return {Severity.INFO: "инфо", Severity.WARNING: "внимание", Severity.ERROR: "ошибка"}[self]
+        return {
+            Severity.INFO: tr('инфо'),
+            Severity.WARNING: tr('внимание'),
+            Severity.ERROR: tr('ошибка'),
+        }[self]
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +74,7 @@ class QcProfile:
     отключает лишнее, не убирая правила из списка.
     """
 
-    name: str = "Общий"
+    name: str = tr('Общий')
     max_cps: float | None = 17.0
     max_line_length: int | None = 42
     max_lines: int | None = 2
@@ -96,9 +101,9 @@ class QcProfile:
 
 
 PROFILES: dict[str, QcProfile] = {
-    "general": QcProfile(name="Общий"),
+    "general": QcProfile(name=tr('Общий')),
     "netflix-ru": QcProfile(
-        name="Netflix (русский)",
+        name=tr('Netflix (русский)'),
         max_cps=17.0,
         max_line_length=42,
         max_lines=2,
@@ -107,12 +112,12 @@ PROFILES: dict[str, QcProfile] = {
         min_gap_frames=2,
     ),
     "netflix-en": QcProfile(
-        name="Netflix (английский)",
+        name=tr('Netflix (английский)'),
         max_cps=20.0,
         max_line_length=42,
     ),
     "loose": QcProfile(
-        name="Свободный",
+        name=tr('Свободный'),
         max_cps=None,
         max_line_length=None,
         max_lines=None,
@@ -187,7 +192,7 @@ def _check_cps(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if value > limit:
         yield Issue(
             event.eid, "cps", Severity.WARNING,
-            f"Слишком быстро: {value:.1f} симв/с при норме {limit:.0f}",
+            tr('Слишком быстро: {0:.1f} симв/с при норме {1:.0f}').format(value, limit),
             value,
         )
 
@@ -200,7 +205,7 @@ def _check_line_length(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if longest > limit:
         yield Issue(
             event.eid, "line_length", Severity.WARNING,
-            f"Строка длиннее нормы: {longest} симв. при норме {limit}",
+            tr('Строка длиннее нормы: {0} симв. при норме {1}').format(longest, limit),
             float(longest),
         )
 
@@ -213,7 +218,7 @@ def _check_line_count(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if count > limit:
         yield Issue(
             event.eid, "line_count", Severity.WARNING,
-            f"Строк в реплике: {count} при норме {limit}", float(count),
+            tr('Строк в реплике: {0} при норме {1}').format(count, limit), float(count),
         )
 
 
@@ -223,19 +228,19 @@ def _check_duration(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if event.duration <= 0:
         yield Issue(
             event.eid, "duration", Severity.ERROR,
-            "Нулевая или отрицательная длительность", float(event.duration),
+            tr('Нулевая или отрицательная длительность'), float(event.duration),
         )
         return
     if low is not None and event.duration < low:
         yield Issue(
             event.eid, "min_duration", Severity.WARNING,
-            f"Слишком коротко: {event.duration} мс при минимуме {low} мс",
+            tr('Слишком коротко: {0} мс при минимуме {1} мс').format(event.duration, low),
             float(event.duration),
         )
     if high is not None and event.duration > high:
         yield Issue(
             event.eid, "max_duration", Severity.INFO,
-            f"Долго висит: {event.duration / 1000:.1f} с", float(event.duration),
+            tr('Долго висит: {0:.1f} с').format(event.duration / 1000), float(event.duration),
         )
 
 
@@ -247,7 +252,7 @@ def _check_gap(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if 0 < gap < minimum:
         yield Issue(
             event.eid, "min_gap", Severity.WARNING,
-            f"Зазор до следующей реплики {gap} мс, нужно не меньше {minimum} мс",
+            tr('Зазор до следующей реплики {0} мс, нужно не меньше {1} мс').format(gap, minimum),
             float(gap),
         )
 
@@ -266,7 +271,7 @@ def _check_overlap(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
         overlap = event.end - ctx.following.start
         yield Issue(
             event.eid, "overlap", Severity.WARNING,
-            f"Перекрывает следующую реплику на {overlap} мс", float(overlap),
+            tr('Перекрывает следующую реплику на {0} мс').format(overlap), float(overlap),
         )
 
 
@@ -277,7 +282,7 @@ def _check_tags(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if text.count("{") != text.count("}"):
         yield Issue(
             event.eid, "unbalanced_tags", Severity.ERROR,
-            "Непарные фигурные скобки в тексте",
+            tr('Непарные фигурные скобки в тексте'),
         )
         return
     # Пустой блок {} безвреден, но обычно это след удалённого тега.
@@ -285,7 +290,7 @@ def _check_tags(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
         if not block.tags and not block.comment:
             yield Issue(
                 event.eid, "empty_tag_block", Severity.INFO,
-                "Пустой блок тегов {}",
+                tr('Пустой блок тегов {}'),
             )
             break
 
@@ -296,7 +301,7 @@ def _check_style(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if event.style not in ctx.doc.styles:
         yield Issue(
             event.eid, "missing_style", Severity.ERROR,
-            f"Стиль «{event.style}» не определён в документе",
+            tr('Стиль «{0}» не определён в документе').format(event.style),
         )
 
 
@@ -304,7 +309,7 @@ def _check_empty(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if not ctx.profile.check_empty or event.comment:
         return
     if not event.plain.strip():
-        yield Issue(event.eid, "empty_text", Severity.WARNING, "Пустая реплика")
+        yield Issue(event.eid, "empty_text", Severity.WARNING, tr('Пустая реплика'))
 
 
 def _check_typography(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
@@ -312,15 +317,15 @@ def _check_typography(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
         return
     plain = event.plain
     if _DOUBLE_SPACE.search(plain):
-        yield Issue(event.eid, "double_space", Severity.INFO, "Двойной пробел")
+        yield Issue(event.eid, "double_space", Severity.INFO, tr('Двойной пробел'))
     for line in plain.split("\n"):
         if line != line.rstrip():
-            yield Issue(event.eid, "trailing_space", Severity.INFO, "Пробел в конце строки")
+            yield Issue(event.eid, "trailing_space", Severity.INFO, tr('Пробел в конце строки'))
             break
     if _HYPHEN_AS_DASH.search(plain):
         yield Issue(
             event.eid, "wrong_dash", Severity.INFO,
-            "Дефис вместо тире в начале реплики",
+            tr('Дефис вместо тире в начале реплики'),
         )
 
 
@@ -341,7 +346,7 @@ def _check_shot_change(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     if window <= 0:
         return
 
-    for moment, edge in ((event.start, "начало"), (event.end, "конец")):
+    for moment, edge in ((event.start, tr('начало')), (event.end, tr('конец'))):
         nearest = _nearest_keyframe(ctx.keyframes, moment)
         if nearest is None:
             continue
@@ -351,7 +356,8 @@ def _check_shot_change(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
                 event.eid,
                 "shot_change",
                 Severity.WARNING,
-                f"{edge} в {distance} мс от склейки (нужно не ближе {limit} кадров)",
+                tr('{0} в {1} мс от склейки (нужно не ближе {2} кадров)')
+                    .format(edge, distance, limit),
                 float(distance),
             )
 
@@ -378,7 +384,7 @@ def _check_repeat(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
     text = event.plain.strip()
     if text and text == ctx.previous.plain.strip():
         yield Issue(
-            event.eid, "repeat", Severity.WARNING, "Повтор предыдущей реплики"
+            event.eid, "repeat", Severity.WARNING, tr('Повтор предыдущей реплики')
         )
 
 
@@ -400,9 +406,9 @@ def _check_short_line(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
                 event.eid,
                 "short_line",
                 Severity.INFO,
-                "Короткая строка ("
-                + plural(len(line), "знак", "знака", "знаков")
-                + ") — перенесите к соседней",
+                tr('Короткая строка (')
+                + plural(len(line), tr('знак'), tr('знака'), tr('знаков'))
+                + tr(') — перенесите к соседней'),
                 float(len(line)),
             )
             break
@@ -430,7 +436,7 @@ def _check_glossary(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
             event.eid,
             "glossary",
             severity,
-            f"«{term.source}» переводится как «{term.target}»",
+            tr('«{0}» переводится как «{1}»').format(term.source, term.target),
         )
 
 
@@ -467,7 +473,7 @@ def register_rule(rule) -> None:
     невозможно понять, чей это плагин.
     """
     if not callable(rule):
-        raise TypeError("правило проверки должно быть функцией")
+        raise TypeError(tr('правило проверки должно быть функцией'))
     EXTRA_RULES.append(rule)
 
 
@@ -587,7 +593,8 @@ class QcRunner:
                     event.eid,
                     "plugin_rule",
                     Severity.WARNING,
-                    f"Проверка из плагина не сработала: {type(exc).__name__}: {exc}",
+                    tr('Проверка из плагина не сработала: {0}: {1}').format(
+                        type(exc).__name__, exc),
                 )
 
     # -- доступ к находкам ---------------------------------------------------- #
@@ -615,7 +622,7 @@ class QcRunner:
     def summary(self) -> str:
         counts = self.counts()
         if not any(counts.values()):
-            return "Проблем не найдено"
+            return tr('Проблем не найдено')
         parts = [
             f"{counts[level]} {level.label}"
             for level in (Severity.ERROR, Severity.WARNING, Severity.INFO)

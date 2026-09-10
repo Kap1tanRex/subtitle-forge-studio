@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.changeset import ChangeSet
 from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
@@ -27,7 +28,7 @@ class SetText(Command):
 
     __slots__ = ("_after", "_before", "_stamp", "eid", "label")
 
-    def __init__(self, eid: int, new_text: str, *, label: str = "Правка текста") -> None:
+    def __init__(self, eid: int, new_text: str, *, label: str = tr('Правка текста')) -> None:
         self.eid = eid
         self._after = new_text
         self._before: str | None = None
@@ -43,7 +44,7 @@ class SetText(Command):
         return ChangeSet.changed(self.eid)
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None, "revert до apply"
+        assert self._before is not None, tr('revert до apply')
         doc.by_eid(self.eid).set_text(self._before)
         doc.bump_revision()
         return ChangeSet.changed(self.eid)
@@ -94,21 +95,21 @@ class SetStyle(_SetField):
     FIELD = "style"
 
     def __init__(self, eid: int, style_name: str) -> None:
-        super().__init__(eid, style_name, label="Смена стиля")
+        super().__init__(eid, style_name, label=tr('Смена стиля'))
 
 
 class SetActor(_SetField):
     FIELD = "name"
 
     def __init__(self, eid: int, actor: str) -> None:
-        super().__init__(eid, actor, label="Смена актёра")
+        super().__init__(eid, actor, label=tr('Смена актёра'))
 
 
 class SetNote(_SetField):
     FIELD = "note"
 
     def __init__(self, eid: int, note: str) -> None:
-        super().__init__(eid, note, label="Заметка")
+        super().__init__(eid, note, label=tr('Заметка'))
 
 
 class SetStatus(Command):
@@ -125,7 +126,7 @@ class SetStatus(Command):
         self.eids = list(eids)
         self.status = status
         self._before: list[tuple[int, str]] = []
-        self.label = "Пометка"
+        self.label = tr('Пометка')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         self._before = []
@@ -157,7 +158,7 @@ class ToggleComment(Command):
 
     def __init__(self, eids: list[int]) -> None:
         self.eids = eids
-        self.label = "Комментарий"
+        self.label = tr('Комментарий')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         for eid in self.eids:
@@ -185,7 +186,7 @@ class SetMargins(Command):
         self.eid = eid
         self.margins = (left, right, vertical)
         self._before: tuple[int, int, int] | None = None
-        self.label = "Поля реплики"
+        self.label = tr('Поля реплики')
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         event = doc.by_eid(self.eid)
@@ -196,7 +197,7 @@ class SetMargins(Command):
         return ChangeSet.changed(self.eid)
 
     def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        assert self._before is not None, "revert до apply"
+        assert self._before is not None, tr('revert до apply')
         event = doc.by_eid(self.eid)
         event.margin_l, event.margin_r, event.margin_v = self._before
         doc.bump_revision()

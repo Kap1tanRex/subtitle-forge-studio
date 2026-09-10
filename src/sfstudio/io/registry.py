@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.io.charset import decode_bytes
 from sfstudio.io.formats import ass as ass_fmt
@@ -72,7 +73,7 @@ def register_format(spec: FormatSpec) -> None:
     читатель ASS лучше нашего, запрещать его подстановку было бы упрямством.
     """
     if not spec.fid:
-        raise ValueError("формат без идентификатора")
+        raise ValueError(tr('формат без идентификатора'))
     FORMATS[spec.fid] = spec
 
 
@@ -137,7 +138,7 @@ def load(path: Path, *, encoding: str | None = None) -> SubtitleDocument:
 
     spec = FORMATS.get(fid)
     if spec is None or spec.reader is None:
-        raise ValueError(f"формат {fid!r} не поддерживается для чтения")
+        raise ValueError(tr('формат {0!r} не поддерживается для чтения').format(fid))
 
     doc = spec.reader(text)
     doc.source_path = path
@@ -164,7 +165,7 @@ def save(
     fid = fid or _format_for_suffix(path.suffix) or doc.source_format
     spec = FORMATS.get(fid)
     if spec is None or spec.writer is None:
-        raise ValueError(f"формат {fid!r} не поддерживается для записи")
+        raise ValueError(tr('формат {0!r} не поддерживается для записи').format(fid))
 
     text = spec.writer(doc, newline=newline, **options)
 

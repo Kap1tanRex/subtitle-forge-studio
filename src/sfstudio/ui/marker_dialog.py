@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.markers import (
     MARKER_COLORS,
     Marker,
@@ -139,7 +140,7 @@ class MarkerDialog(QDialog):
         is_new: bool = False,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Маркеры")
+        self.setWindowTitle(tr('Маркеры'))
         self._marker = marker
 
         root = QVBoxLayout(self)
@@ -148,45 +149,45 @@ class MarkerDialog(QDialog):
 
         time_row = QHBoxLayout()
         self.time_edit = QLineEdit(format_ass(marker.time))
-        self.time_edit.setToolTip("Ч:ММ:СС.сс — как в таймкоде реплик")
+        self.time_edit.setToolTip(tr('Ч:ММ:СС.сс — как в таймкоде реплик'))
         time_row.addWidget(self.time_edit, 1)
 
-        time_row.addWidget(QLabel("Длительность"))
+        time_row.addWidget(QLabel(tr('Длительность')))
         self.duration_spin = QDoubleSpinBox()
         self.duration_spin.setRange(0.0, 24 * 60 * 60)
         self.duration_spin.setDecimals(2)
         self.duration_spin.setSingleStep(0.5)
-        self.duration_spin.setSuffix(" с")
-        self.duration_spin.setSpecialValueText("точка")
+        self.duration_spin.setSuffix(tr(' с'))
+        self.duration_spin.setSpecialValueText(tr('точка'))
         self.duration_spin.setValue(marker.duration / 1000)
         self.duration_spin.setToolTip(
-            "Ноль — отметка в одной точке. Больше нуля — отмеченный отрезок"
+            tr('Ноль — отметка в одной точке. Больше нуля — отмеченный отрезок')
         )
         time_row.addWidget(self.duration_spin)
-        form.addRow("Время", _wrap(time_row))
+        form.addRow(tr('Время'), _wrap(time_row))
 
         self.name_edit = QLineEdit(marker.name)
-        self.name_edit.setPlaceholderText("Имя маркера")
-        form.addRow("Имя", self.name_edit)
+        self.name_edit.setPlaceholderText(tr('Имя маркера'))
+        form.addRow(tr('Имя'), self.name_edit)
 
         self.note_edit = QPlainTextEdit(marker.note)
-        self.note_edit.setPlaceholderText("Для примечаний…")
+        self.note_edit.setPlaceholderText(tr('Для примечаний…'))
         self.note_edit.setFixedHeight(80)
-        form.addRow("Примечания", self.note_edit)
+        form.addRow(tr('Примечания'), self.note_edit)
 
         self.keyword_edit = QLineEdit(marker.keyword)
-        self.keyword_edit.setPlaceholderText("Одно слово для поиска")
+        self.keyword_edit.setPlaceholderText(tr('Одно слово для поиска'))
         if keywords:
             from PySide6.QtWidgets import QCompleter
 
             completer = QCompleter(keywords, self.keyword_edit)
             completer.setCaseSensitivity(Qt.CaseInsensitive)
             self.keyword_edit.setCompleter(completer)
-        form.addRow("Ключевое слово", self.keyword_edit)
+        form.addRow(tr('Ключевое слово'), self.keyword_edit)
 
         self.colors = ColorRow()
         self.colors.set_color(marker.color)
-        form.addRow("Цвет", self.colors)
+        form.addRow(tr('Цвет'), self.colors)
         root.addLayout(form)
 
         # Кнопки разложены вручную: «Удалить» слева, «Готово» справа — так же,
@@ -194,11 +195,11 @@ class MarkerDialog(QDialog):
         # QDialogButtonBox расставили бы их наоборот, а Enter отдали бы
         # удалению.
         row = QHBoxLayout()
-        self.delete_button = QPushButton("Удалить маркер")
+        self.delete_button = QPushButton(tr('Удалить маркер'))
         self.delete_button.clicked.connect(self._delete)
         row.addWidget(self.delete_button)
         row.addStretch(1)
-        self.done_button = QPushButton("Готово")
+        self.done_button = QPushButton(tr('Готово'))
         self.done_button.setDefault(True)
         self.done_button.clicked.connect(self.accept)
         row.addWidget(self.done_button)

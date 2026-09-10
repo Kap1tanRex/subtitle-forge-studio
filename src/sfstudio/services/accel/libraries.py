@@ -28,6 +28,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.base import (
     CancelToken,
     ProgressReporter,
@@ -59,7 +60,7 @@ CUDA_PACKAGES: tuple[LibraryPackage, ...] = (
         project="nvidia-cublas-cu12",
         files=("cublas64_12.dll", "cublasLt64_12.dll"),
         size_mb=735,
-        note="Матричные операции на видеокарте. Без неё CUDA не работает.",
+        note=tr('Матричные операции на видеокарте. Без неё CUDA не работает.'),
     ),
 )
 
@@ -102,7 +103,8 @@ def download_cuda_libraries(
     try:
         folder.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise RecognitionError(f"не удалось создать каталог {folder}: {exc}") from exc
+        raise RecognitionError(tr('не удалось создать каталог {0}: {1}')
+            .format(folder, exc)) from exc
 
     written: list[Path] = []
     for index, package in enumerate(CUDA_PACKAGES):
@@ -114,16 +116,16 @@ def download_cuda_libraries(
                 progress(_b + _s * share, note)
 
         url, digest = _wheel_url(package.project)
-        report(0.0, f"загрузка {package.project}")
+        report(0.0, tr('загрузка {0}').format(package.project))
         archive = _download(url, folder, report, cancel, digest)
         try:
-            report(0.95, "распаковка")
+            report(0.95, tr('распаковка'))
             written.extend(_extract(archive, package.files, folder))
         finally:
             archive.unlink(missing_ok=True)
 
     if progress is not None:
-        progress(1.0, "библиотеки установлены")
+        progress(1.0, tr('библиотеки установлены'))
     return written
 
 
@@ -158,8 +160,8 @@ def _wheel_url(project: str) -> tuple[str, str]:
                 return found
 
     raise RecognitionError(
-        f"для «{project}» нет сборки под Windows (версия {version}). "
-        "Установите библиотеку вручную: pip install " + project
+        tr('для «{0}» нет сборки под Windows (версия {1}). Установите библиотеку вручную: '
+               'pip install ').format(project, version) + project
     )
 
 
@@ -207,29 +209,28 @@ def _download(
             done = 0
             while chunk := answer.read(_CHUNK):
                 if cancel is not None and cancel.cancelled:
-                    raise RecognitionCancelled("загрузка библиотек прервана")
+                    raise RecognitionCancelled(tr('загрузка библиотек прервана'))
                 out.write(chunk)
                 running.update(chunk)
                 done += len(chunk)
                 if total:
                     report(
                         0.9 * done / total,
-                        f"загрузка: {done / 1024 / 1024:.0f} из "
-                        f"{total / 1024 / 1024:.0f} МБ",
+                        tr('загрузка: {0:.0f} из {1:.0f} МБ').format(
+                            done / 1024 / 1024, total / 1024 / 1024),
                     )
     except RecognitionCancelled:
         temp.unlink(missing_ok=True)
         raise
     except Exception as exc:
         temp.unlink(missing_ok=True)
-        raise RecognitionError(f"не удалось скачать библиотеку: {exc}") from exc
+        raise RecognitionError(tr('не удалось скачать библиотеку: {0}').format(exc)) from exc
 
     if digest and running.hexdigest() != digest:
         temp.unlink(missing_ok=True)
         raise RecognitionError(
-            "скачанный файл не совпал с контрольной суммой из указателя PyPI. "
-            "Повторите загрузку; если повторяется — установите библиотеку "
-            "командой pip install."
+            tr('скачанный файл не совпал с контрольной суммой из указателя PyPI. Повторите '
+                   'загрузку; если повторяется — установите библиотеку командой pip install.')
         )
     return temp
 
@@ -248,7 +249,7 @@ def _extract(archive: Path, wanted: tuple[str, ...], folder: Path) -> list[Path]
         missing = [name for name in wanted if name not in by_name]
         if missing:
             raise RecognitionError(
-                "в пакете нет ожидаемых файлов: " + ", ".join(missing)
+                tr('в пакете нет ожидаемых файлов: ') + ", ".join(missing)
             )
         for name in wanted:
             target = folder / name

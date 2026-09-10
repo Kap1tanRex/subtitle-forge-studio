@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
+
 __all__ = ["RGBA"]
 
 # &HAABBGGRR& — альфа и амперсанд на конце необязательны, регистр любой.
@@ -30,7 +32,7 @@ class RGBA:
         for name in ("r", "g", "b", "a"):
             value = getattr(self, name)
             if not 0 <= value <= 255:
-                raise ValueError(f"RGBA.{name} вне диапазона 0..255: {value}")
+                raise ValueError(tr('RGBA.{0} вне диапазона 0..255: {1}').format(name, value))
 
     # -- ASS ---------------------------------------------------------------- #
 
@@ -50,7 +52,7 @@ class RGBA:
         """
         m = _ASS_COLOR_RE.match(text)
         if not m:
-            raise ValueError(f"не похоже на цвет ASS: {text!r}")
+            raise ValueError(tr('не похоже на цвет ASS: {0!r}').format(text))
         digits = m.group(1).rjust(8, "0")
         ass_alpha = int(digits[0:2], 16)
         return RGBA(
@@ -65,7 +67,7 @@ class RGBA:
         """Для тегов ``\\1a`` и подобных: ``&HRR&`` → внутренняя альфа."""
         m = _ASS_COLOR_RE.match(text)
         if not m:
-            raise ValueError(f"не похоже на альфу ASS: {text!r}")
+            raise ValueError(tr('не похоже на альфу ASS: {0!r}').format(text))
         return 255 - int(m.group(1)[-2:].rjust(2, "0"), 16)
 
     # -- прочее ------------------------------------------------------------- #
@@ -86,11 +88,11 @@ class RGBA:
         if len(raw) == 3:
             raw = "".join(char * 2 for char in raw)
         if len(raw) not in (6, 8):
-            raise ValueError(f"не похоже на #RRGGBB: {text!r}")
+            raise ValueError(tr('не похоже на #RRGGBB: {0!r}').format(text))
         try:
             value = int(raw, 16)
         except ValueError as exc:
-            raise ValueError(f"не похоже на #RRGGBB: {text!r}") from exc
+            raise ValueError(tr('не похоже на #RRGGBB: {0!r}').format(text)) from exc
         if len(raw) == 6:
             return RGBA((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF, 255)
         return RGBA(

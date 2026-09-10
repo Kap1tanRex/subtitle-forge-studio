@@ -24,6 +24,8 @@ from dataclasses import dataclass, field, replace
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QWidget
 
+from sfstudio.app.i18n import tr
+
 __all__ = ["ActionRegistry", "ActionSpec", "Conflict"]
 
 
@@ -58,7 +60,8 @@ class Conflict:
     keys: tuple[str, ...]
 
     def __str__(self) -> str:
-        where = "глобально" if self.context == "global" else f"в контексте «{self.context}»"
+        where = tr('глобально') if self.context == "global" else tr('в контексте «{0}»').format(
+            self.context)
         return f"{self.shortcut} {where}: {', '.join(self.keys)}"
 
 
@@ -74,7 +77,7 @@ class ActionRegistry:
 
     def register(self, spec: ActionSpec) -> ActionSpec:
         if spec.key in self._specs:
-            raise ValueError(f"действие {spec.key!r} уже зарегистрировано")
+            raise ValueError(tr('действие {0!r} уже зарегистрировано').format(spec.key))
         self._specs[spec.key] = spec
         self._defaults[spec.key] = spec.shortcut
         return spec

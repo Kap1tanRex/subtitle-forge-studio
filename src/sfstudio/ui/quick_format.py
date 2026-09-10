@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.effective import Effective, effective_style
@@ -73,14 +74,14 @@ class QuickFormatPanel(QFrame):
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(6)
 
-        grid.addWidget(self._caption("Шрифт"), 0, 0)
+        grid.addWidget(self._caption(tr('Шрифт')), 0, 0)
         self.font_box = FontComboBox()
         self.font_box.setEditable(True)
         self.font_box.setMinimumWidth(190)
         self.font_box.currentFontChanged.connect(self._on_font)
         grid.addWidget(self.font_box, 0, 1, 1, 3)
 
-        grid.addWidget(self._caption("Кегль"), 1, 0)
+        grid.addWidget(self._caption(tr('Кегль')), 1, 0)
         self.size_box = QDoubleSpinBox()
         self.size_box.setRange(1.0, 800.0)
         self.size_box.setDecimals(0)
@@ -90,23 +91,23 @@ class QuickFormatPanel(QFrame):
 
         style_row = QHBoxLayout()
         style_row.setSpacing(4)
-        self.btn_bold = self._toggle("Ж", "Жирный", bold=True)
-        self.btn_italic = self._toggle("К", "Курсив", italic=True)
-        self.btn_underline = self._toggle("Ч", "Подчёркнутый", underline=True)
-        self.btn_strike = self._toggle("З", "Зачёркнутый", strike=True)
+        self.btn_bold = self._toggle(tr('Ж'), tr('Жирный'), bold=True)
+        self.btn_italic = self._toggle(tr('К'), tr('Курсив'), italic=True)
+        self.btn_underline = self._toggle(tr('Ч'), tr('Подчёркнутый'), underline=True)
+        self.btn_strike = self._toggle(tr('З'), tr('Зачёркнутый'), strike=True)
         for button in (self.btn_bold, self.btn_italic,
                        self.btn_underline, self.btn_strike):
             style_row.addWidget(button)
         style_row.addStretch(1)
         grid.addLayout(style_row, 1, 2, 1, 2)
 
-        grid.addWidget(self._caption("Цвет"), 2, 0)
-        self.color_button = QPushButton("Основной…")
+        grid.addWidget(self._caption(tr('Цвет')), 2, 0)
+        self.color_button = QPushButton(tr('Основной…'))
         self.color_button.clicked.connect(self._pick_color)
         grid.addWidget(self.color_button, 2, 1, 1, 2)
 
-        self.reset_button = QPushButton("Сбросить")
-        self.reset_button.setToolTip("Убрать оформление, заданное тегами")
+        self.reset_button = QPushButton(tr('Сбросить'))
+        self.reset_button.setToolTip(tr('Убрать оформление, заданное тегами'))
         self.reset_button.clicked.connect(self._reset)
         grid.addWidget(self.reset_button, 2, 3)
 
@@ -177,9 +178,9 @@ class QuickFormatPanel(QFrame):
 
         overridden = sorted(eff.overridden)
         self.hint.setText(
-            "Переопределено тегами: " + ", ".join("\\" + n for n in overridden)
+            tr('Переопределено тегами: ') + ", ".join("\\" + n for n in overridden)
             if overridden
-            else f"Всё из стиля «{event.style}»"
+            else tr('Всё из стиля «{0}»').format(event.style)
         )
         self.reset_button.setEnabled(bool(overridden))
 
@@ -192,7 +193,7 @@ class QuickFormatPanel(QFrame):
         # «включено» было бы враньём, а «выключено» — ещё большим.
         button.setProperty("mixed", mixed)
         base = str(button.property("base_tip") or "")
-        button.setToolTip(f"{base} — в реплике меняется" if mixed else base)
+        button.setToolTip(tr('{0} — в реплике меняется').format(base) if mixed else base)
 
     def _paint_color_button(self, color: RGBA) -> None:
         text_color = color.contrasting_text().to_hex()
@@ -218,7 +219,7 @@ class QuickFormatPanel(QFrame):
 
     def _pick_color(self) -> None:
         current = QColor(self._color.to_hex())
-        chosen = QColorDialog.getColor(current, self, "Основной цвет")
+        chosen = QColorDialog.getColor(current, self, tr('Основной цвет'))
         if not chosen.isValid():
             return
         picked = RGBA(chosen.red(), chosen.green(), chosen.blue(), 255)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.color import RGBA
 
 __all__ = ["ALIGNMENT_NAMES", "BorderStyle", "SubtitleStyle"]
@@ -18,15 +19,15 @@ class BorderStyle:
 
 #: Numpad-нотация выравнивания ASS.
 ALIGNMENT_NAMES: dict[int, str] = {
-    1: "снизу слева",
-    2: "снизу по центру",
-    3: "снизу справа",
-    4: "по центру слева",
-    5: "по центру",
-    6: "по центру справа",
-    7: "сверху слева",
-    8: "сверху по центру",
-    9: "сверху справа",
+    1: tr('снизу слева'),
+    2: tr('снизу по центру'),
+    3: tr('снизу справа'),
+    4: tr('по центру слева'),
+    5: tr('по центру'),
+    6: tr('по центру справа'),
+    7: tr('сверху слева'),
+    8: tr('сверху по центру'),
+    9: tr('сверху справа'),
 }
 
 
@@ -68,7 +69,7 @@ class SubtitleStyle:
 
     @property
     def alignment_name(self) -> str:
-        return ALIGNMENT_NAMES.get(self.alignment, "неизвестно")
+        return ALIGNMENT_NAMES.get(self.alignment, tr('неизвестно'))
 
     @property
     def anchor_col(self) -> int:

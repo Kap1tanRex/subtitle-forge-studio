@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.ui.actions import ActionRegistry
 
 __all__ = ["ShortcutsDialog"]
@@ -52,7 +53,7 @@ class ShortcutsDialog(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Горячие клавиши")
+        self.setWindowTitle(tr('Горячие клавиши'))
         self.resize(680, 560)
         self._registry = registry
         self._overrides = dict(overrides or {})
@@ -60,13 +61,13 @@ class ShortcutsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         self.filter_edit = QLineEdit()
-        self.filter_edit.setPlaceholderText("поиск по названию команды")
+        self.filter_edit.setPlaceholderText(tr('поиск по названию команды'))
         self.filter_edit.textChanged.connect(self._apply_filter)
         layout.addWidget(self.filter_edit)
 
         self.tree = QTreeWidget()
         self.tree.setColumnCount(3)
-        self.tree.setHeaderLabels(["Команда", "Меню", "Сочетание"])
+        self.tree.setHeaderLabels([tr('Команда'), tr('Меню'), tr('Сочетание')])
         self.tree.setRootIsDecorated(False)
         self.tree.setAlternatingRowColors(True)
         self.tree.header().setSectionResizeMode(COL_TITLE, QHeaderView.Stretch)
@@ -77,9 +78,9 @@ class ShortcutsDialog(QDialog):
         layout.addWidget(self.conflict_label)
 
         buttons = QDialogButtonBox()
-        reset = buttons.addButton("Вернуть умолчания", QDialogButtonBox.ResetRole)
+        reset = buttons.addButton(tr('Вернуть умолчания'), QDialogButtonBox.ResetRole)
         reset.clicked.connect(self._reset_all)
-        close = buttons.addButton("Закрыть", QDialogButtonBox.RejectRole)
+        close = buttons.addButton(tr('Закрыть'), QDialogButtonBox.RejectRole)
         close.clicked.connect(self.accept)
         layout.addWidget(buttons)
 
@@ -141,17 +142,17 @@ class ShortcutsDialog(QDialog):
         conflicts = self._registry.conflicts()
         if not conflicts:
             self.conflict_label.setProperty("role", "hint")
-            self.conflict_label.setText("Совпадающих сочетаний нет.")
+            self.conflict_label.setText(tr('Совпадающих сочетаний нет.'))
         else:
             lines = [
-                f"«{conflict.shortcut}» — {len(conflict.keys)} команды"
+                tr('«{0}» — {1} команды').format(conflict.shortcut, len(conflict.keys))
                 for conflict in conflicts[:5]
             ]
-            tail = "" if len(conflicts) <= 5 else f" и ещё {len(conflicts) - 5}"
+            tail = "" if len(conflicts) <= 5 else tr(' и ещё {0}').format(len(conflicts) - 5)
             self.conflict_label.setProperty("role", "warning")
             self.conflict_label.setText(
-                "Одно сочетание у нескольких команд: " + "; ".join(lines) + tail + "."
-                + " Это допустимо, если команды работают в разных панелях."
+                tr('Одно сочетание у нескольких команд: ') + "; ".join(lines) + tail + "."
+                + tr(' Это допустимо, если команды работают в разных панелях.')
             )
         style = self.conflict_label.style()
         style.unpolish(self.conflict_label)

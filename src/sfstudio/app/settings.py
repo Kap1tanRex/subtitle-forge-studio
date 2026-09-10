@@ -25,6 +25,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from sfstudio.app.i18n import tr
 from sfstudio.platform.paths import config_dir
 
 __all__ = ["CONFIG_VERSION", "Settings", "SettingsError"]
@@ -213,9 +214,9 @@ class Settings:
         version = int(raw.get("config_version", 0) or 0)
         if version > CONFIG_VERSION:
             raise SettingsError(
-                f"Файл настроек от более новой версии программы "
-                f"(версия {version}, поддерживается {CONFIG_VERSION}). "
-                f"Обновите программу или удалите {self._path.name}."
+                tr('Файл настроек от более новой версии программы (версия {0}, '
+                       'поддерживается {1}). Обновите программу или удалите {2}.')
+                    .format(version, CONFIG_VERSION, self._path.name)
             )
         raw = self._migrate(raw, version)
         self._data = _deep_merge(DEFAULTS, raw)
@@ -252,7 +253,7 @@ class Settings:
             temporary.replace(self._path)
             self._dirty = False
         except OSError as exc:
-            raise SettingsError(f"не удалось сохранить настройки: {exc}") from exc
+            raise SettingsError(tr('не удалось сохранить настройки: {0}').format(exc)) from exc
         finally:
             if temporary.exists():
                 temporary.unlink(missing_ok=True)

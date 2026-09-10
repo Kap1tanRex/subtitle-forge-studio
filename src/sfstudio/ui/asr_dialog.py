@@ -41,6 +41,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from sfstudio.app.i18n import tr
 from sfstudio.app.storage import libraries_dir, models_dir
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.time import format_srt
@@ -62,14 +63,14 @@ __all__ = ["AsrDialog"]
 #: Языки, которые чаще всего нужны. Список не исчерпывающий намеренно:
 #: «Определить» покрывает остальные, а длинный перечень только мешает.
 LANGUAGES: tuple[tuple[str, str | None], ...] = (
-    ("Определить автоматически", None),
-    ("Русский", "ru"),
-    ("Английский", "en"),
-    ("Немецкий", "de"),
-    ("Французский", "fr"),
-    ("Испанский", "es"),
-    ("Японский", "ja"),
-    ("Китайский", "zh"),
+    (tr('Определить автоматически'), None),
+    (tr('Русский'), "ru"),
+    (tr('Английский'), "en"),
+    (tr('Немецкий'), "de"),
+    (tr('Французский'), "fr"),
+    (tr('Испанский'), "es"),
+    (tr('Японский'), "ja"),
+    (tr('Китайский'), "zh"),
 )
 
 
@@ -89,7 +90,7 @@ class AsrDialog(QDialog):
         selection: tuple[int, int] | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Распознавание речи")
+        self.setWindowTitle(tr('Распознавание речи'))
         self.resize(640, 620)
         self._doc = doc
         self._media = media
@@ -112,14 +113,14 @@ class AsrDialog(QDialog):
         layout.addWidget(self._progress_group(), 1)
 
         self.buttons = QDialogButtonBox()
-        self.run_button = self.buttons.addButton("Распознать", QDialogButtonBox.ActionRole)
+        self.run_button = self.buttons.addButton(tr('Распознать'), QDialogButtonBox.ActionRole)
         self.run_button.clicked.connect(self._start)
-        self.cancel_button = self.buttons.addButton("Прервать", QDialogButtonBox.ActionRole)
+        self.cancel_button = self.buttons.addButton(tr('Прервать'), QDialogButtonBox.ActionRole)
         self.cancel_button.clicked.connect(self._cancel)
-        self.insert_button = self.buttons.addButton("Вставить реплики",
+        self.insert_button = self.buttons.addButton(tr('Вставить реплики'),
                                                     QDialogButtonBox.AcceptRole)
         self.insert_button.clicked.connect(self._insert)
-        close_button = self.buttons.addButton("Закрыть", QDialogButtonBox.RejectRole)
+        close_button = self.buttons.addButton(tr('Закрыть'), QDialogButtonBox.RejectRole)
         close_button.clicked.connect(self.reject)
         layout.addWidget(self.buttons)
 
@@ -131,17 +132,17 @@ class AsrDialog(QDialog):
     # -- построение --------------------------------------------------------------- #
 
     def _engine_group(self) -> QWidget:
-        box = QGroupBox("Движок")
+        box = QGroupBox(tr('Движок'))
         form = QFormLayout(box)
         form.setLabelAlignment(Qt.AlignRight)
 
         self.engine_box = QComboBox()
         self._infos: list[EngineInfo] = engine_infos()
         for info in self._infos:
-            suffix = "" if info.available else "  — не установлен"
+            suffix = "" if info.available else tr('  — не установлен')
             self.engine_box.addItem(f"{info.title}{suffix}", info.key)
         self.engine_box.currentIndexChanged.connect(self._refresh_engine)
-        form.addRow("Движок", self.engine_box)
+        form.addRow(tr('Движок'), self.engine_box)
 
         self.engine_note = QLabel("")
         self.engine_note.setWordWrap(True)
@@ -152,24 +153,24 @@ class AsrDialog(QDialog):
         self.model_box = QComboBox()
         self.model_box.setEditable(True)
         self.model_box.setToolTip(
-            "Крупные модели точнее, но требуют больше памяти и времени"
+            tr('Крупные модели точнее, но требуют больше памяти и времени')
         )
         self.model_box.currentTextChanged.connect(self._refresh_model_note)
         model_row.addWidget(self.model_box, 1)
 
-        self.download_button = QPushButton("Скачать")
+        self.download_button = QPushButton(tr('Скачать'))
         self.download_button.setToolTip(
-            "Скачать выбранную модель в указанный каталог"
+            tr('Скачать выбранную модель в указанный каталог')
         )
         self.download_button.clicked.connect(self._download_model)
         model_row.addWidget(self.download_button)
-        form.addRow("Модель", model_row)
+        form.addRow(tr('Модель'), model_row)
 
         # Кнопка появляется, только когда выбран whisper.cpp и его нет:
         # у остальных движков ставить нечего.
-        self.engine_setup_button = QPushButton("Установить whisper.cpp")
+        self.engine_setup_button = QPushButton(tr('Установить whisper.cpp'))
         self.engine_setup_button.setToolTip(
-            "Скачать готовую сборку whisper.cpp (20 МБ) в папку загрузок"
+            tr('Скачать готовую сборку whisper.cpp (20 МБ) в папку загрузок')
         )
         self.engine_setup_button.clicked.connect(self._download_engine)
         self.engine_setup_button.hide()
@@ -186,30 +187,30 @@ class AsrDialog(QDialog):
         # Заметка о модели зависит и от языка: одноязычной модели русская речь
         # не по силам, и сказать об этом надо до запуска, а не после.
         self.language_box.currentIndexChanged.connect(self._refresh_model_note)
-        form.addRow("Язык", self.language_box)
+        form.addRow(tr('Язык'), self.language_box)
 
         device_row = QHBoxLayout()
         self.device_box = QComboBox()
-        self.device_box.addItem("Определить автоматически", "")
+        self.device_box.addItem(tr('Определить автоматически'), "")
         # Остальное — то, что действительно нашлось на этой машине, с
         # названиями карт. «Видеокарта (CUDA)» в списке у человека без
         # видеокарты — обещание, которое программа не выполнит.
         for accel in self._accelerators:
             self.device_box.addItem(accel.caption, accel.key)
         self.device_box.setToolTip(
-            "Видеокарта не всегда быстрее: модель нужно загрузить в её память, "
-            "и на коротких отрезках это съедает выигрыш"
+            tr('Видеокарта не всегда быстрее: модель нужно загрузить в её память, и на '
+                   'коротких отрезках это съедает выигрыш')
         )
         self.device_box.currentIndexChanged.connect(self._refresh_device_note)
         device_row.addWidget(self.device_box, 1)
 
-        self.libraries_button = QPushButton("Включить видеокарту")
+        self.libraries_button = QPushButton(tr('Включить видеокарту'))
         self.libraries_button.setToolTip(
-            "Скачать библиотеку cuBLAS (около 0,7 ГБ) в папку загрузок"
+            tr('Скачать библиотеку cuBLAS (около 0,7 ГБ) в папку загрузок')
         )
         self.libraries_button.clicked.connect(self._download_libraries)
         device_row.addWidget(self.libraries_button)
-        form.addRow("Считать на", device_row)
+        form.addRow(tr('Считать на'), device_row)
 
         self.device_note = QLabel("")
         self.device_note.setWordWrap(True)
@@ -224,57 +225,56 @@ class AsrDialog(QDialog):
         self.models_dir_edit.setPlaceholderText(str(models_dir(self._settings)))
         self.models_dir_edit.textChanged.connect(self._refresh_model_note)
         models_row.addWidget(self.models_dir_edit, 1)
-        browse = QPushButton("Обзор…")
+        browse = QPushButton(tr('Обзор…'))
         browse.clicked.connect(self._choose_models_dir)
         models_row.addWidget(browse)
-        form.addRow("Модели", models_row)
+        form.addRow(tr('Модели'), models_row)
         return box
 
     def _scope_group(self) -> QWidget:
-        box = QGroupBox("Что распознавать")
+        box = QGroupBox(tr('Что распознавать'))
         form = QFormLayout(box)
         form.setLabelAlignment(Qt.AlignRight)
 
-        self.media_label = QLabel(self._media.name if self._media else "видео не открыто")
-        form.addRow("Файл", self.media_label)
+        self.media_label = QLabel(self._media.name if self._media else tr('видео не открыто'))
+        form.addRow(tr('Файл'), self.media_label)
 
-        self.selection_check = QCheckBox("Только выделенный участок")
+        self.selection_check = QCheckBox(tr('Только выделенный участок'))
         self.selection_check.setEnabled(self._selection is not None)
         if self._selection is not None:
             start, end = self._selection
             self.selection_check.setText(
-                f"Только участок {format_srt(start)} — {format_srt(end)}"
+                tr('Только участок {0} — {1}').format(format_srt(start), format_srt(end))
             )
         form.addRow("", self.selection_check)
 
-        self.replace_check = QCheckBox("Заменить существующие реплики")
+        self.replace_check = QCheckBox(tr('Заменить существующие реплики'))
         self.replace_check.setToolTip(
-            "Иначе распознанное добавится к тому, что уже есть в документе"
+            tr('Иначе распознанное добавится к тому, что уже есть в документе')
         )
         form.addRow("", self.replace_check)
 
-        self.wrap_check = QCheckBox("Переносить длинные строки")
+        self.wrap_check = QCheckBox(tr('Переносить длинные строки'))
         self.wrap_check.setChecked(True)
         form.addRow("", self.wrap_check)
         return box
 
     def _progress_group(self) -> QWidget:
-        box = QGroupBox("Ход работы")
+        box = QGroupBox(tr('Ход работы'))
         layout = QVBoxLayout(box)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         layout.addWidget(self.progress)
 
-        self.status = QLabel("Готово к запуску.")
+        self.status = QLabel(tr('Готово к запуску.'))
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
 
         self.preview = QTextEdit()
         self.preview.setReadOnly(True)
         self.preview.setPlaceholderText(
-            "Здесь появится образец распознанного текста — до того, как он "
-            "попадёт в документ."
+            tr('Здесь появится образец распознанного текста — до того, как он попадёт в документ.')
         )
         layout.addWidget(self.preview, 1)
         return box
@@ -299,7 +299,7 @@ class AsrDialog(QDialog):
 
     def _choose_models_dir(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
-            self, "Каталог моделей", self.models_dir_edit.text() or str(Path.home())
+            self, tr('Каталог моделей'), self.models_dir_edit.text() or str(Path.home())
         )
         if chosen:
             self.models_dir_edit.setText(chosen)
@@ -317,11 +317,11 @@ class AsrDialog(QDialog):
         """
         info = self._current_info()
         if self._media is None:
-            self.status.setText("Сначала откройте видео или аудио.")
+            self.status.setText(tr('Сначала откройте видео или аудио.'))
         elif info is not None and not info.available:
-            self.status.setText("Выбранный движок не установлен.")
+            self.status.setText(tr('Выбранный движок не установлен.'))
         else:
-            self.status.setText("Готово к запуску.")
+            self.status.setText(tr('Готово к запуску.'))
 
     def _refresh_engine(self) -> None:
         info = self._current_info()
@@ -357,7 +357,7 @@ class AsrDialog(QDialog):
         folder = data_root(self._settings)
         answer = QMessageBox.question(
             self,
-            "Установить whisper.cpp",
+            tr('Установить whisper.cpp'),
             f"Скачать сборку «{build.title}» ({build.size_mb} МБ) в папку:\n"
             f"{folder}\n\nЭто отдельная программа распознавания: один файл, "
             "без пакетов Python. Модель к ней качается отдельно.\n\nСкачивать?",
@@ -373,13 +373,13 @@ class AsrDialog(QDialog):
         self._download.signals.failed.connect(self._on_failed)
         self.engine_setup_button.setEnabled(False)
         self.run_button.setEnabled(False)
-        self.status.setText("Загрузка whisper.cpp…")
+        self.status.setText(tr('Загрузка whisper.cpp…'))
         QThreadPool.globalInstance().start(self._download)
 
     def _on_engine_ready(self, path: str) -> None:
         self._download = None
         self.engine_setup_button.setEnabled(True)
-        self.status.setText(f"whisper.cpp установлен: {path}")
+        self.status.setText(tr('whisper.cpp установлен: {0}').format(path))
         # Список движков перечитывается: доступность считается по факту
         # наличия файла, и после загрузки она уже другая.
         self._infos = engine_infos()
@@ -406,7 +406,7 @@ class AsrDialog(QDialog):
 
             detected = pick_device()
             self.device_note.setText(
-                "Выбрано: " + ("видеокарта" if detected == "cuda" else "процессор")
+                tr('Выбрано: ') + (tr('видеокарта') if detected == "cuda" else tr('процессор'))
             )
 
         # Кнопка загрузки показывается ровно тогда, когда есть что чинить:
@@ -419,7 +419,7 @@ class AsrDialog(QDialog):
         folder = libraries_dir(self._settings)
         answer = QMessageBox.question(
             self,
-            "Включить видеокарту",
+            tr('Включить видеокарту'),
             f"Скачать библиотеку cuBLAS (около 0,7 ГБ) в папку:\n{folder}\n\n"
             "Без неё распознавание считается на процессоре — в 2–3 раза "
             "медленнее. Папку можно будет удалить в любой момент.\n\n"
@@ -436,7 +436,7 @@ class AsrDialog(QDialog):
         self._download.signals.failed.connect(self._on_failed)
         self.libraries_button.setEnabled(False)
         self.run_button.setEnabled(False)
-        self.status.setText("Загрузка библиотек для видеокарты…")
+        self.status.setText(tr('Загрузка библиотек для видеокарты…'))
         QThreadPool.globalInstance().start(self._download)
 
     def _on_libraries_ready(self, folder: str) -> None:
@@ -451,11 +451,11 @@ class AsrDialog(QDialog):
             index = self.device_box.findData("cuda")
             if index >= 0:
                 self.device_box.setCurrentIndex(index)
-            self.status.setText(f"Видеокарта включена. Библиотеки: {folder}")
+            self.status.setText(tr('Видеокарта включена. Библиотеки: {0}').format(folder))
         else:
             self.status.setText(
-                "Библиотеки скачаны, но видеокарта всё ещё недоступна. "
-                "Перезапустите программу — библиотеки подхватываются при старте."
+                tr('Библиотеки скачаны, но видеокарта всё ещё недоступна. Перезапустите '
+                       'программу — библиотеки подхватываются при старте.')
             )
         self._refresh_device_note()
         self._refresh_buttons(running=False)
@@ -486,7 +486,7 @@ class AsrDialog(QDialog):
             return
 
         have = name in installed_models(self._models_dir())
-        status = "уже скачана" if have else f"примерно {info.size_mb} МБ"
+        status = tr('уже скачана') if have else tr('примерно {0} МБ').format(info.size_mb)
 
         # Несовпадение языка важнее веса и важнее примечания: модель молча
         # выдаст текст на своём языке, и понять это можно будет только по
@@ -497,24 +497,24 @@ class AsrDialog(QDialog):
             allowed = ", ".join(info.languages or ())
             chosen = self.language_box.currentText().lower()
             self.model_note.setText(
-                f"Эта модель знает только: {allowed}. Выбран язык «{chosen}» — "
-                f"субтитры получатся на английском. Возьмите medium или "
-                f"large-v3. ({status})"
+                tr('Эта модель знает только: {0}. Выбран язык «{1}» — субтитры получатся на '
+                       'английском. Возьмите medium или large-v3. '
+                           '({2})').format(allowed, chosen, status)
             )
         else:
             self.model_note.setText(f"{info.note} ({status})")
         self.model_note.setProperty("role", "warning" if mismatch else "hint")
         repolish(self.model_note)
         # Скачивать заново незачем, но и запрещать не будем: файл мог побиться.
-        self.download_button.setText("Скачать заново" if have else "Скачать")
+        self.download_button.setText(tr('Скачать заново') if have else tr('Скачать'))
         self.download_button.setEnabled(bool(self._models_dir()))
 
     def _download_model(self) -> None:
         models_dir = self._models_dir()
         if models_dir is None:
             QMessageBox.information(
-                self, "Каталог моделей",
-                "Сначала укажите каталог, куда скачивать модели.",
+                self, tr('Каталог моделей'),
+                tr('Сначала укажите каталог, куда скачивать модели.'),
             )
             return
 
@@ -527,13 +527,13 @@ class AsrDialog(QDialog):
         self._download.signals.failed.connect(self._on_failed)
         self.download_button.setEnabled(False)
         self.run_button.setEnabled(False)
-        self.status.setText(f"Загрузка модели {name}…")
+        self.status.setText(tr('Загрузка модели {0}…').format(name))
         QThreadPool.globalInstance().start(self._download)
 
     def _on_downloaded(self, path: str) -> None:
         self._download = None
         self.progress.setValue(100)
-        self.status.setText(f"Модель загружена: {path}")
+        self.status.setText(tr('Модель загружена: {0}').format(path))
         self._refresh_model_note()
         self._refresh_buttons(running=False)
 
@@ -562,7 +562,7 @@ class AsrDialog(QDialog):
         self._result = None
         self.preview.clear()
         self.progress.setValue(0)
-        self.status.setText("Запуск…")
+        self.status.setText(tr('Запуск…'))
 
         start_ms, end_ms = 0, None
         if self.selection_check.isChecked() and self._selection is not None:
@@ -597,7 +597,7 @@ class AsrDialog(QDialog):
             if task is not None:
                 task.cancel()
         if self._task is not None or self._download is not None:
-            self.status.setText("Прерывание…")
+            self.status.setText(tr('Прерывание…'))
 
     # -- события задачи ------------------------------------------------------------- #
 
@@ -618,14 +618,16 @@ class AsrDialog(QDialog):
 
         self.progress.setValue(100)
         if not self._prepared:
-            self.status.setText("Речь не распознана. Проверьте звук и выбор языка.")
+            self.status.setText(tr('Речь не распознана. Проверьте звук и выбор языка.'))
             self._refresh_buttons(running=False)
             return
 
-        language = f", язык: {result.language}" if result.language else ""
+        language = tr(', язык: {0}').format(result.language) if result.language else ""
         self.status.setText(
-            f"Готово: {len(self._prepared)} реплик из {len(result.segments)} "
-            f"фрагментов за {result.elapsed_s:.0f} с{language}."
+            tr('Готово: {0} реплик из {1} фрагментов за '
+                '{2:.0f} '
+                   'с{3}.').format(
+                       len(self._prepared), len(result.segments), result.elapsed_s, language)
         )
         self.preview.setPlainText(self._preview_text())
         self._refresh_buttons(running=False)
@@ -642,7 +644,7 @@ class AsrDialog(QDialog):
             for item in self._prepared[:12]
         ]
         if len(self._prepared) > 12:
-            lines.append(f"… и ещё {len(self._prepared) - 12}")
+            lines.append(tr('… и ещё {0}').format(len(self._prepared) - 12))
         return "\n\n".join(lines)
 
     def _on_failed(self, message: str) -> None:
@@ -668,9 +670,10 @@ class AsrDialog(QDialog):
         if self.replace_check.isChecked() and len(self._doc):
             answer = QMessageBox.question(
                 self,
-                "Заменить реплики",
-                f"Удалить {len(self._doc)} существующих реплик и вставить "
-                f"{len(self._prepared)} новых?",
+                tr('Заменить '
+                       'реплики'),
+                tr('Удалить {0} существующих реплик и вставить {1} '
+                       'новых?').format(len(self._doc), len(self._prepared)),
             )
             if answer != QMessageBox.Yes:
                 return

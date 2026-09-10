@@ -31,6 +31,8 @@ from bisect import bisect_left, insort
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, replace
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "DEFAULT_COLOR",
     "INFO_KEY",
@@ -50,22 +52,22 @@ INFO_KEY = "SFStudio Markers"
 #: в монтажных программах: кто ставил маркеры в Resolve, найдёт свой цвет на
 #: том же месте. Ключ уходит в файл, подпись видит человек.
 MARKER_COLORS: tuple[tuple[str, str, str], ...] = (
-    ("blue", "Синий", "#3C8CE0"),
-    ("cyan", "Голубой", "#35B8C4"),
-    ("green", "Зелёный", "#4CAF50"),
-    ("yellow", "Жёлтый", "#D6BE3A"),
-    ("red", "Красный", "#D9483B"),
-    ("pink", "Розовый", "#E06CA0"),
-    ("purple", "Фиолетовый", "#8E5BD0"),
-    ("fuchsia", "Пурпурный", "#C24CC2"),
-    ("rose", "Пепельно-розовый", "#E08A9B"),
-    ("lavender", "Лавандовый", "#A99BE0"),
-    ("sky", "Небесный", "#7FC4E8"),
-    ("mint", "Мятный", "#7FD6A8"),
-    ("lemon", "Лимонный", "#E3E07A"),
-    ("sand", "Песочный", "#D6A96A"),
-    ("cocoa", "Какао", "#9B7A5A"),
-    ("cream", "Кремовый", "#E8E0CC"),
+    ("blue", tr('Синий'), "#3C8CE0"),
+    ("cyan", tr('Голубой'), "#35B8C4"),
+    ("green", tr('Зелёный'), "#4CAF50"),
+    ("yellow", tr('Жёлтый'), "#D6BE3A"),
+    ("red", tr('Красный'), "#D9483B"),
+    ("pink", tr('Розовый'), "#E06CA0"),
+    ("purple", tr('Фиолетовый'), "#8E5BD0"),
+    ("fuchsia", tr('Пурпурный'), "#C24CC2"),
+    ("rose", tr('Пепельно-розовый'), "#E08A9B"),
+    ("lavender", tr('Лавандовый'), "#A99BE0"),
+    ("sky", tr('Небесный'), "#7FC4E8"),
+    ("mint", tr('Мятный'), "#7FD6A8"),
+    ("lemon", tr('Лимонный'), "#E3E07A"),
+    ("sand", tr('Песочный'), "#D6A96A"),
+    ("cocoa", tr('Какао'), "#9B7A5A"),
+    ("cream", tr('Кремовый'), "#E8E0CC"),
 )
 
 #: Цвет нового маркера. Синий — первый в палитре и самый нейтральный.
@@ -119,7 +121,7 @@ class Marker:
 
     def title(self) -> str:
         """Как назвать маркер в списке, если имени ему не дали."""
-        return self.name or self.keyword or self.note.split("\n")[0] or "Без имени"
+        return self.name or self.keyword or self.note.split("\n")[0] or tr('Без имени')
 
 
 class MarkerList:
@@ -155,7 +157,7 @@ class MarkerList:
         return NotImplemented
 
     def __repr__(self) -> str:
-        return f"MarkerList({len(self._items)} маркеров)"
+        return tr('MarkerList({0} маркеров)').format(len(self._items))
 
     @property
     def items(self) -> list[Marker]:

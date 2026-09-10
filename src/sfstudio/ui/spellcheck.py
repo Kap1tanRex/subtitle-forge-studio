@@ -13,6 +13,7 @@ from __future__ import annotations
 from PySide6.QtGui import QAction, QColor, QSyntaxHighlighter, QTextCharFormat
 from PySide6.QtWidgets import QMenu, QPlainTextEdit
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.spelling import SpellChecker
 
 __all__ = ["SpellHighlighter", "attach_spellcheck"]
@@ -81,11 +82,11 @@ def _prepend_suggestions(menu: QMenu, editor, checker, word, cursor,
         header.append(action)
 
     if not header:
-        empty = QAction("Замен не нашлось", menu)
+        empty = QAction(tr('Замен не нашлось'), menu)
         empty.setEnabled(False)
         header.append(empty)
 
-    remember = QAction(f"Добавить «{word}» в словарь", menu)
+    remember = QAction(tr('Добавить «{0}» в словарь').format(word), menu)
     remember.triggered.connect(
         lambda: (checker.add_word(word), highlighter.rehighlight())
     )

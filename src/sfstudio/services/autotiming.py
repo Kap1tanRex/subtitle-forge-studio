@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.time import FpsModel, SnapMode
 from sfstudio.media.keyframes import KeyframeIndex
@@ -104,16 +105,16 @@ class TimingPlan:
 
     def summary(self) -> str:
         if not self.changes:
-            return "Ничего менять не потребовалось"
+            return tr('Ничего менять не потребовалось')
         stretched = sum(1 for c in self.changes if c.delta_duration > 0)
         shrunk = sum(1 for c in self.changes if c.delta_duration < 0)
-        parts = [f"затронуто реплик: {len(self.changes)}"]
+        parts = [tr('затронуто реплик: {0}').format(len(self.changes))]
         if stretched:
-            parts.append(f"удлинено {stretched}")
+            parts.append(tr('удлинено {0}').format(stretched))
         if shrunk:
-            parts.append(f"укорочено {shrunk}")
+            parts.append(tr('укорочено {0}').format(shrunk))
         if self.unresolved:
-            parts.append(f"не хватило места: {len(self.unresolved)}")
+            parts.append(tr('не хватило места: {0}').format(len(self.unresolved)))
         return " · ".join(parts)
 
 

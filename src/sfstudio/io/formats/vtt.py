@@ -23,6 +23,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
 from sfstudio.core import time as timemod
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
@@ -256,7 +257,7 @@ def write_vtt(
 
     for event in sorted(doc.events, key=lambda e: (e.start, e.eid)):
         if event.comment:
-            note = event.plain.replace("\n", " ") or "(пусто)"
+            note = event.plain.replace("\n", " ") or tr('(пусто)')
             out.append(f"NOTE {note}")
             out.append("")
             continue
@@ -347,5 +348,5 @@ def lossy_report(doc: SubtitleDocument) -> list[str]:
                     seen.add(tag.name)
                     warnings.append(f"тег \\{tag.name} не выражается в WebVTT")
     if len(doc.styles) > 1:
-        warnings.append("именованные стили ASS в WebVTT не переносятся")
+        warnings.append(tr('именованные стили ASS в WebVTT не переносятся'))
     return warnings
