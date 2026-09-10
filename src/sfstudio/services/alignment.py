@@ -121,8 +121,8 @@ class AlignmentPlan:
         if self.is_empty:
             return "Выравнивать нечего"
         parts = [
-            "затайминговано "
-            + plural(len(self.changes), "реплика", "реплики", "реплик"),
+            "время рассчитано для "
+            + plural(len(self.changes), "реплики", "реплик", "реплик"),
             f"опора найдена у {self.coverage * 100:.0f} % слов",
         ]
         shaky = len(self.shaky)

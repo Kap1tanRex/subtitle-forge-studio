@@ -252,7 +252,7 @@ class TestSummary:
         events = [Event(1, "первая"), Event(2, "неуслышанная"), Event(3, "третья")]
         plan = align(events, speech([(1000, "первая"), (9000, "третья")]))
         text = plan.summary()
-        assert "3 реплики" in text
+        assert "3 реплик" in text
         assert "проверки" in text
 
     def test_mapping_covers_every_change(self) -> None:

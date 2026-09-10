@@ -83,6 +83,7 @@ class ScriptImportDialog(QDialog):
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
         self.buttons.button(QDialogButtonBox.Ok).setText("Импортировать")
+        self.buttons.button(QDialogButtonBox.Cancel).setText("Отмена")
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         root.addWidget(self.buttons)

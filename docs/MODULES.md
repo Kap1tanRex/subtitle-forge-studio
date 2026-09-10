@@ -159,6 +159,14 @@ ASS→SRT и отчётом о потерях.
 | 42 | **Подготовка звука и нарезка** | `services/asr/audio.py`, `services/asr/segmentation.py` | 41, 19 | ✅ |
 | 43 | **Адаптеры движков** | `services/asr/engines/*` | 41, 42 | ✅ |
 | 44 | **Окно распознавания** | `ui/asr_dialog.py`, `ui/asr_task.py` | 41–43, 24 | ✅ |
+| 45 | **Двуязычный режим** | `core/reference.py`, `ui/event_table.py` | 6, 22 | ✅ |
+| 46 | **Рабочие пометки** | `core/workflow.py` | 6 | ✅ |
+| 47 | **Проверка орфографии** | `services/spelling.py`, `ui/spellcheck.py` | 24 | ✅ |
+| 48 | **Глоссарий** | `core/glossary.py`, `ui/glossary_dialog.py` | 6, 27, 45 | ✅ |
+| 49 | **Профили и отчёт проверок** | `services/qc_profiles.py`, `services/qc_report.py` | 27, 29 | ✅ |
+| 50 | **Пакетная обработка** | `services/batch.py` | 16, 27 | ✅ |
+| 51 | **Выравнивание по речи** | `services/alignment.py`, `ui/alignment_dialog.py` | 41–43, 28 | ✅ |
+| 52 | **Импорт текста без таймингов** | `services/script_import.py`, `ui/script_dialog.py` | 6, 16 | ✅ |
 
 ---
 

@@ -352,6 +352,12 @@ class AlignmentDialog(QDialog):
         self.apply_button.setEnabled(not running and not self._plan.is_empty)
         self.engine_box.setEnabled(not running)
 
+        # Клавиша Enter должна делать то, ради чего окно открыли: пока плана
+        # нет — запускать, когда посчитан — применять.
+        has_plan = not self._plan.is_empty
+        self.run_button.setDefault(not has_plan)
+        self.apply_button.setDefault(has_plan)
+
         if self._media is None:
             self.status.setText("Сначала откройте видео или аудио.")
         elif info is not None and not info.available:
