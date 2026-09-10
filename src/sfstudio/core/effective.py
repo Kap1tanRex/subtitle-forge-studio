@@ -22,7 +22,7 @@ from sfstudio.core.color import RGBA
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.style import SubtitleStyle
 
-__all__ = ["Effective", "effective_style"]
+__all__ = ["Effective", "effective_style", "style_tags"]
 
 #: Теги, меняющие оформление по ходу строки. Их наличие после начала текста
 #: означает, что одним значением реплику не описать.
@@ -180,3 +180,57 @@ def _split_blocks(
         cursor = block.end
 
     return leading, trailing
+
+
+def style_tags(
+    wanted: SubtitleStyle, base: SubtitleStyle | None
+) -> dict[str, object]:
+    """Теги, которыми ``wanted`` отличается от стиля реплики.
+
+    Нужно, когда оформление применяют не ко всему стилю, а к выбранным
+    репликам: стиль общий, и перекрасить через него одну реплику нельзя, не
+    перекрасив остальные. Разница ложится тегами — тем самым способом, каким
+    ASS и описывает исключение из стиля.
+
+    Совпадающие свойства дают ``None`` — это указание **снять** тег, если он
+    там был. Иначе прежнее оформление осталось бы поверх нового: человек
+    вернул кегль к стилевому, а в реплике по-прежнему стоит ``\fs72``.
+    """
+    if base is None:
+        base = SubtitleStyle()
+
+    tags: dict[str, object] = {}
+
+    def put(name: str, value: object, same: bool) -> None:
+        tags[name] = None if same else value
+
+    put("fn", wanted.fontname, wanted.fontname == base.fontname)
+    put("fs", _num(wanted.fontsize), wanted.fontsize == base.fontsize)
+    put("c", wanted.primary.to_ass(with_alpha=False), wanted.primary == base.primary)
+    put(
+        "3c",
+        wanted.outline_color.to_ass(with_alpha=False),
+        wanted.outline_color == base.outline_color,
+    )
+    put(
+        "4c",
+        wanted.back_color.to_ass(with_alpha=False),
+        wanted.back_color == base.back_color,
+    )
+    put("b", 1 if wanted.bold else 0, wanted.bold == base.bold)
+    put("i", 1 if wanted.italic else 0, wanted.italic == base.italic)
+    put("u", 1 if wanted.underline else 0, wanted.underline == base.underline)
+    put("s", 1 if wanted.strikeout else 0, wanted.strikeout == base.strikeout)
+    put("bord", _num(wanted.outline), wanted.outline == base.outline)
+    put("shad", _num(wanted.shadow), wanted.shadow == base.shadow)
+    put("fscx", _num(wanted.scale_x), wanted.scale_x == base.scale_x)
+    put("fscy", _num(wanted.scale_y), wanted.scale_y == base.scale_y)
+    put("fsp", _num(wanted.spacing), wanted.spacing == base.spacing)
+    put("frz", _num(wanted.angle), wanted.angle == base.angle)
+    put("an", wanted.alignment, wanted.alignment == base.alignment)
+    return tags
+
+
+def _num(value: float) -> str:
+    """Число для тега: без хвостового нуля, как это принято в ASS."""
+    return f"{value:g}"

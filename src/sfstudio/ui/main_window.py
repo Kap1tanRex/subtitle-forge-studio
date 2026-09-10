@@ -50,6 +50,7 @@ from sfstudio.core.commands import (
     UpdateStyle,
 )
 from sfstudio.core.document import SubtitleDocument
+from sfstudio.core.effective import style_tags
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.project import (
     PROJECT_SUFFIX,
@@ -82,6 +83,11 @@ from sfstudio.ui.style_forge import StyleForge
 from sfstudio.ui.timeline import TimelineWidget
 from sfstudio.ui.transport import TransportBar
 from sfstudio.ui.video_pane import VideoPane
+
+#: Пауза перед тем, как живая правка оформления уйдёт в документ.
+#: Ползунок кегля выдаёт десятки значений за одно движение мыши; без паузы
+#: каждое из них перерисовывало бы кадр и ложилось в историю отмены.
+FORGE_DELAY_MS = 250
 
 SUBTITLE_FILTER = (
     tr('Субтитры (*.ass *.ssa *.srt *.vtt *.ttml *.dfxp);;ASS (*.ass *.ssa);;SubRip '
@@ -369,6 +375,17 @@ class MainWindow(QMainWindow):
         # край. Любую вкладку можно вынести в своё окно кнопкой в её углу.
         self.style_forge = StyleForge(self._default_style())
         self.style_forge.apply_requested.connect(self._apply_forged_style)
+        # Правка ползунком применяется сама, без нажатия кнопок: человек
+        # крутит кегль, чтобы увидеть его на кадре, а не чтобы потом ещё раз
+        # подтвердить выбор. Кнопки остаются для случая, когда область нужна
+        # другая, чем подсказывает выделение.
+        self.style_forge.style_changed.connect(self._on_forge_edit)
+        self._pending_style = None
+        #: Формат метки говорящего, который уже отражён в тексте реплик.
+        self._label_template_applied = self.label_template()
+        self._forge_timer = QTimer(self)
+        self._forge_timer.setSingleShot(True)
+        self._forge_timer.timeout.connect(self._flush_forge_edit)
 
         # Порядок вкладок — порядок работы: список реплик, их текст, потом
         # свойства от общего к частному. Список и текст встают в начало,
@@ -1497,12 +1514,12 @@ class MainWindow(QMainWindow):
             label=assign.label,
         )
 
-    def relabel_all(self) -> None:
+    def relabel_all(self, *, quiet: bool = False) -> None:
         """Перестраивает метки говорящих во всём документе.
 
-        Нужна после смены формата в настройках и для файлов, где акторы
-        расставлены, а меток нет. Отдельная команда, потому что менять
-        готовый текст молча, по факту открытия настроек, нельзя.
+        Зовётся из меню и сама, когда в настройках сменили формат метки.
+        ``quiet`` убирает сообщение «уже в порядке»: при смене настройки
+        менять обычно нечего, и говорить об этом каждый раз — шум.
         """
         from sfstudio.core.actor_label import relabel_events
         from sfstudio.core.commands import CompositeCommand, SetText
@@ -1514,7 +1531,8 @@ class MainWindow(QMainWindow):
             self._doc.actors.names(),
         )
         if not changes:
-            self._show_status(tr('Метки говорящих уже в порядке'))
+            if not quiet:
+                self._show_status(tr('Метки говорящих уже в порядке'))
             return
 
         self._undo.run(
@@ -1543,6 +1561,7 @@ class MainWindow(QMainWindow):
         self.apply_theme()
         self._reschedule_autosave()
         self.apply_spelling_settings()
+        self._relabel_if_format_changed()
 
         profile = self._profile_by_name(
             str(self._settings.get("qc.profile", "general"))
@@ -1555,6 +1574,24 @@ class MainWindow(QMainWindow):
         player = self.video_pane.player
         if player is not None and self.video_pane.has_video:
             player.volume = float(self._settings.get("media.volume", 80.0) or 0.0)
+
+    def _relabel_if_format_changed(self) -> None:
+        """Перестраивает метки говорящих, когда сменили их формат.
+
+        Раньше настройка действовала только на будущие назначения, а готовый
+        файл обновляла отдельная команда меню. Человек, поменявший формат в
+        настройках, разумно ждёт увидеть его в тексте сразу — и не обязан
+        знать, что где-то есть ещё один пункт про то же самое.
+
+        Молчаливой правкой это не становится: она ложится одним шагом истории
+        и отменяется одним Ctrl+Z, а строка состояния говорит, сколько реплик
+        затронуто.
+        """
+        template = self.label_template()
+        if template == self._label_template_applied:
+            return
+        self._label_template_applied = template
+        self.relabel_all(quiet=True)
 
     def open_subtitles(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, tr('Открыть субтитры'), "", SUBTITLE_FILTER)
@@ -2659,47 +2696,102 @@ class MainWindow(QMainWindow):
 
         return next(iter(self._doc.styles.values()), SubtitleStyle())
 
-    def _apply_forged_style(self, style, to_all: bool) -> None:
-        """Применяет стиль из вкладки оформления.
+    def _apply_forged_style(self, style, to_all: bool | None = None) -> None:
+        """Применяет оформление из вкладки «Оформление».
 
-        Правится **именованный стиль**, а не каждая реплика по отдельности:
-        так задуман ASS, и правка стиля разом меняет всё, что на него
-        ссылается. Реплики, которым назначен другой стиль, при «ко всем»
-        переводятся на этот.
+        Куда именно — решает выделение, и это разные операции по сути.
+
+        **Ничего не выделено — правится именованный стиль.** Так задуман ASS:
+        стиль один на многие реплики, и правка стиля меняет их все разом.
+
+        **Есть выделение — оформляется только оно.** Правкой стиля этого не
+        добиться: он общий, и «сделать вот эту реплику жёлтой» через стиль
+        означало бы перекрасить все остальные. Поэтому на выделенные реплики
+        ложатся теги — тот самый способ, которым ASS и описывает исключение
+        из стиля.
+
+        ``to_all`` задаётся кнопками окна явно; ``None`` значит «решай по
+        выделению» — так приходят живые правки ползунками.
         """
+        chosen = self._editable_selection()
+        if to_all is None:
+            to_all = not chosen
+        if to_all:
+            self._restyle_whole_document(style)
+        elif chosen:
+            self._restyle_events(chosen, style)
+        else:
+            self._show_status(tr('Сначала выберите реплики в таблице или на таймлайне'))
+
+    def _restyle_whole_document(self, style) -> None:
+        """Переписывает именованный стиль — меняются все реплики на нём."""
         from dataclasses import replace
 
-        from sfstudio.core.commands import (
-            ApplyStyleToEvents,
-            CreateStyle,
-            UpdateStyle,
-        )
+        from sfstudio.core.commands import CreateStyle, UpdateStyle
 
         name = style.name or next(iter(self._doc.styles), "Default")
         target = replace(style, name=name)
+        if name in self._doc.styles:
+            if self._doc.styles[name] == target:
+                return
+            self._undo.run(UpdateStyle(name, target))
+        else:
+            self._undo.run(CreateStyle(target))
+
+        self._after_restyle()
+        self._show_status(tr('Стиль «{0}» обновлён и применён {1}').format(
+            name, tr('ко всем репликам')
+        ))
+
+    def _restyle_events(self, eids: list[int], style) -> None:
+        """Оформляет выделенные реплики тегами поверх их стиля."""
+        from sfstudio.core.commands import SetMargins, SetOverrideTags
 
         commands = []
-        if name in self._doc.styles:
-            commands.append(UpdateStyle(name, target))
-        else:
-            commands.append(CreateStyle(target))
+        for eid in eids:
+            event = self._doc.by_eid(eid)
+            tags = style_tags(style, self._doc.styles.get(event.style))
+            if tags:
+                commands.append(SetOverrideTags(eid, tags))
+            if (event.margin_l, event.margin_r, event.margin_v) != (
+                style.margin_l, style.margin_r, style.margin_v
+            ):
+                commands.append(
+                    SetMargins(eid, style.margin_l, style.margin_r, style.margin_v)
+                )
+        if not commands:
+            return
 
-        eids = (
-            [event.eid for event in self._doc.events] if to_all
-            else self._editable_selection()
-        )
-        moving = [eid for eid in eids if self._doc.by_eid(eid).style != name]
-        if moving:
-            commands.append(ApplyStyleToEvents(moving, name))
+        self._undo.run(CompositeCommand(
+            commands, label=tr('Оформление {0} реплик').format(len(eids))
+        ))
+        self._after_restyle()
+        self._show_status(tr('Оформление применено {0}').format(
+            tr('к выделенным ({0})').format(len(eids))
+        ))
 
-        self._undo.run(
-            CompositeCommand(commands, label=tr('Оформление стиля «{0}»').format(name))
-        )
+    def _after_restyle(self) -> None:
+        """Обновляет всё, что показывает оформление."""
         self._on_widget_edit()
-        self.model.reset_document(self._doc)
+        self.model.refresh_qc()
         self.preview.update()
-        where = tr('ко всем репликам') if to_all else tr('к выделенным ({0})').format(len(moving))
-        self._show_status(tr('Стиль «{0}» обновлён и применён {1}').format(name, where))
+
+    def _on_forge_edit(self, style) -> None:
+        """Живая правка из кузницы: применяем не сразу, а через паузу.
+
+        Ползунок кегля выдаёт десятки значений за одно движение мыши.
+        Применять каждое — значит перерисовывать кадр десятки раз и класть в
+        историю десятки шагов. Пауза в четверть секунды укладывает движение в
+        одну правку; слияние в самой команде добирает остальное.
+        """
+        self._pending_style = style
+        self._forge_timer.start(FORGE_DELAY_MS)
+
+    def _flush_forge_edit(self) -> None:
+        style = self._pending_style
+        self._pending_style = None
+        if style is not None:
+            self._apply_forged_style(style)
 
     # -- маркеры ------------------------------------------------------------- #
 
