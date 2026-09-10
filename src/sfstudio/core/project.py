@@ -25,6 +25,7 @@ from sfstudio.core.document import SubtitleDocument
 __all__ = [
     "FORMAT_VERSION",
     "FPS_PRESETS",
+    "GLOSSARY_NAME",
     "MANIFEST_NAME",
     "PROJECT_SUFFIX",
     "REFERENCE_NAME",
@@ -44,6 +45,8 @@ SUBTITLES_NAME = "subtitles.ass"
 #: Оригинал, с которого идёт перевод. Лежит в проекте отдельным
 #: файлом: это чужой текст, и в наши субтитры он попадать не должен.
 REFERENCE_NAME = "reference.ass"
+#: Глоссарий проекта. CSV — в таком виде их и присылают.
+GLOSSARY_NAME = "glossary.csv"
 
 #: Готовые разрешения. Это ``PlayRes`` документа — система координат, в
 #: которой заданы ``\pos``, а не размер видео: они могут не совпадать, и
@@ -127,6 +130,8 @@ class Project:
     state: ProjectState = field(default_factory=ProjectState)
     #: Оригинал для перевода: только для чтения, в экспорт не попадает.
     reference: object | None = None
+    #: Глоссарий: как переводить термины и имена.
+    glossary: object | None = None
     created: str = ""
     modified: str = ""
     #: Откуда прочитан или куда записан. Не сохраняется внутрь файла.
@@ -174,6 +179,7 @@ class Project:
             # Оригинал переносится в копию: без него восстановление из
             # автосохранения молча оставило бы переводчика без исходника.
             reference=self.reference,
+            glossary=self.glossary,
             created=self.created,
             modified=self.modified,
         )

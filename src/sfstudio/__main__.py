@@ -36,7 +36,23 @@ def _versions() -> list[tuple[str, str]]:
             # libmpv-2.dll. Ловить только ImportError здесь недостаточно:
             # на машине без нативных библиотек падал бы даже --version.
             rows.append((label, f"нет нативной библиотеки: {_short(exc)}"))
+    rows.append(("проверка орфографии", _spelling_state()))
     return rows
+
+
+def _spelling_state() -> str:
+    """Есть ли словари. В собранной программе они лежат внутри exe, и без
+    этой строки узнать об их пропаже можно было бы только на глаз."""
+    try:
+        from sfstudio.services.spelling import SpellChecker, available
+    except ImportError:
+        return "не установлена"
+    if not available():
+        return "не установлена"
+    checker = SpellChecker("ru")
+    # Пробуем настоящее слово: библиотека может стоять, а словари — нет.
+    checker.known("проверка")
+    return "недоступна" if checker._failed else "русский, английский"
 
 
 def _short(exc: BaseException, limit: int = 60) -> str:

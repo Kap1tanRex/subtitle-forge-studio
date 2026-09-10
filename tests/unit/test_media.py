@@ -27,6 +27,10 @@ from sfstudio.media import peaks as pk
 from sfstudio.media.probe import MediaProbeError, probe
 
 pytestmark = pytest.mark.needs_media
+#: Эти тесты идут отдельным, последовательным прогоном: они создают
+#: экземпляры libmpv и libass, а несколько таких копий в параллельных
+#: процессах давали то падение воркера, то зависание всего прогона.
+pytestmark = [pytestmark, pytest.mark.serial]
 
 SPEC = MediaSpec()
 

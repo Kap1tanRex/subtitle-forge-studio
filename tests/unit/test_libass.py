@@ -23,6 +23,10 @@ from sfstudio.render.libass import (
 from sfstudio.render.renderer import LibassMeasurer
 
 pytestmark = pytest.mark.needs_native
+#: Эти тесты идут отдельным, последовательным прогоном: они создают
+#: экземпляры libmpv и libass, а несколько таких копий в параллельных
+#: процессах давали то падение воркера, то зависание всего прогона.
+pytestmark = [pytestmark, pytest.mark.serial]
 
 PLAY_RES = (1920, 1080)
 

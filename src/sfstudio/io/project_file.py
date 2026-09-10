@@ -30,6 +30,7 @@ from pathlib import Path
 
 from sfstudio.core.project import (
     FORMAT_VERSION,
+    GLOSSARY_NAME,
     MANIFEST_NAME,
     PROJECT_SUFFIX,
     REFERENCE_NAME,
@@ -82,6 +83,7 @@ def save_project(project: Project, path: Path) -> Path:
         "state": project.state.to_dict(),
         "subtitles": SUBTITLES_NAME,
         "reference": _reference_entry(project),
+        "glossary": GLOSSARY_NAME if project.glossary else None,
     }
 
     temporary = path.with_name(path.name + ".tmp")
@@ -93,6 +95,8 @@ def save_project(project: Project, path: Path) -> Path:
             archive.writestr(SUBTITLES_NAME, write_ass(project.document))
             if project.reference:
                 archive.writestr(REFERENCE_NAME, _reference_ass(project.reference))
+            if project.glossary:
+                archive.writestr(GLOSSARY_NAME, project.glossary.to_csv())
         temporary.replace(path)
     except OSError as exc:
         temporary.unlink(missing_ok=True)
@@ -165,6 +169,10 @@ def load_project(path: Path) -> Project:
                 archive.read(REFERENCE_NAME).decode("utf-8-sig")
                 if REFERENCE_NAME in names else ""
             )
+            glossary_raw = (
+                archive.read(GLOSSARY_NAME).decode("utf-8-sig")
+                if GLOSSARY_NAME in names else ""
+            )
     except KeyError as exc:
         raise ProjectError(f"в проекте нет обязательной части: {exc}") from exc
     except (zipfile.BadZipFile, OSError, UnicodeDecodeError) as exc:
@@ -204,7 +212,21 @@ def load_project(path: Path) -> Project:
 
     project.media_path = _resolve_media(manifest.get("media"), path)
     project.reference = _read_reference(reference_raw, manifest.get("reference"))
+    project.glossary = _read_glossary(glossary_raw)
     return project
+
+
+def _read_glossary(raw: str):
+    """Глоссарий из проекта. Испорченный не мешает открыть работу."""
+    if not raw:
+        return None
+    from sfstudio.core.glossary import Glossary
+
+    try:
+        glossary = Glossary.from_csv(raw)
+    except Exception:
+        return None
+    return glossary or None
 
 
 def _read_reference(raw: str, entry: object):

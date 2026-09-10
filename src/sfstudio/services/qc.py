@@ -134,6 +134,10 @@ class _Context:
     fps: FpsModel | None
     previous: SubtitleEvent | None
     following: SubtitleEvent | None
+    #: Глоссарий и оригинал перевода. Правило про термины без них молчит:
+    #: проверять «переведён ли термин» не по чему, если оригинала нет.
+    glossary: object | None = None
+    reference: object | None = None
 
     @property
     def min_gap_ms(self) -> int:
@@ -307,6 +311,32 @@ def _check_typography(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
         )
 
 
+def _check_glossary(event: SubtitleEvent, ctx: _Context) -> Iterator[Issue]:
+    """Термин из глоссария есть в оригинале, но не виден в переводе.
+
+    Проверка нужна ровно там, где ошибаются: имя, названное в первой серии
+    «Эшли», в восьмой становится «Ашлей», и заметить это глазами нельзя.
+
+    Молчит, когда нечего сравнивать: без оригинала или без глоссария правило
+    не срабатывает вовсе — догадываться, что имелось в виду, оно не должно.
+    """
+    if ctx.glossary is None or ctx.reference is None or not ctx.glossary:
+        return
+
+    original = ctx.reference.text_for(event.start, event.end)
+    if not original:
+        return
+
+    for term in ctx.glossary.missing_in(original, event.plain):
+        severity = Severity.WARNING if term.required else Severity.INFO
+        yield Issue(
+            event.eid,
+            "glossary",
+            severity,
+            f"«{term.source}» переводится как «{term.target}»",
+        )
+
+
 #: Порядок правил определяет порядок находок внутри одного события.
 RULES = (
     _check_style,
@@ -319,6 +349,7 @@ RULES = (
     _check_gap,
     _check_empty,
     _check_typography,
+    _check_glossary,
 )
 
 #: Правила, добавленные извне — плагинами. Отдельный список, а не дополнение
@@ -370,6 +401,9 @@ class QcRunner:
 
     profile: QcProfile = field(default_factory=default_profile)
     fps: FpsModel | None = None
+    #: Глоссарий и оригинал — их ставит окно, когда они появляются.
+    glossary: object | None = None
+    reference: object | None = None
     _issues: dict[int, list[Issue]] = field(default_factory=dict)
 
     # -- полный и инкрементальный прогон ------------------------------------- #
@@ -434,6 +468,8 @@ class QcRunner:
             fps=self.fps,
             previous=doc.get(before_eid) if before_eid is not None else None,
             following=doc.get(after_eid) if after_eid is not None else None,
+            glossary=self.glossary,
+            reference=self.reference,
         )
         for rule in RULES:
             yield from rule(event, ctx)

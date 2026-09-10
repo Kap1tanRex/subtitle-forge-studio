@@ -24,6 +24,10 @@ from sfstudio.ui.timeline import NEW_EVENT_MS, TimelineWidget
 from sfstudio.ui.transport import TransportBar
 
 pytestmark = pytest.mark.needs_gui
+#: Эти тесты идут отдельным, последовательным прогоном: они создают
+#: экземпляры libmpv и libass, а несколько таких копий в параллельных
+#: процессах давали то падение воркера, то зависание всего прогона.
+pytestmark = [pytestmark, pytest.mark.serial]
 
 
 @pytest.fixture(scope="module")

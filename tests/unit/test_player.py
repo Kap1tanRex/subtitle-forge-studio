@@ -33,6 +33,10 @@ from media_fixtures import MediaSpec, make_test_media
 from sfstudio.media.player import MpvPlayer, MpvUnavailableError
 
 pytestmark = pytest.mark.needs_native
+#: Эти тесты идут отдельным, последовательным прогоном: они создают
+#: экземпляры libmpv и libass, а несколько таких копий в параллельных
+#: процессах давали то падение воркера, то зависание всего прогона.
+pytestmark = [pytestmark, pytest.mark.serial]
 
 SPEC = MediaSpec(duration_ms=4000)
 

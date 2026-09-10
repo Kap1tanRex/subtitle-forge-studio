@@ -118,6 +118,8 @@ class MainWindow(QMainWindow):
         self._project: Project | None = None
         #: Оригинал, с которого идёт перевод. ``None`` — режим обычный.
         self._reference = None
+        #: Глоссарий проекта: как переводить термины и имена.
+        self._glossary = None
 
         # Движки распознавания ищут скачанное сами — им нужен только путь.
         from sfstudio.app.storage import data_root
@@ -435,6 +437,9 @@ class MainWindow(QMainWindow):
         add("edit.relabel", "Обновить метки говорящих", self.relabel_all,
             menu="Правка",
             tip="Проставить или убрать имена акторов в тексте по настройке")
+        add("edit.glossary", "Глоссарий…", self.open_glossary,
+            menu="Правка",
+            tip="Как переводить термины и имена. Проверяется по оригиналу")
         add("edit.actors", "Акторы…", self.open_actors,
             shortcut="Ctrl+Shift+A", menu="Правка")
         add("edit.add_track", "Новая дорожка", self.add_track,
@@ -777,6 +782,47 @@ class MainWindow(QMainWindow):
             self._settings.set("spelling.words", words)
             self._settings.save()
 
+    # -- глоссарий ----------------------------------------------------------------- #
+
+    @property
+    def glossary(self):
+        return self._glossary
+
+    def open_glossary(self) -> None:
+        """Окно правки глоссария."""
+        from sfstudio.ui.glossary_dialog import GlossaryDialog
+
+        dialog = GlossaryDialog(self._glossary, self)
+        dialog.changed.connect(self.set_glossary)
+        dialog.exec()
+
+    def set_glossary(self, glossary) -> None:
+        """Применяет глоссарий и перепроверяет реплики.
+
+        Полный прогон проверок, а не точечный: правило про термины касается
+        каждой реплики сразу, и оставить прежние находки значило бы
+        показывать замечания по списку, которого больше нет.
+        """
+        self._glossary = glossary or None
+        self._qc.glossary = self._glossary
+        self._qc.reference = self._reference
+        if self._project is not None:
+            self._project.glossary = self._glossary
+
+        self._qc.run_all(self._doc)
+        self.model.refresh_qc()
+        self.qc_panel.refresh()
+
+        if self._glossary is None:
+            self._show_status("Глоссарий пуст")
+            return
+
+        from sfstudio.ui.safe_text import plural
+
+        count = plural(len(self._glossary), "термин", "термина", "терминов")
+        note = "" if self._reference else " · оригинал не подключён"
+        self._show_status(f"Глоссарий: {count}{note}")
+
     # -- оригинал для перевода ---------------------------------------------------- #
 
     @property
@@ -841,6 +887,9 @@ class MainWindow(QMainWindow):
     def set_reference(self, track, *, announce: bool = True) -> None:
         """Подключает или снимает оригинал и раздаёт его тем, кто показывает."""
         self._reference = track or None
+        # Правило про термины сравнивает перевод с оригиналом — значит
+        # оригинал нужен и проверкам, а не только таблице.
+        self._qc.reference = self._reference
         self.model.set_reference(self._reference)
         self.table.show_reference(self._reference is not None)
         self.original.setVisible(self._reference is not None)
@@ -888,6 +937,8 @@ class MainWindow(QMainWindow):
         self._settings.save()
 
         self.set_reference(project.reference, announce=False)
+        self._glossary = project.glossary
+        self._qc.glossary = self._glossary
 
         if project.media_path is not None:
             if project.media_path.is_file():
@@ -980,6 +1031,7 @@ class MainWindow(QMainWindow):
 
         try:
             self._project.reference = self._reference
+            self._project.glossary = self._glossary
             snapshot = self._project.snapshot(
                 self._doc, self._media_path, self._capture_state()
             )
@@ -1010,6 +1062,7 @@ class MainWindow(QMainWindow):
         self._project.media_path = self._media_path
         self._project.state = self._capture_state()
         self._project.reference = self._reference
+        self._project.glossary = self._glossary
 
         try:
             written = save_project(self._project, path)
