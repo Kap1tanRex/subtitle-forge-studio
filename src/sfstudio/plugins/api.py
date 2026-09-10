@@ -33,6 +33,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "API_VERSION",
     "MANIFEST_NAME",
@@ -68,10 +70,10 @@ class PluginState(StrEnum):
     @property
     def title(self) -> str:
         return {
-            PluginState.LOADED: "работает",
-            PluginState.DISABLED: "выключен",
-            PluginState.INCOMPATIBLE: "несовместим",
-            PluginState.FAILED: "ошибка",
+            PluginState.LOADED: tr('работает'),
+            PluginState.DISABLED: tr('выключен'),
+            PluginState.INCOMPATIBLE: tr('несовместим'),
+            PluginState.FAILED: tr('ошибка'),
         }[self]
 
 
@@ -102,7 +104,7 @@ class PluginInfo:
     def from_dict(cls, data: dict[str, Any], folder: Path) -> PluginInfo:
         name = str(data.get("name") or folder.name).strip()
         if not name:
-            raise PluginError("в манифесте не указано имя плагина")
+            raise PluginError(tr('в манифесте не указано имя плагина'))
         return cls(
             name=name,
             title=str(data.get("title") or name),
@@ -208,7 +210,7 @@ class PluginContext:
         по действию «export», и без приставки второе затёрло бы первое.
         """
         if not callable(callback):
-            raise PluginError(f"действие «{action_id}» не даёт функции-обработчика")
+            raise PluginError(tr('действие «{0}» не даёт функции-обработчика').format(action_id))
         self.actions.append(
             PluginAction(
                 plugin=self.plugin,
@@ -232,19 +234,19 @@ class PluginContext:
             # Перечисляем всё сразу: чинить по одному методу за прогон —
             # значит заставлять автора плагина искать ошибки по очереди.
             names = ", ".join(f"{name}()" for name in missing)
-            raise PluginError(f"движок распознавания без методов: {names}")
+            raise PluginError(tr('движок распознавания без методов: {0}').format(names))
         self.asr_engines.append(engine)
 
     def register_format(self, handler: Any) -> None:
         """Добавляет формат чтения и записи субтитров."""
         if not hasattr(handler, "extensions"):
-            raise PluginError("формат не сообщает, какие расширения он читает")
+            raise PluginError(tr('формат не сообщает, какие расширения он читает'))
         self.formats.append(handler)
 
     def register_qc_rule(self, rule: Any) -> None:
         """Добавляет проверку качества."""
         if not callable(rule) and not hasattr(rule, "check"):
-            raise PluginError("проверка должна быть функцией либо иметь метод check()")
+            raise PluginError(tr('проверка должна быть функцией либо иметь метод check()'))
         self.qc_rules.append(rule)
 
     def log(self, message: str) -> None:
@@ -256,7 +258,7 @@ class PluginContext:
     def _require_host(self):
         if self.host is None:
             raise PluginError(
-                "действие вызвано вне работающей программы: документа нет"
+                tr('действие вызвано вне работающей программы: документа нет')
             )
         return self.host
 
@@ -315,7 +317,7 @@ class PluginContext:
         commands = [SetText(eid, text) for eid, text in changes.items()]
         self.run(
             CompositeCommand(
-                commands, label=label or f"Правка {len(commands)} реплик"
+                commands, label=label or tr('Правка {0} реплик').format(len(commands))
             )
         )
         return len(commands)

@@ -259,7 +259,7 @@ def cmd_plugins() -> int:
     enabled = bool(settings.get("plugins.enabled", False))
 
     print(tr('каталог плагинов: {0}').format(folder))
-    print(tr('загрузка плагинов: {0}').format('включена' if enabled else 'выключена'))
+    print(tr('загрузка плагинов: {0}').format(tr('включена') if enabled else tr('выключена')))
     if not enabled:
         print(tr('  (в этом режиме плагины перечисляются, но не выполняются)'))
     print()

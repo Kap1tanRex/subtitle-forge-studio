@@ -32,6 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.io.formats.ass import read_ass
@@ -85,19 +86,19 @@ def extract_subtitles(path: Path, stream_index: int) -> SubtitleDocument:
     try:
         import av
     except (ImportError, OSError) as exc:
-        raise ContainerError(f"PyAV недоступен: {exc}") from exc
+        raise ContainerError(tr('PyAV недоступен: {0}').format(exc)) from exc
 
     info = probe(path)
     track = next((t for t in info.subtitles if t.index == stream_index), None)
     if track is None:
-        raise ContainerError(f"дорожки #{stream_index} нет в {path.name}")
+        raise ContainerError(tr('дорожки #{0} нет в {1}').format(stream_index, path.name))
     if track.is_bitmap:
         raise UnsupportedTrackError(
-            f"дорожка #{stream_index} ({track.codec}) — картинка, "
-            "для правки нужен OCR"
+            tr('дорожка #{0} ({1}) — картинка, для правки нужен '
+                   'OCR').format(stream_index, track.codec)
         )
     if not track.is_editable:
-        raise UnsupportedTrackError(f"кодек {track.codec} не поддерживается")
+        raise UnsupportedTrackError(tr('кодек {0} не поддерживается').format(track.codec))
 
     container = av.open(str(path))
     try:
@@ -240,7 +241,7 @@ def mux_subtitles(
     codec = CONTAINER_CODEC.get(suffix)
     if codec is None:
         raise ContainerError(
-            f"контейнер {suffix or '?'} не поддерживается для записи субтитров"
+            tr('контейнер {0} не поддерживается для записи субтитров').format(suffix or '?')
         )
 
     info = probe(media)
@@ -282,7 +283,7 @@ def mux_subtitles(
                 f"ffmpeg вернул код {result.returncode}:\n{result.stderr}"
             )
         if not temporary.exists() or temporary.stat().st_size == 0:
-            raise ContainerError("ffmpeg отработал, но файл пустой")
+            raise ContainerError(tr('ffmpeg отработал, но файл пустой'))
         temporary.replace(output)
     except FfmpegError as exc:
         raise ContainerError(str(exc)) from exc
@@ -300,7 +301,7 @@ def _subtitle_position(info: MediaInfo, stream_index: int) -> int:
     for position, track in enumerate(info.subtitles):
         if track.index == stream_index:
             return position
-    raise ContainerError(f"дорожки #{stream_index} нет в файле")
+    raise ContainerError(tr('дорожки #{0} нет в файле').format(stream_index))
 
 
 def lossy_warning(output: Path) -> str | None:
@@ -312,13 +313,11 @@ def lossy_warning(output: Path) -> str | None:
     codec = CONTAINER_CODEC.get(output.suffix.lower())
     if codec == "mov_text":
         return (
-            "MP4 хранит субтитры только как простой текст (mov_text): "
-            "стили, цвета и позиции \\pos будут потеряны. "
-            "Для сохранения оформления выберите MKV."
+            tr('MP4 хранит субтитры только как простой текст (mov_text): стили, цвета и '
+                   'позиции \\pos будут потеряны. Для сохранения оформления выберите MKV.')
         )
     if codec == "webvtt":
         return (
-            "WebM хранит субтитры в WebVTT: сложное оформление ASS "
-            "будет упрощено."
+            tr('WebM хранит субтитры в WebVTT: сложное оформление ASS будет упрощено.')
         )
     return None

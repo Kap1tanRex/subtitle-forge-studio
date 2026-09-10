@@ -531,7 +531,7 @@ class PreferencesDialog(QDialog):
         form.addRow(tr('Зазор между репликами'), self.gap_spin)
 
         self.position_box = QComboBox()
-        self.position_box.addItem("Координатами \\pos", "pos")
+        self.position_box.addItem(tr('Координатами \\pos'), "pos")
         self.position_box.addItem(tr('Полями и выравниванием'), "margins")
         self.position_box.setToolTip(
             tr('Чем записывать перетаскивание субтитра в кадре')

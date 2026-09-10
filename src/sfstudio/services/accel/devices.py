@@ -25,6 +25,8 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "Accelerator",
     "GpuInfo",
@@ -54,7 +56,7 @@ class Vendor(StrEnum):
             Vendor.NVIDIA: "NVIDIA",
             Vendor.AMD: "AMD",
             Vendor.INTEL: "Intel",
-            Vendor.OTHER: "видеокарта",
+            Vendor.OTHER: tr('видеокарта'),
         }[self]
 
 
@@ -182,9 +184,9 @@ def detect_accelerators(*, libraries_dir=None) -> list[Accelerator]:
     result = [
         Accelerator(
             key="cpu",
-            title="Процессор",
+            title=tr('Процессор'),
             available=True,
-            note="Работает всегда. Медленнее видеокарты в 2–5 раз.",
+            note=tr('Работает всегда. Медленнее видеокарты в 2–5 раз.'),
             engines=("faster-whisper", "whisper-cpp", "vosk"),
         )
     ]
@@ -198,16 +200,16 @@ def detect_accelerators(*, libraries_dir=None) -> list[Accelerator]:
         result.append(
             Accelerator(
                 key="vulkan",
-                title="Видеокарта (Vulkan)",
+                title=tr('Видеокарта (Vulkan)'),
                 available=False,
                 note=(
-                    "Карта найдена, но готового пути к ней у программы нет. "
-                    "Оба встроенных движка считают на видеокарте только через "
-                    "CUDA, то есть на NVIDIA. whisper.cpp умеет Vulkan и "
-                    "работает с любой картой, но собранных с Vulkan файлов "
-                    "проект не выкладывает — проверены двенадцать последних "
-                    "выпусков. Такой файл можно собрать самому и указать путь "
-                    "к нему; иначе счёт идёт на процессоре."
+                    tr('Карта найдена, но готового пути к ней у программы нет. '
+                       'Оба встроенных движка считают на видеокарте только через '
+                       'CUDA, то есть на NVIDIA. whisper.cpp умеет Vulkan и '
+                       'работает с любой картой, но собранных с Vulkan файлов '
+                       'проект не выкладывает — проверены двенадцать последних '
+                       'выпусков. Такой файл можно собрать самому и указать путь '
+                       'к нему; иначе счёт идёт на процессоре.')
                 ),
                 devices=others,
                 engines=("whisper-cpp",),
@@ -223,7 +225,7 @@ def _cuda_accelerator(devices: tuple[str, ...], libraries_dir) -> Accelerator:
     ready, note = cuda_status(libraries_dir)
     return Accelerator(
         key="cuda",
-        title="Видеокарта (CUDA)",
+        title=tr('Видеокарта (CUDA)'),
         available=ready,
         note=note,
         devices=devices,

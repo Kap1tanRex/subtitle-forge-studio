@@ -21,6 +21,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.audio import extract_audio, write_wav
 from sfstudio.services.asr.base import (
     CancelToken,
@@ -92,17 +93,16 @@ class WhisperCppEngine:
         where = f"\nНайден: {found}" if found is not None else ""
         return EngineInfo(
             key=self.key,
-            title="Whisper.cpp (внешняя программа)",
+            title=tr('Whisper.cpp (внешняя программа)'),
             description=(
-                "Локальное распознавание без установки пакетов Python. "
-                "Нужен исполняемый файл whisper.cpp и файл модели .bin."
-                f"{where}"
+                tr('Локальное распознавание без установки пакетов Python. Нужен исполняемый '
+                       'файл whisper.cpp и файл модели .bin.{0}').format(where)
             ),
             kind=EngineKind.EXTERNAL,
             available=found is not None,
             hint=(
-                "Скачайте сборку whisper.cpp и укажите путь к ней в настройках "
-                "или добавьте её в PATH."
+                tr('Скачайте сборку whisper.cpp и укажите путь к ней в настройках или '
+                       'добавьте её в PATH.')
             ),
             models=(),  # модель задаётся файлом, а не именем из списка
             word_timings=False,
@@ -120,13 +120,13 @@ class WhisperCppEngine:
         binary = self.binary()
         if binary is None:
             raise RecognitionError(
-                "не найден исполняемый файл whisper.cpp. Укажите путь к нему "
-                "в настройках или добавьте в PATH."
+                tr('не найден исполняемый файл whisper.cpp. Укажите путь к нему в '
+                    'настройках или добавьте в PATH.')
             )
 
         model_file = self._model_file(request)
         if progress is not None:
-            progress(0.05, "чтение звука")
+            progress(0.05, tr('чтение звука'))
 
         chunk = extract_audio(
             request.media,
@@ -143,7 +143,7 @@ class WhisperCppEngine:
             if cancel is not None:
                 cancel.raise_if_cancelled()
             if progress is not None:
-                progress(0.15, "распознавание")
+                progress(0.15, tr('распознавание'))
 
             self._run(binary, model_file, wav, request, cancel)
             srt = wav.with_suffix(".wav.srt")
@@ -151,14 +151,14 @@ class WhisperCppEngine:
                 srt = wav.with_suffix(".srt")
             if not srt.is_file():
                 raise RecognitionError(
-                    "whisper.cpp отработал, но файл субтитров не появился. "
-                    "Проверьте, что сборка поддерживает вывод --output-srt."
+                    tr('whisper.cpp отработал, но файл субтитров не появился. Проверьте, '
+                           'что сборка поддерживает вывод --output-srt.')
                 )
             segments = _parse_srt(srt.read_text(encoding="utf-8", errors="replace"),
                                   chunk.offset_ms)
 
         if progress is not None:
-            progress(1.0, "готово")
+            progress(1.0, tr('готово'))
         return RecognitionResult(
             segments=segments,
             language=request.language,
@@ -180,8 +180,8 @@ class WhisperCppEngine:
         raw = str(request.options.get("model_file") or request.model or "")
         if not raw:
             raise RecognitionError(
-                "не выбран файл модели. whisper.cpp требует файл .bin — "
-                "например ggml-small.bin."
+                tr('не выбран файл модели. whisper.cpp требует файл .bin — например '
+                       'ggml-small.bin.')
             )
 
         filename = GGML_FILES.get(raw, raw)
@@ -202,8 +202,8 @@ class WhisperCppEngine:
         if path.is_file():
             return path
         raise RecognitionError(
-            f"файл модели не найден: {filename}. "
-            "Скачайте модель для whisper.cpp в окне распознавания."
+            tr('файл модели не найден: {0}. Скачайте модель для whisper.cpp в окне '
+                'распознавания.').format(filename)
         )
 
     def _run(
@@ -233,7 +233,8 @@ class WhisperCppEngine:
                 creationflags=_NO_WINDOW,
             )
         except OSError as exc:
-            raise RecognitionError(f"не удалось запустить {binary.name}: {exc}") from exc
+            raise RecognitionError(tr('не удалось запустить {0}: '
+                   '{1}').format(binary.name, exc)) from exc
 
         # Ждём короткими интервалами, чтобы отмена срабатывала сразу, а не
         # после завершения многоминутного распознавания.
@@ -244,7 +245,7 @@ class WhisperCppEngine:
             except subprocess.TimeoutExpired:
                 if cancel is not None and cancel.cancelled:
                     process.terminate()
-                    raise RecognitionCancelled("распознавание прервано") from None
+                    raise RecognitionCancelled(tr('распознавание прервано')) from None
 
         if process.returncode != 0:
             output = (process.stdout.read() if process.stdout else "") or ""

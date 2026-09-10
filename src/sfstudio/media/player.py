@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.time import FpsModel
 from sfstudio.platform.native import libmpv_spec
 
@@ -98,14 +99,14 @@ class MpvPlayer:
         path = _prepare_path()
         if path is None:
             raise MpvUnavailableError(
-                "libmpv не найдена. Разложите её: python build/vendor_libs.py --check"
+                tr('libmpv не найдена. Разложите её: python build/vendor_libs.py --check')
             )
         try:
             import mpv
         except ImportError as exc:
-            raise MpvUnavailableError(f"нет пакета python-mpv: {exc}") from exc
+            raise MpvUnavailableError(tr('нет пакета python-mpv: {0}').format(exc)) from exc
         except OSError as exc:
-            raise MpvUnavailableError(f"libmpv не загрузилась: {exc}") from exc
+            raise MpvUnavailableError(tr('libmpv не загрузилась: {0}').format(exc)) from exc
 
         options: dict[str, object] = {
             "vo": video_output,
@@ -224,9 +225,9 @@ class MpvPlayer:
         """
         if self._video_output == "libmpv":
             raise RuntimeError(
-                "wait_until_loaded() нельзя вызывать при vo=libmpv: главный поток "
-                "обязан обслуживать рендер, иначе процесс встанет намертво. "
-                "Используйте колбэк on_duration."
+                tr('wait_until_loaded() нельзя вызывать при vo=libmpv: главный поток обязан '
+                       'обслуживать рендер, иначе процесс встанет намертво. '
+                           'Используйте колбэк on_duration.')
             )
         try:
             self._mpv.wait_until_playing(timeout=timeout)

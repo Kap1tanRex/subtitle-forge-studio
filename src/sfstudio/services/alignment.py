@@ -27,6 +27,8 @@ import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "AlignedEvent",
     "AlignmentPlan",
@@ -119,17 +121,17 @@ class AlignmentPlan:
         from sfstudio.core.plural import plural
 
         if self.is_empty:
-            return "Выравнивать нечего"
+            return tr('Выравнивать нечего')
         parts = [
-            "время рассчитано для "
-            + plural(len(self.changes), "реплики", "реплик", "реплик"),
-            f"опора найдена у {self.coverage * 100:.0f} % слов",
+            tr('время рассчитано для ')
+            + plural(len(self.changes), tr('реплики'), tr('реплик'), tr('реплик')),
+            tr('опора найдена у {0:.0f} % слов').format(self.coverage * 100),
         ]
         shaky = len(self.shaky)
         if shaky:
             parts.append(
-                plural(shaky, "реплика требует", "реплики требуют", "реплик требуют")
-                + " проверки"
+                plural(shaky, tr('реплика требует'), tr('реплики требуют'), tr('реплик требуют'))
+                + tr(' проверки')
             )
         return " · ".join(parts)
 

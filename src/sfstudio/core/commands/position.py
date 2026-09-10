@@ -31,7 +31,7 @@ class SetOverrideTag(Command):
         self.args = args
         self._before: str | None = None
         self._had = False
-        self.label = label or f"Тег \\{name}"
+        self.label = label or tr('Тег \\{0}').format(name)
 
     def apply(self, doc: SubtitleDocument) -> ChangeSet:
         event = doc.by_eid(self.eid)
@@ -109,7 +109,7 @@ class SetAlignment(Command):
 
     def __init__(self, eid: int, an: int, new_pos: tuple[float, float] | None = None) -> None:
         if not 1 <= an <= 9:
-            raise ValueError(f"\\an вне диапазона 1..9: {an}")
+            raise ValueError(tr('\\an вне диапазона 1..9: {0}').format(an))
         self.eid = eid
         self.new_an = an
         self.new_pos = new_pos

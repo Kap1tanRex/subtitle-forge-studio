@@ -20,6 +20,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 
 __all__ = [
@@ -74,10 +75,10 @@ def shift(delta_ms: int) -> BatchTask:
                 event.start, event.end = start, end
                 moved += 1
         doc.rebuild_lookup()
-        return f"сдвинуто реплик: {moved}"
+        return tr('сдвинуто реплик: {0}').format(moved)
 
     sign = "+" if delta_ms >= 0 else ""
-    return BatchTask(f"сдвиг {sign}{delta_ms} мс", apply)
+    return BatchTask(tr('сдвиг {0}{1} мс').format(sign, delta_ms), apply)
 
 
 def convert(fid: str) -> BatchTask:
@@ -85,9 +86,9 @@ def convert(fid: str) -> BatchTask:
 
     def apply(doc: SubtitleDocument) -> str:
         doc.source_format = fid
-        return f"формат: {fid}"
+        return tr('формат: {0}').format(fid)
 
-    return BatchTask(f"перевод в {fid}", apply)
+    return BatchTask(tr('перевод в {0}').format(fid), apply)
 
 
 def run_checks(profile, report_dir: Path | None = None) -> BatchTask:
@@ -102,13 +103,13 @@ def run_checks(profile, report_dir: Path | None = None) -> BatchTask:
 
         if report_dir is not None and doc.source_path is not None:
             report_dir.mkdir(parents=True, exist_ok=True)
-            target = report_dir / f"{doc.source_path.stem} — проверка.html"
+            target = report_dir / tr('{0} — проверка.html').format(doc.source_path.stem)
             target.write_text(
                 report_html(doc, issues, profile=profile), encoding="utf-8-sig"
             )
-        return f"замечаний: {len(issues)}"
+        return tr('замечаний: {0}').format(len(issues))
 
-    return BatchTask("проверка", apply)
+    return BatchTask(tr('проверка'), apply)
 
 
 def run_batch(
@@ -140,7 +141,7 @@ def run_batch(
         try:
             doc = registry.load(path)
         except Exception as exc:
-            result.error = f"не открылся: {exc}"
+            result.error = tr('не открылся: {0}').format(exc)
             results.append(result)
             continue
 
@@ -148,7 +149,7 @@ def run_batch(
             # Разбор субтитров всеяден: любой набор байтов «читается» как
             # файл без реплик. Записать пустышку и отчитаться об успехе —
             # худшее, что можно сделать с чужим файлом.
-            result.error = "в файле нет реплик — похоже, это не субтитры"
+            result.error = tr('в файле нет реплик — похоже, это не субтитры')
             results.append(result)
             continue
 
@@ -158,13 +159,13 @@ def run_batch(
                 if note:
                     result.notes.append(note)
         except Exception as exc:
-            result.error = f"ошибка на шаге «{task.title}»: {exc}"
+            result.error = tr('ошибка на шаге «{0}»: {1}').format(task.title, exc)
             results.append(result)
             continue
 
         target = _target_path(path, doc, output_dir, suffix)
         if target == path and not overwrite:
-            result.error = "перезапись исходника не разрешена"
+            result.error = tr('перезапись исходника не разрешена')
             results.append(result)
             continue
 
@@ -172,7 +173,7 @@ def run_batch(
             target.parent.mkdir(parents=True, exist_ok=True)
             registry.save(doc, target, encoding=encoding)
         except Exception as exc:
-            result.error = f"не записался: {exc}"
+            result.error = tr('не записался: {0}').format(exc)
             results.append(result)
             continue
 
@@ -203,7 +204,7 @@ def describe(results: Sequence[BatchResult]) -> str:
 
     good = sum(1 for r in results if r.ok)
     bad = len(results) - good
-    parts = [plural(good, "файл готов", "файла готовы", "файлов готовы")]
+    parts = [plural(good, tr('файл готов'), tr('файла готовы'), tr('файлов готовы'))]
     if bad:
-        parts.append(plural(bad, "не вышел", "не вышло", "не вышло"))
+        parts.append(plural(bad, tr('не вышел'), tr('не вышло'), tr('не вышло')))
     return ", ".join(parts)

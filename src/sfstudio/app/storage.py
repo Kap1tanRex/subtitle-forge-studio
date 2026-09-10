@@ -27,6 +27,8 @@ import tempfile
 from enum import StrEnum
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "StorageMode",
     "beside_program",
@@ -66,22 +68,22 @@ class StorageMode(StrEnum):
 
 
 _TITLES = {
-    StorageMode.BESIDE: "Рядом с программой",
-    StorageMode.PROFILE: "В профиле пользователя",
-    StorageMode.CUSTOM: "В указанной папке",
+    StorageMode.BESIDE: tr('Рядом с программой'),
+    StorageMode.PROFILE: tr('В профиле пользователя'),
+    StorageMode.CUSTOM: tr('В указанной папке'),
 }
 
 _NOTES = {
     StorageMode.BESIDE: (
-        "Модели и библиотеки лягут в подпапки возле файла программы. "
-        "Всю папку можно скопировать на другой компьютер целиком."
+        tr('Модели и библиотеки лягут в подпапки возле файла программы. Всю папку можно '
+               'скопировать на другой компьютер целиком.')
     ),
     StorageMode.PROFILE: (
-        "Стандартное место для программ. Подходит, если программа "
-        "установлена туда, где нельзя писать."
+        tr('Стандартное место для программ. Подходит, если программа установлена туда, '
+               'где нельзя писать.')
     ),
     StorageMode.CUSTOM: (
-        "Свой путь — например, на втором диске, где больше места."
+        tr('Свой путь — например, на втором диске, где больше места.')
     ),
 }
 

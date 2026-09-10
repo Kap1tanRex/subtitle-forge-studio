@@ -23,6 +23,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from sfstudio.app.i18n import tr
+
 __all__ = [
     "LANGUAGES",
     "Misspelling",
@@ -32,9 +34,9 @@ __all__ = [
 
 #: Языки, для которых словарь есть без загрузки. Ключ — как в настройках.
 LANGUAGES: tuple[tuple[str, str], ...] = (
-    ("", "Не проверять"),
-    ("ru", "Русский"),
-    ("en_US", "Английский"),
+    ("", tr('Не проверять')),
+    ("ru", tr('Русский')),
+    ("en_US", tr('Английский')),
 )
 
 #: Слово: буквы, дефис и апостроф внутри. Цифры не берём — «2024» и «5-й»

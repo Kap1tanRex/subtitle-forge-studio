@@ -294,7 +294,7 @@ class MainWindow(QMainWindow):
         self.table.insert_requested.connect(self.insert_event)
 
         self.editor = QPlainTextEdit()
-        self.editor.setPlaceholderText("Текст реплики (\\N — перевод строки)")
+        self.editor.setPlaceholderText(tr('Текст реплики (\\N — перевод строки)'))
         self.editor.setMaximumHeight(96)
         self.editor.textChanged.connect(self._on_editor_changed)
         self._setup_spellcheck()
@@ -1644,7 +1644,7 @@ class MainWindow(QMainWindow):
                        path.name,
                        info.duration_ms / 1000,
                        size,
-                       'звук есть' if info.has_audio else 'без звука')
+                       tr('звук есть') if info.has_audio else tr('без звука'))
         )
 
     def _apply_playback_defaults(self) -> None:
@@ -1705,8 +1705,9 @@ class MainWindow(QMainWindow):
             answer = QMessageBox.question(
                 self,
                 tr('Несохранённые изменения'),
-                "В файле есть вшитые субтитры, но текущий документ изменён.\n"
-                "Открыть дорожку из контейнера, потеряв правки?",
+                tr('В файле есть вшитые субтитры, но текущий документ изменён.')
+                + "\n"
+                + tr('Открыть дорожку из контейнера, потеряв правки?'),
                 QMessageBox.Yes | QMessageBox.No,
             )
             if answer != QMessageBox.Yes:
@@ -2994,8 +2995,8 @@ def _demo_document() -> SubtitleDocument:
     doc.add_style(note)
 
     doc.create_event(0, 4000, tr('Перетащите эту строку мышью'))
-    doc.create_event(0, 4000, r"{\pos(300,220)}Надпись сверху слева", style=tr('Надпись'))
-    doc.create_event(4500, 8000, r"Вторая реплика,\Nв две строки")
-    doc.create_event(8500, 12_000, r"{\pos(960,540)\an5}По центру кадра")
+    doc.create_event(0, 4000, tr('{\\pos(300,220)}Надпись сверху слева'), style=tr('Надпись'))
+    doc.create_event(4500, 8000, tr('Вторая реплика,\\Nв две строки'))
+    doc.create_event(8500, 12_000, tr('{\\pos(960,540)\\an5}По центру кадра'))
     return doc
 

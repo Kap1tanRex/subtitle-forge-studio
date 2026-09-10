@@ -22,6 +22,7 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.base import (
     CancelToken,
     ProgressReporter,
@@ -67,23 +68,23 @@ def extract_audio(
         import av
         import numpy as np
     except ImportError as exc:  # pragma: no cover - PyAV есть в поставке
-        raise RecognitionError(f"нет PyAV или NumPy: {exc}") from exc
+        raise RecognitionError(tr('нет PyAV или NumPy: {0}').format(exc)) from exc
 
     media = Path(media)
     if not media.is_file():
-        raise RecognitionError(f"файл не найден: {media}")
+        raise RecognitionError(tr('файл не найден: {0}').format(media))
 
     try:
         container = av.open(str(media))
     except Exception as exc:
-        raise RecognitionError(f"не удалось открыть {media.name}: {exc}") from exc
+        raise RecognitionError(tr('не удалось открыть {0}: {1}').format(media.name, exc)) from exc
 
     try:
         streams = container.streams.audio
         if not streams:
-            raise RecognitionError(f"в {media.name} нет звуковой дорожки")
+            raise RecognitionError(tr('в {0} нет звуковой дорожки').format(media.name))
         if stream_index >= len(streams):
-            raise RecognitionError(f"звуковая дорожка {stream_index} не найдена")
+            raise RecognitionError(tr('звуковая дорожка {0} не найдена').format(stream_index))
         stream = streams[stream_index]
 
         # Перемотка к началу участка: декодировать час ради последних пяти
@@ -117,7 +118,7 @@ def extract_audio(
 
             if progress is not None and span_ms:
                 done = max(0, frame_start_ms - start_ms) / span_ms
-                progress(min(0.99, done), "чтение звука")
+                progress(min(0.99, done), tr('чтение звука'))
 
         # Хвост ресемплера: без слива теряется последняя доля секунды, а это
         # ровно та часть, где обычно и находится конец последней фразы.
@@ -134,7 +135,7 @@ def extract_audio(
     samples = np.concatenate(blocks).astype("float32", copy=False)
     samples = _trim(samples, start_ms, end_ms)
     if progress is not None:
-        progress(1.0, "звук готов")
+        progress(1.0, tr('звук готов'))
     return AudioChunk(samples=samples, offset_ms=start_ms)
 
 
@@ -173,7 +174,7 @@ def write_wav(chunk: AudioChunk, path: Path) -> Path:
     try:
         import numpy as np
     except ImportError as exc:  # pragma: no cover
-        raise RecognitionError(f"нет NumPy: {exc}") from exc
+        raise RecognitionError(tr('нет NumPy: {0}').format(exc)) from exc
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

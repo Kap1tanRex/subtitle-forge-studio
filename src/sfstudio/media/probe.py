@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.time import FpsModel
 
 __all__ = [
@@ -121,14 +122,14 @@ class SubtitleTrackInfo:
         if self.language:
             parts.append(f"[{self.language}]")
         if not parts:
-            parts.append(f"Дорожка {self.index}")
+            parts.append(tr('Дорожка {0}').format(self.index))
         flags = []
         if self.is_default:
-            flags.append("по умолчанию")
+            flags.append(tr('по умолчанию'))
         if self.is_forced:
             flags.append("forced")
         if self.is_bitmap:
-            flags.append("картинка, правка недоступна")
+            flags.append(tr('картинка, правка недоступна'))
         suffix = f" ({', '.join(flags)})" if flags else ""
         return f"{' '.join(parts)} · {self.codec}{suffix}"
 
@@ -167,12 +168,12 @@ def probe(path: Path) -> MediaInfo:
     try:
         import av
     except (ImportError, OSError) as exc:
-        raise MediaProbeError(f"PyAV недоступен: {exc}") from exc
+        raise MediaProbeError(tr('PyAV недоступен: {0}').format(exc)) from exc
 
     try:
         container = av.open(str(path))
     except Exception as exc:
-        raise MediaProbeError(f"не удалось открыть {path.name}: {exc}") from exc
+        raise MediaProbeError(tr('не удалось открыть {0}: {1}').format(path.name, exc)) from exc
 
     try:
         info = MediaInfo(path=path, container=container.format.name)

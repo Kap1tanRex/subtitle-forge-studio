@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.base import (
     CancelToken,
     ProgressReporter,
@@ -54,8 +55,8 @@ class ModelInfo:
 
     @property
     def caption(self) -> str:
-        mark = " · только английский" if self.english_only else ""
-        return f"{self.title} — {self.size_mb} МБ{mark}"
+        mark = tr(' · только английский') if self.english_only else ""
+        return tr('{0} — {1} МБ{2}').format(self.title, self.size_mb, mark)
 
     def supports(self, language: str | None) -> bool:
         """Справится ли модель с этим языком.
@@ -74,25 +75,25 @@ class ModelInfo:
 #: Числа в мебибайтах, как их показывает проводник Windows.
 MODEL_CATALOG: tuple[ModelInfo, ...] = (
     ModelInfo("tiny", "tiny", 75, 39,
-              "Самая быстрая. Годится проверить, что всё работает."),
+              tr('Самая быстрая. Годится проверить, что всё работает.')),
     ModelInfo("base", "base", 141, 74,
-              "Быстрая. Русский разбирает с ошибками."),
+              tr('Быстрая. Русский разбирает с ошибками.')),
     ModelInfo("small", "small", 464, 244,
-              "Разумный выбор для русского на машине без видеокарты."),
+              tr('Разумный выбор для русского на машине без видеокарты.')),
     ModelInfo("medium", "medium", 1460, 769,
-              "Втрое больше small по числу параметров — отсюда и вес."),
+              tr('Втрое больше small по числу параметров — отсюда и вес.')),
     ModelInfo("large-v3-turbo", "large-v3-turbo", 1547, 809,
-              "Лучшее соотношение качества и веса: точность почти как у "
-              "large-v3 вдвое меньшим файлом. Декодер урезан с 32 слоёв до "
-              "четырёх, поэтому она ещё и заметно быстрее. Многоязычная, "
-              "русский понимает."),
+              tr('Лучшее соотношение качества и веса: точность почти как у large-v3 вдвое '
+                     'меньшим файлом. Декодер урезан с 32 слоёв до четырёх, поэтому '
+                         'она ещё и заметно быстрее. Многоязычная, русский понимает.')),
     ModelInfo("distil-large-v3", "distil-large-v3", 1446, 756,
-              "Сжатая large для английской речи: качество близко к ней, "
-              "размер как у medium. Другие языки не понимает — на них выдаёт "
-              "английский текст. Для русского берите medium или large-v3.",
+              tr('Сжатая large для английской речи: качество близко к ней, размер как '
+                  'у '
+                     'medium. Другие языки не понимает — на них выдаёт английский '
+                         'текст. Для русского берите medium или large-v3.'),
               languages=("en",)),
     ModelInfo("large-v3", "large-v3", 2948, 1550,
-              "Лучшее качество. Требует много памяти и времени."),
+              tr('Лучшее качество. Требует много памяти и времени.')),
 )
 
 #: Имена репозиториев на HuggingFace для faster-whisper.
@@ -159,7 +160,7 @@ def download_model(
     repo = _REPO.get(model)
     if repo is None:
         raise RecognitionError(
-            f"неизвестная модель «{model}». Доступны: "
+            tr('неизвестная модель «{0}». Доступны: ').format(model)
             + ", ".join(info.name for info in MODEL_CATALOG)
         )
 
@@ -167,18 +168,19 @@ def download_model(
         from huggingface_hub import snapshot_download
     except ImportError as exc:
         raise RecognitionError(
-            "нет huggingface_hub. Он ставится вместе с faster-whisper: "
-            "pip install faster-whisper"
+            tr('нет huggingface_hub. Он ставится вместе с faster-whisper: pip install '
+                   'faster-whisper')
         ) from exc
 
     models_dir = Path(models_dir)
     try:
         models_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise RecognitionError(f"не удалось создать каталог {models_dir}: {exc}") from exc
+        raise RecognitionError(tr('не удалось создать каталог {0}: '
+               '{1}').format(models_dir, exc)) from exc
 
     if progress is not None:
-        progress(0.0, f"загрузка модели {model}")
+        progress(0.0, tr('загрузка модели {0}').format(model))
 
     tracker = _ProgressTqdm.factory(progress, cancel, model)
     try:
@@ -196,7 +198,7 @@ def download_model(
         ) from exc
 
     if progress is not None:
-        progress(1.0, "модель загружена")
+        progress(1.0, tr('модель загружена'))
     return Path(path)
 
 
@@ -265,7 +267,7 @@ class _ProgressTqdm:
     def update(self, amount: int = 1) -> None:
         self.n += amount
         if self._cancel is not None and self._cancel.cancelled:
-            raise RecognitionCancelled("загрузка модели прервана")
+            raise RecognitionCancelled(tr('загрузка модели прервана'))
         if self._reporter is None:
             return
 
@@ -276,11 +278,11 @@ class _ProgressTqdm:
         share = max(share, type(self)._peak)
         type(self)._peak = share
         volume = (
-            f": {leader.n / 1024 / 1024:.0f} из {leader.total / 1024 / 1024:.0f} МБ"
+            tr(': {0:.0f} из {1:.0f} МБ').format(leader.n / 1024 / 1024, leader.total / 1024 / 1024)
             if leader.counts_bytes
             else ""
         )
-        self._reporter(share, f"загрузка {self._label}{volume}")
+        self._reporter(share, tr('загрузка {0}{1}').format(self._label, volume))
 
     @classmethod
     def _leader(cls) -> _ProgressTqdm | None:
@@ -401,7 +403,7 @@ def download_ggml_model(
     filename = GGML_FILES.get(model)
     if filename is None:
         raise RecognitionError(
-            f"для whisper.cpp нет модели «{model}». Доступны: "
+            tr('для whisper.cpp нет модели «{0}». Доступны: ').format(model)
             + ", ".join(GGML_FILES)
         )
 
@@ -409,18 +411,19 @@ def download_ggml_model(
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
         raise RecognitionError(
-            "нет huggingface_hub — через него скачиваются модели. "
-            "Он ставится вместе с faster-whisper."
+            tr('нет huggingface_hub — через него скачиваются модели. Он ставится вместе с '
+                   'faster-whisper.')
         ) from exc
 
     models_dir = Path(models_dir)
     try:
         models_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise RecognitionError(f"не удалось создать каталог {models_dir}: {exc}") from exc
+        raise RecognitionError(tr('не удалось создать каталог {0}: '
+               '{1}').format(models_dir, exc)) from exc
 
     if progress is not None:
-        progress(0.0, f"загрузка модели {model}")
+        progress(0.0, tr('загрузка модели {0}').format(model))
 
     tracker = _ProgressTqdm.factory(progress, cancel, model)
     try:
@@ -439,5 +442,5 @@ def download_ggml_model(
         ) from exc
 
     if progress is not None:
-        progress(1.0, "модель загружена")
+        progress(1.0, tr('модель загружена'))
     return Path(path)

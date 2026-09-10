@@ -234,7 +234,9 @@ class AutoTimingDialog(QDialog):
         if len(self._plan.changes) > PREVIEW_ROWS:
             text += tr(' · показаны первые {0}').format(PREVIEW_ROWS)
         if self._plan.unresolved:
-            text += "\nПодсвеченным репликам не хватило места: мешают соседние."
+            text += "\n" + tr(
+                'Подсвеченным репликам не хватило места: мешают соседние.'
+            )
         self.summary.setText(text)
         self._ok.setEnabled(not self._plan.is_empty)
 

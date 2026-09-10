@@ -28,6 +28,7 @@ import zipfile
 from fractions import Fraction
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.project import (
     FORMAT_VERSION,
     GLOSSARY_NAME,
@@ -100,7 +101,7 @@ def save_project(project: Project, path: Path) -> Path:
         temporary.replace(path)
     except OSError as exc:
         temporary.unlink(missing_ok=True)
-        raise ProjectError(f"не удалось записать проект: {exc}") from exc
+        raise ProjectError(tr('не удалось записать проект: {0}').format(exc)) from exc
 
     project.path = path
     return path
@@ -157,7 +158,7 @@ def load_project(path: Path) -> Project:
     """Читает проект."""
     path = Path(path)
     if not path.is_file():
-        raise ProjectError(f"файл проекта не найден: {path}")
+        raise ProjectError(tr('файл проекта не найден: {0}').format(path))
 
     try:
         with zipfile.ZipFile(path) as archive:
@@ -174,22 +175,22 @@ def load_project(path: Path) -> Project:
                 if GLOSSARY_NAME in names else ""
             )
     except KeyError as exc:
-        raise ProjectError(f"в проекте нет обязательной части: {exc}") from exc
+        raise ProjectError(tr('в проекте нет обязательной части: {0}').format(exc)) from exc
     except (zipfile.BadZipFile, OSError, UnicodeDecodeError) as exc:
-        raise ProjectError(f"не удалось прочитать проект: {exc}") from exc
+        raise ProjectError(tr('не удалось прочитать проект: {0}').format(exc)) from exc
 
     try:
         manifest = json.loads(manifest_raw)
     except ValueError as exc:
-        raise ProjectError(f"манифест проекта повреждён: {exc}") from exc
+        raise ProjectError(tr('манифест проекта повреждён: {0}').format(exc)) from exc
     if not isinstance(manifest, dict):
-        raise ProjectError("манифест проекта повреждён: ожидался объект")
+        raise ProjectError(tr('манифест проекта повреждён: ожидался объект'))
 
     version = _as_int(manifest.get("version"), 0)
     if version > FORMAT_VERSION:
         raise ProjectError(
-            f"проект создан более новой версией программы (формат {version}, "
-            f"поддерживается {FORMAT_VERSION}). Обновите программу."
+            tr('проект создан более новой версией программы (формат {0}, поддерживается '
+                   '{1}). Обновите программу.').format(version, FORMAT_VERSION)
         )
 
     document = read_ass(subtitles)
@@ -268,7 +269,7 @@ def _subtitles_name(manifest_raw: str, names: set[str]) -> str:
         return candidate
     if SUBTITLES_NAME in names:
         return SUBTITLES_NAME
-    raise ProjectError("в проекте нет файла субтитров")
+    raise ProjectError(tr('в проекте нет файла субтитров'))
 
 
 def _resolve_media(raw: object, project_path: Path) -> Path | None:

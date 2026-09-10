@@ -346,7 +346,7 @@ def lossy_report(doc: SubtitleDocument) -> list[str]:
                     continue
                 if tag.name not in seen:
                     seen.add(tag.name)
-                    warnings.append(f"тег \\{tag.name} не выражается в WebVTT")
+                    warnings.append(tr('тег \\{0} не выражается в WebVTT').format(tag.name))
     if len(doc.styles) > 1:
         warnings.append(tr('именованные стили ASS в WebVTT не переносятся'))
     return warnings

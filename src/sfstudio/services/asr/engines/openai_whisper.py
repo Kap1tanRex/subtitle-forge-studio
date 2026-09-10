@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import time
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.audio import extract_audio
 from sfstudio.services.asr.base import (
     CancelToken,
@@ -44,14 +45,14 @@ class OpenAiWhisperEngine:
     def info(self) -> EngineInfo:
         return EngineInfo(
             key=self.key,
-            title="Whisper (оригинальный)",
+            title=tr('Whisper (оригинальный)'),
             description=(
-                "Эталонная реализация OpenAI. Работает медленнее, чем "
-                "faster-whisper, и требует PyTorch."
+                tr('Эталонная реализация OpenAI. Работает медленнее, чем faster-whisper, и '
+                       'требует PyTorch.')
             ),
             kind=EngineKind.LIBRARY,
             available=module_installed(MODULE),
-            hint="Установите: pip install openai-whisper",
+            hint=tr('Установите: pip install openai-whisper'),
             models=MODELS,
             word_timings=True,
         )
@@ -67,12 +68,12 @@ class OpenAiWhisperEngine:
             import whisper
         except ImportError as exc:
             raise RecognitionError(
-                "openai-whisper не установлен. Установите его командой "
-                "pip install openai-whisper либо выберите другой движок."
+                tr('openai-whisper не установлен. Установите его командой pip install '
+                       'openai-whisper либо выберите другой движок.')
             ) from exc
 
         if progress is not None:
-            progress(0.02, "загрузка модели")
+            progress(0.02, tr('загрузка модели'))
         name = request.model or DEFAULT_MODEL
         try:
             model = whisper.load_model(
@@ -80,10 +81,11 @@ class OpenAiWhisperEngine:
                 download_root=str(request.models_dir) if request.models_dir else None,
             )
         except Exception as exc:
-            raise RecognitionError(f"не удалось загрузить модель «{name}»: {exc}") from exc
+            raise RecognitionError(tr('не удалось загрузить модель «{0}»: {1}').format(
+                name, exc)) from exc
 
         if progress is not None:
-            progress(0.1, "чтение звука")
+            progress(0.1, tr('чтение звука'))
         chunk = extract_audio(
             request.media,
             start_ms=request.start_ms,
@@ -99,7 +101,7 @@ class OpenAiWhisperEngine:
         if progress is not None:
             # Точку прогресса дальше двигать нечем: библиотека вернёт всё
             # сразу. Показываем стадию, а не выдуманные проценты.
-            progress(0.2, "распознавание (без индикации)")
+            progress(0.2, tr('распознавание (без индикации)'))
 
         try:
             raw = model.transcribe(
@@ -109,7 +111,7 @@ class OpenAiWhisperEngine:
                 verbose=False,
             )
         except Exception as exc:
-            raise RecognitionError(f"whisper не справился: {exc}") from exc
+            raise RecognitionError(tr('whisper не справился: {0}').format(exc)) from exc
 
         if cancel is not None:
             cancel.raise_if_cancelled()
@@ -118,7 +120,7 @@ class OpenAiWhisperEngine:
             _convert(item, chunk.offset_ms) for item in raw.get("segments", [])
         ]
         if progress is not None:
-            progress(1.0, "готово")
+            progress(1.0, tr('готово'))
 
         return RecognitionResult(
             segments=segments,

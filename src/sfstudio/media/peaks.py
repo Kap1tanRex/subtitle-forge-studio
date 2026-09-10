@@ -46,6 +46,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from sfstudio.app.i18n import tr
+
 if TYPE_CHECKING:
     import numpy as np
 
@@ -148,19 +150,19 @@ def extract_peaks(
         import av
         import numpy as np
     except (ImportError, OSError) as exc:
-        raise PeaksError(f"нужны PyAV и NumPy: {exc}") from exc
+        raise PeaksError(tr('нужны PyAV и NumPy: {0}').format(exc)) from exc
 
     try:
         container = av.open(str(media))
     except Exception as exc:
-        raise PeaksError(f"не удалось открыть {media.name}: {exc}") from exc
+        raise PeaksError(tr('не удалось открыть {0}: {1}').format(media.name, exc)) from exc
 
     try:
         streams = container.streams.audio
         if not streams:
-            raise NoAudioError(f"в {media.name} нет аудиодорожки")
+            raise NoAudioError(tr('в {0} нет аудиодорожки').format(media.name))
         if stream_index >= len(streams):
-            raise PeaksError(f"аудиодорожка {stream_index} не найдена")
+            raise PeaksError(tr('аудиодорожка {0} не найдена').format(stream_index))
         stream = streams[stream_index]
 
         sample_rate = int(stream.codec_context.sample_rate or 48_000)
@@ -175,7 +177,7 @@ def extract_peaks(
 
         for frame in container.decode(stream):
             if cancel is not None and cancel.is_set():
-                raise PeaksError("извлечение отменено")
+                raise PeaksError(tr('извлечение отменено'))
 
             for resampled in resampler.resample(frame):
                 block = resampled.to_ndarray().reshape(-1)
@@ -209,7 +211,7 @@ def extract_peaks(
             decoded_samples += carry.size
 
         if not mins:
-            raise NoAudioError(f"в {media.name} не удалось декодировать звук")
+            raise NoAudioError(tr('в {0} не удалось декодировать звук').format(media.name))
 
         level0 = (
             np.concatenate(mins),
@@ -293,7 +295,7 @@ def _write_file(
     try:
         with tmp.open("wb") as fh:
             fh.write(header)
-            assert fh.tell() == _HEADER_SIZE, "размер заголовка разъехался"
+            assert fh.tell() == _HEADER_SIZE, tr('размер заголовка разъехался')
             for entry in entries:
                 fh.write(entry)
             for level_min, level_max, level_rms in pyramid:
@@ -327,15 +329,16 @@ class PeakData:
         self._path = path
         raw = path.read_bytes()[:_HEADER_SIZE]
         if len(raw) < _HEADER_SIZE:
-            raise PeaksError(f"{path.name}: файл короче заголовка")
+            raise PeaksError(tr('{0}: файл короче заголовка').format(path.name))
 
         magic, version, extractor, rate, channels, duration, levels, stream, _ = _HEADER.unpack(raw)
         if magic != MAGIC:
-            raise PeaksError(f"{path.name}: не файл пиков")
+            raise PeaksError(tr('{0}: не файл пиков').format(path.name))
         if version != FORMAT_VERSION or extractor != EXTRACTOR_VERSION:
             raise PeaksError(
-                f"{path.name}: версия кэша {version}/{extractor}, "
-                f"ожидалась {FORMAT_VERSION}/{EXTRACTOR_VERSION}"
+                tr('{0}: версия кэша {1}/{2}, ожидалась '
+                       '{3}/{4}').format(
+                           path.name, version, extractor, FORMAT_VERSION, EXTRACTOR_VERSION)
             )
         _ = channels
 

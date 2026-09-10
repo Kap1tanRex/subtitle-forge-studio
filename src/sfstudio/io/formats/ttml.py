@@ -29,6 +29,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from xml.sax.saxutils import escape
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.style import SubtitleStyle
@@ -127,10 +128,10 @@ def read_ttml(text: str) -> SubtitleDocument:
     try:
         root = ET.fromstring(text)
     except ET.ParseError as exc:
-        raise TtmlParseError(f"не удалось разобрать XML: {exc}") from exc
+        raise TtmlParseError(tr('не удалось разобрать XML: {0}').format(exc)) from exc
 
     if _local(root.tag) != "tt":
-        raise TtmlParseError("это не TTML: корневой элемент не <tt>")
+        raise TtmlParseError(tr('это не TTML: корневой элемент не <tt>'))
 
     doc = SubtitleDocument.blank()
     for event in list(doc.events):
@@ -187,7 +188,7 @@ def _refuse_entities(text: str) -> None:
     head = text[:4096].lower()
     if "<!entity" in head or ("<!doctype" in head and "entity" in head):
         raise TtmlParseError(
-            "в файле объявлены XML-сущности — такой файл не читается"
+            tr('в файле объявлены XML-сущности — такой файл не читается')
         )
 
 
@@ -383,7 +384,7 @@ def lossy_report(doc: SubtitleDocument) -> list[LossWarning]:
     warnings: list[LossWarning] = []
     for event in doc.events:
         if event.comment:
-            warnings.append(LossWarning(event.eid, "comment", "закомментированные строки"))
+            warnings.append(LossWarning(event.eid, "comment", tr('закомментированные строки')))
             continue
         for block in event.parsed.blocks:
             for tag in block.tags:
@@ -391,7 +392,7 @@ def lossy_report(doc: SubtitleDocument) -> list[LossWarning]:
                     continue
                 warnings.append(LossWarning(event.eid, "tag", f"\\{tag.name}"))
         if event.layer:
-            warnings.append(LossWarning(event.eid, "layer", f"слой {event.layer}"))
+            warnings.append(LossWarning(event.eid, "layer", tr('слой {0}').format(event.layer)))
         if event.effect:
             warnings.append(LossWarning(event.eid, "effect", event.effect))
     return warnings

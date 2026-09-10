@@ -44,7 +44,7 @@ from sfstudio.ui.theme import DARK, Palette
 
 __all__ = ["StylePresetDialog"]
 
-PREVIEW_TEXT = "Пример текста субтитра\\NВторая строка"
+PREVIEW_TEXT = tr('Пример текста субтитра\\NВторая строка')
 
 
 class PreviewStrip(QWidget):

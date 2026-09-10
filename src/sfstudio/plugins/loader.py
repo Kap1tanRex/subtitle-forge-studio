@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sfstudio.app.i18n import tr
 from sfstudio.plugins.api import (
     MANIFEST_NAME,
     PluginContext,
@@ -102,13 +103,13 @@ def discover(folder: Path | None) -> list[PluginInfo]:
 def load_plugin(info: PluginInfo, settings: Any = None) -> LoadedPlugin:
     """Загружает один плагин. Исключений не бросает — возвращает состояние."""
     if info.folder is None:
-        return LoadedPlugin(info, PluginState.FAILED, "неизвестно, где лежит плагин")
+        return LoadedPlugin(info, PluginState.FAILED, tr('неизвестно, где лежит плагин'))
     if not info.compatible:
         return LoadedPlugin(
             info,
             PluginState.INCOMPATIBLE,
-            f"плагин рассчитан на версию контракта {info.api_version}, "
-            f"а программа предоставляет {_api_version()}",
+            tr('плагин рассчитан на версию контракта {0}, а программа предоставляет '
+                   '{1}').format(info.api_version, _api_version()),
         )
 
     # Имя модуля берётся из манифеста, а тот пишет автор плагина. Путь вида
@@ -122,10 +123,10 @@ def load_plugin(info: PluginInfo, settings: Any = None) -> LoadedPlugin:
         return LoadedPlugin(
             info,
             PluginState.FAILED,
-            f"модуль «{info.entry}» лежит за пределами папки плагина",
+            tr('модуль «{0}» лежит за пределами папки плагина').format(info.entry),
         )
     if not entry.is_file():
-        return LoadedPlugin(info, PluginState.FAILED, f"нет файла {info.entry}")
+        return LoadedPlugin(info, PluginState.FAILED, tr('нет файла {0}').format(info.entry))
 
     try:
         module = _import(info, entry)
@@ -135,7 +136,7 @@ def load_plugin(info: PluginInfo, settings: Any = None) -> LoadedPlugin:
     setup = getattr(module, "setup", None)
     if not callable(setup):
         return LoadedPlugin(
-            info, PluginState.FAILED, "в модуле нет функции setup(context)"
+            info, PluginState.FAILED, tr('в модуле нет функции setup(context)')
         )
 
     context = PluginContext(plugin=info.name, folder=info.folder, settings=settings)
@@ -160,7 +161,7 @@ def _import(info: PluginInfo, entry: Path):
     module_name = f"sfstudio_plugin_{info.name.replace('-', '_')}"
     spec = importlib.util.spec_from_file_location(module_name, entry)
     if spec is None or spec.loader is None:
-        raise PluginError("не удалось прочитать модуль плагина")
+        raise PluginError(tr('не удалось прочитать модуль плагина'))
 
     module = importlib.util.module_from_spec(spec)
     folder = str(info.folder)
@@ -187,7 +188,7 @@ def _describe(exc: BaseException) -> str:
     where = ""
     if frames:
         last = frames[-1]
-        where = f" ({Path(last.filename).name}, строка {last.lineno})"
+        where = tr(' ({0}, строка {1})').format(Path(last.filename).name, last.lineno)
     return f"{type(exc).__name__}: {exc}{where}"
 
 
@@ -321,7 +322,7 @@ class PluginManager:
             # реестра — лишняя работа на ровном месте.
             asr_registry.register(key, lambda e=engine: e)
             record.engines.append(key)
-            added.append(f"движок распознавания «{key}»")
+            added.append(tr('движок распознавания «{0}»').format(key))
 
         for spec in context.formats:
             fid = str(getattr(spec, "fid", "") or "")
@@ -333,21 +334,21 @@ class PluginManager:
             try:
                 io_registry.register_format(spec)
             except (ValueError, TypeError) as exc:
-                added.append(f"формат «{fid}» отклонён: {exc}")
+                added.append(tr('формат «{0}» отклонён: {1}').format(fid, exc))
                 continue
             record.formats.append((fid, previous))
-            added.append(f"формат «{fid}»")
+            added.append(tr('формат «{0}»').format(fid))
 
         for rule in context.qc_rules:
             check = rule if callable(rule) else getattr(rule, "check", None)
             try:
                 qc.register_rule(check)
             except TypeError as exc:
-                added.append(f"проверка отклонена: {exc}")
+                added.append(tr('проверка отклонена: {0}').format(exc))
                 continue
             record.rules.append(check)
             name = getattr(rule, "__name__", None) or type(rule).__name__
-            added.append(f"проверка качества «{name}»")
+            added.append(tr('проверка качества «{0}»').format(name))
 
         self._installed[plugin.info.name] = record
         return added

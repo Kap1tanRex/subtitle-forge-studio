@@ -22,6 +22,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.core.time import FpsModel, SnapMode
 
 __all__ = ["KeyframeIndex", "SnapContext", "SnapResult", "build_keyframe_index"]
@@ -94,12 +95,12 @@ def build_keyframe_index(
     try:
         import av
     except (ImportError, OSError) as exc:
-        raise KeyframeError(f"PyAV недоступен: {exc}") from exc
+        raise KeyframeError(tr('PyAV недоступен: {0}').format(exc)) from exc
 
     try:
         container = av.open(str(media))
     except Exception as exc:
-        raise KeyframeError(f"не удалось открыть {media.name}: {exc}") from exc
+        raise KeyframeError(tr('не удалось открыть {0}: {1}').format(media.name, exc)) from exc
 
     try:
         if not container.streams.video:
@@ -111,7 +112,7 @@ def build_keyframe_index(
         found: list[int] = []
         for packet in container.demux(stream):
             if cancel is not None and cancel.is_set():
-                raise KeyframeError("построение индекса отменено")
+                raise KeyframeError(tr('построение индекса отменено'))
             if packet.pts is None:
                 continue
             if packet.is_keyframe:

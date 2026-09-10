@@ -113,8 +113,8 @@ def report_html(
         tr('<p class="meta">{0} · {1} · найдено: {2}</p>')
             .format(
                 html.escape(where),
-                plural(len(doc.events), "реплика", "реплики", "реплик"),
-                plural(len(issues), "замечание", "замечания", "замечаний"),
+                plural(len(doc.events), tr('реплика'), tr('реплики'), tr('реплик')),
+                plural(len(issues), tr('замечание'), tr('замечания'), tr('замечаний')),
             )
     )
 

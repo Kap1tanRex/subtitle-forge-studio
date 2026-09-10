@@ -167,8 +167,9 @@ class Inspector(QTabWidget):
         button.setText("⧉")
         button.setAutoRaise(True)
         button.setToolTip(
-            "Вынести эту вкладку в отдельное окно.\n"
-            "Закрытие окна вернёт её сюда"
+            tr('Вынести эту вкладку в отдельное окно.')
+            + "\n"
+            + tr('Закрытие окна вернёт её сюда')
         )
         button.clicked.connect(self._detach_current)
         return button
@@ -411,7 +412,7 @@ class Inspector(QTabWidget):
         pos_row.addWidget(self.pos_y_spin)
         form.addRow(tr('Положение'), pos_row)
 
-        self.clear_pos_button = QPushButton("Убрать \\pos")
+        self.clear_pos_button = QPushButton(tr('Убрать \\pos'))
         self.clear_pos_button.setToolTip(tr('Вернуть реплику на место по умолчанию'))
         self.clear_pos_button.clicked.connect(lambda: self._set_tag("pos", None))
         form.addRow("", self.clear_pos_button)

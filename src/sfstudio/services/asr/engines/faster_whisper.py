@@ -18,6 +18,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from sfstudio.app.i18n import tr
 from sfstudio.services.asr.audio import extract_audio
 from sfstudio.services.asr.base import (
     CancelToken,
@@ -44,7 +45,7 @@ MODELS = ("tiny", "base", "small", "medium", "large-v3-turbo",
 DEFAULT_MODEL = "small"
 
 #: Как называть устройство человеку. «cuda» ему ни о чём не говорит.
-_DEVICE_TITLE = {"cuda": "(видеокарта)", "cpu": "(процессор)"}
+_DEVICE_TITLE = {"cuda": tr('(видеокарта)'), "cpu": tr('(процессор)')}
 
 
 class FasterWhisperEngine:
@@ -57,12 +58,12 @@ class FasterWhisperEngine:
             key=self.key,
             title="Whisper (faster-whisper)",
             description=(
-                "Локальное распознавание на CPU или видеокарте. Модель "
-                "скачивается один раз при первом запуске."
+                tr('Локальное распознавание на CPU или видеокарте. Модель скачивается один '
+                       'раз при первом запуске.')
             ),
             kind=EngineKind.LIBRARY,
             available=module_installed(MODULE),
-            hint="Установите: pip install faster-whisper",
+            hint=tr('Установите: pip install faster-whisper'),
             models=MODELS,
             word_timings=True,
         )
@@ -85,9 +86,9 @@ class FasterWhisperEngine:
             # сообщаем об ошибке: пользователю нужен результат, а не разбор
             # того, каких библиотек CUDA не хватает.
             if device != "cuda" or not _looks_like_cuda_failure(exc):
-                raise RecognitionError(f"faster-whisper не справился: {exc}") from exc
+                raise RecognitionError(tr('faster-whisper не справился: {0}').format(exc)) from exc
             if progress is not None:
-                progress(0.05, "видеокарта недоступна, считаем на процессоре")
+                progress(0.05, tr('видеокарта недоступна, считаем на процессоре'))
             return self._run(request, "cpu", started, progress, cancel)
 
     def _run(
@@ -101,7 +102,7 @@ class FasterWhisperEngine:
         model = self._load(request, device, progress)
 
         if progress is not None:
-            progress(0.05, "чтение звука")
+            progress(0.05, tr('чтение звука'))
         chunk = extract_audio(
             request.media,
             start_ms=request.start_ms,
@@ -118,7 +119,7 @@ class FasterWhisperEngine:
         # сразу, и без него замерший прогресс выглядит как поломка. Написано
         # «на процессоре» — понятно, почему долго; написано «на видеокарте» —
         # видно, что видеокарта действительно взята в работу.
-        stage = "распознавание " + _DEVICE_TITLE.get(device, f"({device})")
+        stage = tr('распознавание ') + _DEVICE_TITLE.get(device, f"({device})")
         if progress is not None:
             progress(0.1, stage)
 
@@ -137,7 +138,7 @@ class FasterWhisperEngine:
                 progress(min(0.99, 0.1 + 0.89 * done / total_ms), stage)
 
         if progress is not None:
-            progress(1.0, "готово")
+            progress(1.0, tr('готово'))
 
         return RecognitionResult(
             segments=segments,
@@ -184,12 +185,12 @@ class FasterWhisperEngine:
             from faster_whisper import WhisperModel
         except ImportError as exc:
             raise RecognitionError(
-                "faster-whisper не установлен. Установите его командой "
-                "pip install faster-whisper либо выберите другой движок."
+                tr('faster-whisper не установлен. Установите его командой pip install '
+                       'faster-whisper либо выберите другой движок.')
             ) from exc
 
         if progress is not None:
-            progress(0.01, "загрузка модели")
+            progress(0.01, tr('загрузка модели'))
 
         name = request.model or DEFAULT_MODEL
         source, directory = _resolve_source(name, request.models_dir)
@@ -386,23 +387,25 @@ def cuda_status(libraries_dir=None) -> tuple[bool, str]:
     try:
         import ctranslate2
     except Exception:
-        return False, ("Не установлен CTranslate2 — библиотека, которая считает "
-                       "модель. Он ставится вместе с faster-whisper.")
+        return False, (tr('Не установлен CTranslate2 — библиотека, которая считает модель. Он '
+            'ставится '
+            'вместе с faster-whisper.'))
 
     try:
         count = ctranslate2.get_cuda_device_count()
     except Exception:
         count = 0
     if count <= 0:
-        return False, ("Видеокарта NVIDIA не найдена либо драйвер не отвечает. "
-                       "Счёт пойдёт на процессоре.")
+        return False, (tr('Видеокарта NVIDIA не найдена либо драйвер не отвечает. Счёт пойдёт на '
+               'процессоре.'))
 
     enable_cuda_libraries()
     if _cublas_ready():
-        return True, "Готова к работе."
-    return False, ("Нет библиотеки cuBLAS — без неё видеокарта считать не может. "
-                   "Её можно скачать прямо отсюда (около 0,7 ГБ) либо "
-                   "установить командой pip install nvidia-cublas-cu12.")
+        return True, tr('Готова к '
+               'работе.')
+    return False, (tr('Нет библиотеки cuBLAS — без неё видеокарта считать не может. Её можно '
+        'скачать '
+           'прямо отсюда (около 0,7 ГБ) либо установить командой pip install nvidia-cublas-cu12.'))
 
 
 def _cublas_ready() -> bool:
