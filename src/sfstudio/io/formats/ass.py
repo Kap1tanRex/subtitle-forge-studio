@@ -27,6 +27,8 @@ from sfstudio.core.actors import ActorRegistry
 from sfstudio.core.color import RGBA
 from sfstudio.core.document import ScriptInfo, SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
+from sfstudio.core.markers import INFO_KEY as MARKERS_KEY
+from sfstudio.core.markers import MarkerList
 from sfstudio.core.style import SubtitleStyle
 from sfstudio.core.tracks import INFO_KEY as TRACKS_KEY
 from sfstudio.core.tracks import TrackSet
@@ -208,6 +210,10 @@ def _read_registries(doc: SubtitleDocument) -> None:
     if raw_notes:
         apply_notes(raw_notes, doc.events)
 
+    raw_markers = doc.script_info.extra.pop(MARKERS_KEY, None)
+    if raw_markers:
+        doc.markers = MarkerList.from_json(raw_markers)
+
     raw_tracks = doc.script_info.extra.pop(TRACKS_KEY, None)
     if raw_tracks:
         parsed = TrackSet.from_json(raw_tracks)
@@ -385,6 +391,8 @@ def write_ass(
     notes = collect_notes(doc.events)
     if notes != "[]":
         out.append(f"{NOTES_KEY}: {notes}")
+    if len(doc.markers):
+        out.append(f"{MARKERS_KEY}: {doc.markers.to_json()}")
 
     # [V4+ Styles]
     out.append("")

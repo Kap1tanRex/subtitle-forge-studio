@@ -32,7 +32,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
@@ -51,20 +51,27 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QInputDialog, QMenu, QToolTip, QWidget
 
 from sfstudio.core.commands import (
+    AddMarker,
     AddTrack,
+    ClearMarkers,
     CompositeCommand,
     DeleteEvents,
     DuplicateEvents,
     InsertEvent,
     MoveEventsToLayer,
+    MoveMarker,
+    RemoveMarker,
     RemoveTrack,
     SetText,
     SetTiming,
     SetTrackFlags,
+    UpdateMarker,
     UpdateTrack,
 )
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.event import SubtitleEvent
+from sfstudio.core.markers import DEFAULT_COLOR as DEFAULT_MARKER_COLOR
+from sfstudio.core.markers import MARKER_COLORS, Marker, color_value
 from sfstudio.core.time import FpsModel, SnapMode, format_srt
 from sfstudio.core.tracks import Track, TrackKind
 from sfstudio.core.undo import UndoStack
@@ -81,7 +88,16 @@ from sfstudio.ui.theme import DARK, Palette
 
 #: Ширина колонки заголовков. Влезает «Субтитры 10» и две иконки справа.
 HEADER_W = 148.0
-RULER_H = 22.0
+#: Высота полосы маркеров — нижняя часть линейки.
+#:
+#: Своя полоса, а не значки поверх шкалы: маркер и подпись времени иначе
+#: наезжают друг на друга ровно там, где маркер и ставят, — на границе
+#: сцены, у круглой отметки времени.
+MARKER_LANE_H = 13.0
+#: Шкала времени: подписи и деления.
+TIME_LANE_H = 22.0
+#: Вся шапка таймлайна. Дорожки начинаются под ней.
+RULER_H = TIME_LANE_H + MARKER_LANE_H
 SUB_TRACK_H = 44.0
 #: Пределы высоты одной дорожки при растягивании мышью.
 MIN_TRACK_H = 18.0
@@ -118,6 +134,28 @@ _GRID_STEPS = (
 
 #: Признак «в кэше ещё не считали». ``None`` занят и значит «актора нет».
 _MISSING = object()
+
+#: Ширина флажка маркера и допуск попадания мышью по нему, в пикселях.
+MARKER_FLAG_W = 9.0
+MARKER_GRAB_PX = 7.0
+
+
+def _flag_shape(x: float, top: float, height: float) -> QPolygonF:
+    """Флажок: прямоугольник с вырезом снизу, остриём в точке маркера.
+
+    Остриё ровно на времени маркера, а тело — вправо от него: так видно,
+    к какому мгновению отметка относится. Симметричный значок пришлось бы
+    угадывать на глаз, ошибаясь на половину его ширины.
+    """
+    right = x + MARKER_FLAG_W
+    notch = height * 0.35
+    return QPolygonF([
+        QPointF(x, top),
+        QPointF(right, top),
+        QPointF(right, top + height - notch),
+        QPointF(x + MARKER_FLAG_W / 2, top + height),
+        QPointF(x, top + height - notch),
+    ])
 
 
 def _readable_on(background: QColor) -> QColor:
@@ -159,6 +197,7 @@ class DragMode:
     CREATE = 5
     RESIZE_TRACK = 6
     RUBBER = 7
+    MARKER = 8
 
 
 @dataclass(slots=True)
@@ -185,6 +224,12 @@ class _Drag:
     base_selection: frozenset[int] = frozenset()
     #: Сдвиг группы: сколько уже применено к каждой реплике.
     group: tuple[int, ...] = ()
+    #: Маркер, который тянут, и его положение до начала жеста.
+    marker: Marker | None = None
+    marker_origin: Marker | None = None
+    #: Успел ли жест сдвинуть маркер: щелчок без движения открывает окно,
+    #: а не считается переносом на ноль миллисекунд.
+    marker_moved: bool = False
 
 
 @dataclass(slots=True)
@@ -212,6 +257,8 @@ class TimelineWidget(QWidget):
     status_message = Signal(str)
     #: Изменился состав или свойства дорожек — окну нужно обновить меню.
     tracks_changed = Signal()
+    #: Поставили, изменили или убрали маркер.
+    markers_changed = Signal()
 
     def __init__(
         self,
@@ -257,6 +304,14 @@ class TimelineWidget(QWidget):
         #: None — курсор ни разу не заходил или ушёл за пределы дорожек.
         self._mouse_ms: int | None = None
         self._mouse_layer: int | None = None
+        #: Маркер под курсором или тот, чьё окно открыто, — его флажок
+        #: обводится. Без этого при двух отметках рядом непонятно, какую
+        #: именно правят.
+        self._marker_focus: Marker | None = None
+        #: Цвет следующего маркера. Меняется вслед за последним выбранным:
+        #: маркеры ставят сериями одного назначения, и заново выбирать цвет
+        #: на каждой отметке — лишнее движение на каждой из сотни.
+        self._marker_color = DEFAULT_MARKER_COLOR
         #: Чем назначать говорящего. Главное окно подставляет свою функцию,
         #: которая заодно правит метку в тексте реплики; без неё берётся
         #: обычное назначение — таймлайн должен работать и сам по себе.
@@ -383,7 +438,12 @@ class TimelineWidget(QWidget):
         doc_end = self._doc.duration
         peaks = self._peaks
         media_end = int(getattr(peaks, "duration_ms", 0) or 0)
-        return max(doc_end, media_end, 1000)
+        # Маркеры тоже содержимое: отметку за концом последней реплики
+        # «Уместить всё» иначе оставляет за краем экрана, и найти её можно
+        # только прокруткой наугад.
+        markers = self._doc.markers
+        marker_end = markers[-1].end if len(markers) else 0
+        return max(doc_end, media_end, marker_end, 1000)
 
     # -- геометрия полос -------------------------------------------------------- #
 
@@ -530,6 +590,7 @@ class TimelineWidget(QWidget):
 
         self._paint_row_backgrounds(painter, rows)
         self._paint_ruler(painter)
+        self._paint_markers(painter)
         for row in rows:
             if row.track.kind is TrackKind.AUDIO:
                 self._paint_wave(painter, row)
@@ -552,6 +613,13 @@ class TimelineWidget(QWidget):
     def _paint_ruler(self, painter: QPainter) -> None:
         rect = QRectF(0, 0, self.width(), RULER_H)
         painter.fillRect(rect, QColor(self._palette.bg_elevated))
+        # Полоса маркеров чуть темнее шкалы: без этого пустая полоса читается
+        # как случайный отступ, и человек не догадывается, что туда можно
+        # ставить отметки.
+        painter.fillRect(
+            QRectF(0, TIME_LANE_H, self.width(), MARKER_LANE_H),
+            QColor(self._palette.bg_sunken),
+        )
         painter.setPen(QPen(QColor(self._palette.border), 1))
         painter.drawLine(QPointF(0, RULER_H), QPointF(self.width(), RULER_H))
 
@@ -567,12 +635,52 @@ class TimelineWidget(QWidget):
             x = self.ms_to_x(t)
             if x >= HEADER_W - 60:
                 painter.setPen(QPen(QColor(self._palette.border), 1))
-                painter.drawLine(QPointF(x, RULER_H - 6), QPointF(x, RULER_H))
+                painter.drawLine(QPointF(x, TIME_LANE_H - 6), QPointF(x, TIME_LANE_H))
                 painter.setPen(QColor(self._palette.text_muted))
-                painter.drawText(QPointF(x + 3, RULER_H - 8), _short_time(t))
+                painter.drawText(QPointF(x + 3, TIME_LANE_H - 8), _short_time(t))
                 painter.setPen(QPen(QColor(self._palette.border), 1, Qt.DotLine))
                 painter.drawLine(QPointF(x, RULER_H), QPointF(x, self.height()))
             t += step
+
+    def _paint_markers(self, painter: QPainter) -> None:
+        """Флажки на своей полосе. Протяжённые — с хвостом до конца отрезка.
+
+        Рисуются только видимые: маркеров в сериале бывают сотни, и
+        обходить их все на каждую перерисовку незачем.
+        """
+        markers = self._doc.markers
+        if not len(markers):
+            return
+
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setClipRect(
+            QRectF(HEADER_W, TIME_LANE_H, self._content_w, MARKER_LANE_H)
+        )
+        top = TIME_LANE_H + 1.5
+        height = MARKER_LANE_H - 3
+
+        for marker in markers.in_range(int(self._view_start_ms), int(self.view_end_ms)):
+            x = self.ms_to_x(marker.time)
+            color = QColor(color_value(marker.color))
+
+            if marker.duration:
+                # Хвост показывает отмеченный отрезок. Полупрозрачный, чтобы
+                # не спорить с самим флажком за внимание.
+                tail = QColor(color)
+                tail.setAlpha(90)
+                painter.fillRect(
+                    QRectF(x, top, max(1.0, self.ms_to_x(marker.end) - x), height), tail
+                )
+
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(color)
+            painter.drawPolygon(_flag_shape(x, top, height))
+            if marker is self._marker_focus:
+                painter.setPen(QPen(QColor(self._palette.text_primary), 1))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawPolygon(_flag_shape(x, top, height))
+        painter.restore()
 
     def _grid_step(self) -> int:
         """Шаг сетки, при котором подписи не наезжают друг на друга."""
@@ -806,13 +914,32 @@ class TimelineWidget(QWidget):
         painter.setPen(QColor(self._palette.text_muted))
         painter.drawText(self._add_button_rect(), Qt.AlignCenter, "+")
 
+        # Кнопка маркера — на своей полосе, слева от неё же: она относится
+        # к полосе маркеров, а не к шкале времени, и стоять должна там.
+        self._paint_marker_button(painter)
+
+    def _paint_marker_button(self, painter: QPainter) -> None:
+        """Флажок слева от полосы маркеров: поставить отметку на курсоре."""
+        rect = self._marker_button_rect()
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(color_value(self._marker_color)))
+        height = rect.height() - 2
+        painter.drawPolygon(_flag_shape(rect.left() + 2, rect.top() + 1, height))
+        painter.restore()
+
     def _add_button_rect(self) -> QRectF:
         """Кнопка «добавить дорожку»."""
-        return QRectF(HEADER_W - 22, 2, 18, RULER_H - 4)
+        return QRectF(HEADER_W - 22, 2, 18, TIME_LANE_H - 4)
 
     def _new_event_button_rect(self) -> QRectF:
         """Кнопка «новая реплика» — слева от кнопки дорожки."""
-        return QRectF(HEADER_W - 44, 2, 18, RULER_H - 4)
+        return QRectF(HEADER_W - 44, 2, 18, TIME_LANE_H - 4)
+
+    def _marker_button_rect(self) -> QRectF:
+        """Кнопка «поставить маркер» — в левом краю полосы маркеров."""
+        return QRectF(HEADER_W - 22, TIME_LANE_H, 18, MARKER_LANE_H)
 
     def _header_buttons(self, row: _Row) -> list[tuple[str, QRectF]]:
         """Иконки справа в заголовке: видимость и замок (у звука — заглушение)."""
@@ -906,9 +1033,27 @@ class TimelineWidget(QWidget):
             if self._add_button_rect().contains(pos):
                 self._add_track()
                 return
-            if pos.x() >= HEADER_W:
-                self._drag = _Drag(mode=DragMode.SEEK)
-                self._seek_to(int(self.x_to_ms(pos.x())))
+            if self._marker_button_rect().contains(pos):
+                self.add_marker_at_playhead()
+                return
+
+            if pos.x() < HEADER_W:
+                return
+
+            # Полоса маркеров: щелчок по флажку берёт его, по пустому месту —
+            # ставит новый. Перемотка отсюда убрана намеренно: попасть в
+            # флажок шириной девять пикселей и промахнуться в перемотку —
+            # значит потерять место, на котором стоял курсор.
+            if pos.y() >= TIME_LANE_H:
+                hit = self._marker_at(pos.x())
+                if hit is not None:
+                    self._begin_marker_drag(hit, pos.x())
+                else:
+                    self.add_marker_at(int(self.x_to_ms(pos.x())))
+                return
+
+            self._drag = _Drag(mode=DragMode.SEEK)
+            self._seek_to(int(self.x_to_ms(pos.x())))
             return
 
         # Высоту проверяем раньше колонки: граница дорожки тянется и в области
@@ -1044,6 +1189,10 @@ class TimelineWidget(QWidget):
             self.update()
             return
 
+        if self._drag.mode == DragMode.MARKER:
+            self._update_marker_drag(pos.x(), alt=bool(event.modifiers() & Qt.AltModifier))
+            return
+
         ms = int(self.x_to_ms(pos.x()))
         if self._drag.mode == DragMode.SEEK:
             self._seek_to(ms)
@@ -1059,6 +1208,8 @@ class TimelineWidget(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if self._drag.mode == DragMode.MARKER:
+            self._finish_marker_drag()
         if self._drag.mode == DragMode.RESIZE_TRACK:
             self._commit_resize()
         if self._drag.mode == DragMode.RUBBER and not self._rubber_moved():
@@ -1194,6 +1345,12 @@ class TimelineWidget(QWidget):
         Отдельно от :meth:`contextMenuEvent`, потому что тот показывает меню
         модально: проверить его состав, не открывая окно, иначе невозможно.
         """
+        # Полоса маркеров — своё меню: пункты про реплики и дорожки к ней
+        # отношения не имеют, а показывать их значило бы предлагать сделать
+        # не то, на что человек показывает.
+        if TIME_LANE_H <= position.y() < RULER_H and position.x() >= HEADER_W:
+            return self._marker_menu(position.x())
+
         row = self._row_at(position.y())
 
         # Щелчок по невыделенной реплике выделяет её. Пункты меню называют,
@@ -1320,6 +1477,216 @@ class TimelineWidget(QWidget):
                     move.addAction(action)
 
         return menu
+
+    # -- маркеры ------------------------------------------------------------- #
+
+    def _marker_menu(self, x: float) -> QMenu:
+        """Меню полосы маркеров: по флажку — про него, по пустому — про новый."""
+        menu = QMenu(self)
+        ms = int(self.x_to_ms(x))
+        marker = self._marker_at(x)
+
+        if marker is not None:
+            edit = QAction(f"Правка маркера «{menu_label(marker.title())}»", menu)
+            edit.triggered.connect(lambda: self.edit_marker(marker))
+            menu.addAction(edit)
+
+            colors = menu.addMenu("Цвет маркера")
+            for key, title, _value in MARKER_COLORS:
+                action = QAction(title, colors)
+                action.setCheckable(True)
+                action.setChecked(key == marker.color)
+                action.triggered.connect(
+                    lambda _=False, k=key, m=marker: self._recolor_marker(m, k)
+                )
+                colors.addAction(action)
+
+            remove = QAction("Удалить маркер", menu)
+            remove.triggered.connect(lambda: self.remove_marker(marker))
+            menu.addAction(remove)
+            menu.addSeparator()
+        else:
+            new = QAction(f"Новый маркер на {_short_time(ms)}", menu)
+            new.triggered.connect(lambda: self.add_marker_at(ms))
+            menu.addAction(new)
+            menu.addSeparator()
+
+        previous = QAction("Предыдущий маркер", menu)
+        previous.setEnabled(self._doc.markers.before(self._time_ms) is not None)
+        previous.triggered.connect(self.goto_previous_marker)
+        menu.addAction(previous)
+
+        following = QAction("Следующий маркер", menu)
+        following.setEnabled(self._doc.markers.after(self._time_ms) is not None)
+        following.triggered.connect(self.goto_next_marker)
+        menu.addAction(following)
+
+        total = len(self._doc.markers)
+        clear = QAction(f"Убрать все маркеры ({total})", menu)
+        clear.setEnabled(total > 0)
+        clear.triggered.connect(self.clear_markers)
+        menu.addAction(clear)
+        return menu
+
+    def _recolor_marker(self, marker: Marker, color: str) -> None:
+        if marker.color == color:
+            return
+        self._marker_color = color
+        self._undo.run(UpdateMarker(marker, replace(marker, color=color)))
+        self.markers_changed.emit()
+        self.document_edited.emit()
+        self.update()
+
+    def clear_markers(self) -> None:
+        """Убирает все маркеры одним шагом отмены."""
+        if not len(self._doc.markers):
+            return
+        self._undo.run(ClearMarkers())
+        self._marker_focus = None
+        self.markers_changed.emit()
+        self.document_edited.emit()
+        self.update()
+
+    def _marker_at(self, x: float) -> Marker | None:
+        """Маркер под курсором. Допуск — в пикселях, а не в миллисекундах.
+
+        Попадание меряется на экране: при обзоре всего фильма миллисекундный
+        допуск равен доле пикселя, а при увеличении — половине экрана.
+        """
+        radius_ms = int(MARKER_GRAB_PX / self._px_per_ms)
+        ms = int(self.x_to_ms(x))
+        hit = self._doc.markers.at(ms, radius_ms)
+        if hit is None:
+            return None
+        # Тело флажка нарисовано вправо от времени маркера: то, что видно,
+        # и должно ловить щелчок.
+        left = self.ms_to_x(hit.time) - MARKER_GRAB_PX
+        right = max(self.ms_to_x(hit.end), self.ms_to_x(hit.time) + MARKER_FLAG_W)
+        return hit if left <= x <= right else None
+
+    def add_marker_at_playhead(self) -> Marker | None:
+        """Ставит маркер там, где стоит курсор времени."""
+        return self.add_marker_at(self._time_ms)
+
+    def add_marker_at(self, ms: int) -> Marker | None:
+        """Ставит маркер и сразу открывает его окно.
+
+        Открывает намеренно: отметка без подписи через день ничего не
+        значит, а дописать её потом — значит вспомнить, что она была.
+        """
+        marker = Marker(time=max(0, int(ms)), color=self._marker_color)
+        self._undo.run(AddMarker(marker))
+        self.markers_changed.emit()
+        self.document_edited.emit()
+        self.update()
+        return self.edit_marker(marker, is_new=True)
+
+    def edit_marker(self, marker: Marker, *, is_new: bool = False) -> Marker | None:
+        """Открывает окно маркера. Возвращает изменённый маркер или ``None``.
+
+        ``None`` значит, что маркер удалили: окно для этого и предлагает
+        отдельную кнопку.
+        """
+        from sfstudio.ui.marker_dialog import MarkerDialog
+
+        self._marker_focus = marker
+        self.update()
+
+        dialog = MarkerDialog(
+            marker, self, keywords=self._doc.markers.keywords(), is_new=is_new
+        )
+        removed = False
+
+        def _remove() -> None:
+            nonlocal removed
+            removed = True
+
+        dialog.delete_requested.connect(_remove)
+        dialog.exec()
+
+        self._marker_focus = None
+        if removed:
+            self.remove_marker(marker)
+            return None
+
+        updated = dialog.marker()
+        if updated != marker:
+            self._marker_color = updated.color
+            self._undo.run(UpdateMarker(marker, updated))
+            self.markers_changed.emit()
+            self.document_edited.emit()
+        self.update()
+        return updated
+
+    def remove_marker(self, marker: Marker) -> None:
+        self._undo.run(RemoveMarker(marker))
+        self._marker_focus = None
+        self.markers_changed.emit()
+        self.document_edited.emit()
+        self.update()
+
+    def marker_at_playhead(self) -> Marker | None:
+        """Маркер, накрывающий курсор времени, — для меню и клавиш."""
+        return self._doc.markers.at(self._time_ms, radius=0)
+
+    def goto_next_marker(self) -> bool:
+        marker = self._doc.markers.after(self._time_ms)
+        if marker is None:
+            return False
+        self._seek_to(marker.time)
+        self._ensure_visible(marker.time)
+        self.update()
+        return True
+
+    def goto_previous_marker(self) -> bool:
+        marker = self._doc.markers.before(self._time_ms)
+        if marker is None:
+            return False
+        self._seek_to(marker.time)
+        self._ensure_visible(marker.time)
+        self.update()
+        return True
+
+    def _begin_marker_drag(self, marker: Marker, x: float) -> None:
+        self._drag = _Drag(
+            mode=DragMode.MARKER,
+            marker=marker,
+            marker_origin=marker,
+            grab_offset_ms=int(self.x_to_ms(x)) - marker.time,
+        )
+        self._marker_focus = marker
+        self.update()
+
+    def _update_marker_drag(self, x: float, *, alt: bool) -> None:
+        current = self._drag.marker
+        if current is None:
+            return
+        target = int(self.x_to_ms(x)) - self._drag.grab_offset_ms
+        target = max(0, self._snap(target, disabled=alt))
+        if target == current.time:
+            return
+
+        moved = current.moved_to(target)
+        self._undo.run(MoveMarker(current, moved))
+        self._drag.marker = moved
+        self._drag.marker_moved = True
+        self._marker_focus = moved
+        self.update()
+
+    def _finish_marker_drag(self) -> None:
+        """Отпустили маркер. Без движения это был щелчок — открываем окно."""
+        marker = self._drag.marker
+        moved = self._drag.marker_moved
+        self._drag = _Drag()
+        if marker is None:
+            return
+        if moved:
+            self.markers_changed.emit()
+            self.document_edited.emit()
+            self._marker_focus = None
+            self.update()
+            return
+        self.edit_marker(marker)
 
     def create_event_at(self, ms: int, layer: int | None = None) -> int | None:
         """Создаёт реплику в указанном месте. Возвращает её ``eid``.
@@ -1714,6 +2081,9 @@ class TimelineWidget(QWidget):
 
     def _tooltip_at(self, x: float, y: float) -> str:
         """Что рассказать о точке под курсором."""
+        if TIME_LANE_H <= y < RULER_H and x >= HEADER_W:
+            return self._marker_tooltip(x)
+
         hit = self._event_at(x, y)
         if hit is None:
             return ""
@@ -1730,12 +2100,35 @@ class TimelineWidget(QWidget):
         # Текст реплики пришёл из файла: показывать его как разметку нельзя.
         return plain_tooltip("\n".join(lines))
 
+    def _marker_tooltip(self, x: float) -> str:
+        """Подсказка на полосе маркеров: сам маркер или как его поставить."""
+        marker = self._marker_at(x)
+        if marker is None:
+            if not len(self._doc.markers):
+                return "Щелчок ставит маркер. Флажок слева — на курсоре времени"
+            return ""
+
+        lines = [f"{format_srt(marker.time)}   {marker.title()}"]
+        if marker.duration:
+            lines[0] += f"   ({marker.duration / 1000:.1f} с)"
+        if marker.keyword:
+            lines.append(f"Ключевое слово: {marker.keyword}")
+        if marker.note:
+            lines.append(marker.note)
+        lines.append("Щелчок — правка, перетаскивание — перенос")
+        # Имя и примечание пришли из файла: показывать их как разметку нельзя.
+        return plain_tooltip("\n".join(lines))
+
     def _update_cursor(self, x: float, y: float) -> None:
         if self._resize_edge_at(x, y) is not None:
             self.setCursor(Qt.SizeVerCursor)
             return
         if x < HEADER_W:
             self.setCursor(Qt.ArrowCursor)
+            return
+        if TIME_LANE_H <= y < RULER_H:
+            over = self._marker_at(x) is not None
+            self.setCursor(Qt.OpenHandCursor if over else Qt.PointingHandCursor)
             return
         hit = self._event_at(x, y)
         if hit is None:

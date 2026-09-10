@@ -28,6 +28,8 @@ class ChangeSet:
     #: Состав или цвета акторов — таблице нужно перекрасить строки целиком,
     #: а не только те, где сменилось имя говорящего.
     actors_changed: bool = False
+    #: Состав или содержимое маркеров — перерисовать линейку таймлайна.
+    markers_changed: bool = False
     #: Изменился состав или порядок событий — модели нужен полный reset.
     structural: bool = False
 
@@ -41,6 +43,7 @@ class ChangeSet:
             or self.script_info_changed
             or self.tracks_changed
             or self.actors_changed
+            or self.markers_changed
             or self.structural
         )
 
@@ -58,6 +61,7 @@ class ChangeSet:
             script_info_changed=self.script_info_changed or other.script_info_changed,
             tracks_changed=self.tracks_changed or other.tracks_changed,
             actors_changed=self.actors_changed or other.actors_changed,
+            markers_changed=self.markers_changed or other.markers_changed,
             structural=self.structural or other.structural,
         )
 
@@ -80,6 +84,10 @@ class ChangeSet:
     @staticmethod
     def actors(*eids: int) -> ChangeSet:
         return ChangeSet(actors_changed=True, changed_eids=frozenset(eids))
+
+    @staticmethod
+    def markers() -> ChangeSet:
+        return ChangeSet(markers_changed=True)
 
     #: Пустая дельта. ClassVar, а не поле: без этой пометки dataclass принял бы
     #: EMPTY за обязательное поле без значения по умолчанию.

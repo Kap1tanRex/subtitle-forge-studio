@@ -8,6 +8,13 @@ from sfstudio.core.commands.actor_cmds import (
     UpdateActor,
 )
 from sfstudio.core.commands.base import Command, CompositeCommand
+from sfstudio.core.commands.marker_cmds import (
+    AddMarker,
+    ClearMarkers,
+    MoveMarker,
+    RemoveMarker,
+    UpdateMarker,
+)
 from sfstudio.core.commands.position import (
     ClearPosition,
     SetAlignment,
@@ -57,10 +64,12 @@ from sfstudio.core.commands.track_cmds import (
 
 __all__ = [
     "AddActor",
+    "AddMarker",
     "AddTrack",
     "ApplyStyleToEvents",
     "ApplyTimings",
     "AssignActor",
+    "ClearMarkers",
     "ClearPosition",
     "Command",
     "CompositeCommand",
@@ -72,7 +81,9 @@ __all__ = [
     "LinearSync",
     "MergeEvents",
     "MoveEventsToLayer",
+    "MoveMarker",
     "RemoveActor",
+    "RemoveMarker",
     "RemoveTrack",
     "RenameActor",
     "RenameStyle",
@@ -95,6 +106,7 @@ __all__ = [
     "SyncPoints",
     "ToggleComment",
     "UpdateActor",
+    "UpdateMarker",
     "UpdateStyle",
     "UpdateTrack",
 ]

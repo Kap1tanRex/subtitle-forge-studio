@@ -167,6 +167,7 @@ ASS→SRT и отчётом о потерях.
 | 50 | **Пакетная обработка** | `services/batch.py` | 16, 27 | ✅ |
 | 51 | **Выравнивание по речи** | `services/alignment.py`, `ui/alignment_dialog.py` | 41–43, 28 | ✅ |
 | 52 | **Импорт текста без таймингов** | `services/script_import.py`, `ui/script_dialog.py` | 6, 16 | ✅ |
+| 53 | **Маркеры** | `core/markers.py`, `core/commands/marker_cmds.py`, `ui/marker_dialog.py`, `ui/markers_dialog.py` | 6, 7, 25 | ✅ |
 
 ---
 

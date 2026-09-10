@@ -14,6 +14,7 @@ from pathlib import Path
 from sfstudio.core.actors import ActorRegistry
 from sfstudio.core.event import SubtitleEvent
 from sfstudio.core.index import TimeIndex
+from sfstudio.core.markers import MarkerList
 from sfstudio.core.style import SubtitleStyle
 from sfstudio.core.tracks import TrackSet
 
@@ -72,6 +73,7 @@ class SubtitleDocument:
         "actors",
         "attachments",
         "events",
+        "markers",
         "script_info",
         "source_encoding",
         "source_format",
@@ -87,6 +89,7 @@ class SubtitleDocument:
         self.attachments: list[Attachment] = []
         self.actors = ActorRegistry()
         self.tracks = TrackSet.default()
+        self.markers = MarkerList()
 
         #: Непрозрачные данные конкретного формата (порядок полей Format:,
         #: имя секции стилей) — нужны, чтобы запись дала тот же файл, что читали.

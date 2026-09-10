@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sfstudio"
-version = "0.5.0"
+version = "0.6.0"
 description = "SubtitleForge Studio — WYSIWYG subtitle editor"
 readme = "README.md"
 # Проверено 2026-09-07: все зависимости имеют колёса под 3.14

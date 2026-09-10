@@ -246,6 +246,7 @@ class MainWindow(QMainWindow):
         self.timeline.selection_changed.connect(self._on_timeline_selection)
         self.timeline.document_edited.connect(self._on_widget_edit)
         self.timeline.status_message.connect(self._show_status)
+        self.timeline.markers_changed.connect(self._on_markers_changed)
 
         self.transport = TransportBar()
         self.transport.play_pause.connect(self.video_pane.toggle_pause)
@@ -459,6 +460,22 @@ class MainWindow(QMainWindow):
             tip="Разложить готовый перевод по речи: тайминги считаются "
                 "по распознаванию, текст не меняется")
 
+        add("marker.add", "Поставить маркер", self.add_marker,
+            shortcut="Alt+M", menu="Маркеры",
+            tip="Отметка на текущем времени: имя, примечание, цвет")
+        add("marker.edit", "Правка маркера…", self.edit_marker_at_playhead,
+            menu="Маркеры",
+            tip="Открыть маркер, стоящий на текущем времени")
+        add("marker.previous", "Предыдущий маркер", self.goto_previous_marker,
+            shortcut="Alt+Left", menu="Маркеры")
+        add("marker.next", "Следующий маркер", self.goto_next_marker,
+            shortcut="Alt+Right", menu="Маркеры")
+        add("marker.list", "Список маркеров…", self.open_markers,
+            shortcut="Alt+Shift+M", menu="Маркеры",
+            tip="Все отметки списком: поиск по имени и ключевому слову")
+        add("marker.clear", "Убрать все маркеры", self.clear_markers,
+            menu="Маркеры")
+
         add("view.guides", "Направляющие", self.preview.toggle_guides,
             shortcut="F6", menu="Вид", checkable=True, checked=True)
         add("view.safe_area", "Безопасные зоны", self.preview.toggle_safe_area,
@@ -586,7 +603,7 @@ class MainWindow(QMainWindow):
     def _install_menus(self, registry: ActionRegistry, actions: dict) -> None:
         """Раскладывает действия по меню в порядке регистрации."""
         menus: dict[str, object] = {}
-        names = ["Файл", "Правка", "Тайминг", "Вид", "Воспроизведение"]
+        names = ["Файл", "Правка", "Тайминг", "Маркеры", "Вид", "Воспроизведение"]
         # Меню плагинов появляется, только когда плагины вообще есть: пустой
         # пункт в строке меню сообщал бы о возможности, которой человек не
         # просил и не увидит.
@@ -2457,6 +2474,68 @@ class MainWindow(QMainWindow):
         self._select_row(0)
         self._show_status(
             f"Импортировано реплик: {len(lines)}. Тайминг — «Выровнять текст по речи»"
+        )
+
+    # -- маркеры ------------------------------------------------------------- #
+
+    def add_marker(self) -> None:
+        """Ставит маркер на текущем времени и открывает его окно."""
+        self.timeline.add_marker_at_playhead()
+
+    def edit_marker_at_playhead(self) -> None:
+        """Открывает маркер, стоящий на курсоре времени.
+
+        Если его там нет, ставит новый: пункт «правка маркера» на пустом
+        месте иначе просто ничего не делает, и это выглядит поломкой.
+        """
+        marker = self.timeline.marker_at_playhead()
+        if marker is None:
+            self.timeline.add_marker_at_playhead()
+            return
+        self.timeline.edit_marker(marker)
+
+    def goto_next_marker(self) -> None:
+        if not self.timeline.goto_next_marker():
+            self._show_status("Дальше маркеров нет")
+
+    def goto_previous_marker(self) -> None:
+        if not self.timeline.goto_previous_marker():
+            self._show_status("Раньше маркеров нет")
+
+    def clear_markers(self) -> None:
+        """Убирает все маркеры — по подтверждению и одним шагом отмены."""
+        total = len(self._doc.markers)
+        if not total:
+            self._show_status("Маркеров нет")
+            return
+        from sfstudio.core.plural import plural
+
+        answer = QMessageBox.question(
+            self,
+            "Убрать все маркеры",
+            "Убрать "
+            + plural(total, "маркер", "маркера", "маркеров")
+            + "? Это отменяется одним Ctrl+Z.",
+        )
+        if answer != QMessageBox.Yes:
+            return
+        self.timeline.clear_markers()
+
+    def open_markers(self) -> None:
+        """Список маркеров: поиск, переход, правка."""
+        from sfstudio.ui.markers_dialog import MarkersDialog
+
+        dialog = MarkersDialog(self._doc, self.timeline, parent=self)
+        dialog.exec()
+
+    def _on_markers_changed(self) -> None:
+        """Маркеры изменились — сказать, сколько их теперь."""
+        from sfstudio.core.plural import plural
+
+        total = len(self._doc.markers)
+        self._show_status(
+            "Маркеров нет" if not total
+            else "Всего " + plural(total, "маркер", "маркера", "маркеров")
         )
 
     def open_alignment(self) -> None:
