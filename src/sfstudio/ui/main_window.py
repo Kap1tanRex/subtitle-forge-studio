@@ -404,6 +404,10 @@ class MainWindow(QMainWindow):
 
         add("file.open_subtitles", "Импорт субтитров…", self.open_subtitles,
             shortcut="Ctrl+I", menu="Файл")
+        add("file.import_script", "Импорт текста без таймингов…",
+            self.open_script_import, menu="Файл",
+            tip="Сценарий или готовый перевод из текстового файла. "
+                "Тайминг делается потом выравниванием по речи")
         add("file.open_reference", "Открыть оригинал…", self.open_reference,
             menu="Файл",
             tip="Второй файл субтитров, с которого идёт перевод. "
@@ -450,6 +454,10 @@ class MainWindow(QMainWindow):
             shortcut="Ctrl+T", menu="Тайминг")
         add("timing.shift", "Сдвиг таймингов…", self.open_shift_times,
             shortcut="Ctrl+Shift+T", menu="Тайминг")
+        add("timing.align", "Выровнять текст по речи…", self.open_alignment,
+            menu="Тайминг",
+            tip="Разложить готовый перевод по речи: тайминги считаются "
+                "по распознаванию, текст не меняется")
 
         add("view.guides", "Направляющие", self.preview.toggle_guides,
             shortcut="F6", menu="Вид", checkable=True, checked=True)
@@ -2401,6 +2409,85 @@ class MainWindow(QMainWindow):
         if plan.is_empty:
             return
         self._undo.run(ApplyTimings(plan.as_mapping(), label="Доводка таймингов"))
+        self._show_status(plan.summary())
+
+    def open_script_import(self) -> None:
+        """Импорт текста без таймингов: сценарий, расшифровка, перевод."""
+        from sfstudio.ui.script_dialog import ScriptImportDialog
+
+        dialog = ScriptImportDialog(parent=self)
+        if dialog.exec() != ScriptImportDialog.Accepted:
+            return
+        self._insert_script(dialog.lines(), dialog.times())
+
+    def _insert_script(self, lines, times) -> None:
+        """Кладёт импортированные реплики одной операцией отмены.
+
+        Существующие реплики не трогаются: импорт добавляет, а не заменяет.
+        Стереть чужую работу молча — не то, чего ждут от слова «импорт».
+        """
+        if not lines:
+            return
+
+        style = next(iter(self._doc.styles), "Default")
+        layer = self._doc.tracks.subtitles[0].layer if self._doc.tracks.subtitles else 0
+        shift = max((event.end for event in self._doc.events), default=0)
+
+        commands = [
+            InsertEvent(
+                SubtitleEvent(
+                    eid=0,
+                    start=shift + start,
+                    end=shift + end,
+                    text=line.text,
+                    name=line.actor,
+                    style=style,
+                    layer=layer,
+                )
+            )
+            for line, (start, end) in zip(lines, times, strict=True)
+        ]
+        self._undo.run(
+            CompositeCommand(commands, label=f"Импорт текста: {len(lines)}")
+        )
+        self._on_widget_edit()
+        self.model.reset_document(self._doc)
+        self._qc.run_all(self._doc)
+        self.model.refresh_qc()
+        self._select_row(0)
+        self._show_status(
+            f"Импортировано реплик: {len(lines)}. Тайминг — «Выровнять текст по речи»"
+        )
+
+    def open_alignment(self) -> None:
+        """Окно выравнивания готового текста по речи.
+
+        Открывается и без видео: человек должен узнать, что такая
+        возможность есть и что для неё нужно, а не гадать, почему пункта нет.
+        """
+        from sfstudio.ui.alignment_dialog import AlignmentDialog
+
+        if not self._doc.events:
+            # Подсказка, а не тупик: чаще всего текст ещё не загружен, и
+            # человеку нужен соседний пункт меню, а не сообщение об отказе.
+            self._show_status(
+                "Нет реплик. Сначала Файл → «Импорт текста без таймингов»"
+            )
+            return
+
+        dialog = AlignmentDialog(
+            self._doc,
+            self._media_path,
+            self._settings,
+            self._timing_selection(),
+            parent=self,
+        )
+        if dialog.exec() != AlignmentDialog.Accepted:
+            return
+        plan = dialog.plan()
+        if plan.is_empty:
+            return
+        self._undo.run(ApplyTimings(plan.as_mapping(), label="Выравнивание по речи"))
         self._show_status(plan.summary())
 
     def open_shift_times(self) -> None:
