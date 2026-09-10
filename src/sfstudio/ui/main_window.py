@@ -80,8 +80,9 @@ from sfstudio.ui.transport import TransportBar
 from sfstudio.ui.video_pane import VideoPane
 
 SUBTITLE_FILTER = (
-    "Субтитры (*.ass *.ssa *.srt *.vtt);;"
-    "ASS (*.ass *.ssa);;SubRip (*.srt);;WebVTT (*.vtt);;Все файлы (*)"
+    "Субтитры (*.ass *.ssa *.srt *.vtt *.ttml *.dfxp);;"
+    "ASS (*.ass *.ssa);;SubRip (*.srt);;WebVTT (*.vtt);;"
+    "TTML / DFXP (*.ttml *.dfxp *.xml);;Все файлы (*)"
 )
 PROJECT_FILTER = f"Проект SubtitleForge (*{PROJECT_SUFFIX});;Все файлы (*)"
 MEDIA_FILTER = (
@@ -836,7 +837,7 @@ class MainWindow(QMainWindow):
         start = str(self._doc.source_path or self._settings.get("project.folder", "") or "")
         path, _ = QFileDialog.getOpenFileName(
             self, "Открыть оригинал", start,
-            "Субтитры (*.ass *.ssa *.srt *.vtt);;Все файлы (*)",
+            "Субтитры (*.ass *.ssa *.srt *.vtt *.ttml *.dfxp);;Все файлы (*)",
         )
         if not path:
             return False

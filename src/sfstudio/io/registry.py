@@ -15,6 +15,7 @@ from sfstudio.core.document import SubtitleDocument
 from sfstudio.io.charset import decode_bytes
 from sfstudio.io.formats import ass as ass_fmt
 from sfstudio.io.formats import srt as srt_fmt
+from sfstudio.io.formats import ttml as ttml_fmt
 from sfstudio.io.formats import vtt as vtt_fmt
 
 __all__ = [
@@ -52,6 +53,11 @@ FORMATS: dict[str, FormatSpec] = {
     ),
     "srt": FormatSpec("srt", "SubRip", (".srt",), srt_fmt.read_srt, srt_fmt.write_srt),
     "vtt": FormatSpec("vtt", "WebVTT", (".vtt",), vtt_fmt.read_vtt, vtt_fmt.write_vtt),
+    # TTML он же DFXP: в нём принимают Netflix, Apple и Amazon.
+    "ttml": FormatSpec(
+        "ttml", "TTML / DFXP", (".ttml", ".dfxp", ".xml"),
+        ttml_fmt.read_ttml, ttml_fmt.write_ttml,
+    ),
 }
 
 
@@ -107,6 +113,11 @@ def detect_format(text: str, hint: str | None = None) -> str:
         return "ass"
     if "dialogue:" in low and "," in head:
         return "ass"
+    # TTML — это XML, и опознаётся по корневому элементу, а не по
+    # расширению: присылают и .ttml, и .dfxp, и просто .xml.
+    if "<tt" in low and "ns/ttml" in low:
+        return "ttml"
+
     if "-->" in head:
         return "vtt" if low.lstrip("﻿").startswith("webvtt") else "srt"
 
