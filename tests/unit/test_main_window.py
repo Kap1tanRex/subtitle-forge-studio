@@ -93,3 +93,43 @@ class TestTitle:
         title = window.windowTitle()
         assert "вместе.ass" in title
         assert clip.name in title
+
+
+class TestEditBar:
+    """Полоса правки под кадром — она же команды меню «Правка»."""
+
+    def test_bar_sits_under_the_frame(self, window) -> None:
+        centre = window.centralWidget().layout()
+        order = [centre.itemAt(i).widget() for i in range(centre.count())]
+        assert order.index(window.edit_bar) > order.index(window.video_pane)
+
+    def test_buttons_are_filled_from_the_registry(self, window) -> None:
+        assert window.edit_bar.keys() == [
+            "edit.insert", "edit.duplicate", "edit.delete", "edit.add_track",
+        ]
+
+    def test_new_line_button_adds_a_line(self, window) -> None:
+        before = len(window._doc.events)
+        window.edit_bar.button("edit.insert").click()
+        assert len(window._doc.events) == before + 1
+
+    def test_new_track_button_adds_a_track(self, window) -> None:
+        before = len(window._doc.tracks.subtitles)
+        window.edit_bar.button("edit.add_track").click()
+        assert len(window._doc.tracks.subtitles) == before + 1
+
+    def test_buttons_carry_their_shortcuts(self, window) -> None:
+        """Подсказка учит сочетанию, а не просто повторяет надпись."""
+        tip = window.edit_bar.button("edit.insert").toolTip()
+        assert "Ctrl" in tip
+
+    def test_captions_are_short(self, window) -> None:
+        """В меню «Новое событие», на кнопке «Реплика»: полоса узкая.
+
+        Сравниваем через ``tr``, а не с русской строкой: подпись переводится,
+        и на английском интерфейсе дословное сравнение развалилось бы.
+        """
+        from sfstudio.app.i18n import tr
+
+        assert window.edit_bar.button("edit.insert").text() == tr('Реплика')
+        assert len(window.edit_bar.button("edit.insert").text()) <= 12

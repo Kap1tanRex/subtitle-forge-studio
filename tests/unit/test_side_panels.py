@@ -87,19 +87,17 @@ class TestNarrowing:
 
 
 class TestEnabling:
-    def test_event_tabs_go_dim_without_a_selection(self, inspector: Inspector) -> None:
-        inspector.set_event(None)
-        assert not inspector.widget_for("event").isEnabled()
+    """Гаснут только вкладки реплики.
+
+    Само гашение проверяется в ``test_inspector.py``; здесь — что оно не
+    задевает соседей.
+    """
 
     def test_other_tabs_keep_working(self, inspector: Inspector, doc) -> None:
         """Оформление и акторы не зависят от того, что выделено."""
         inspector.add_panel("style", "Оформление", QLabel("кузница"))
         inspector.set_event(None)
         assert inspector.widget_for("style").isEnabled()
-
-    def test_selection_lights_the_event_tabs(self, inspector: Inspector, doc) -> None:
-        inspector.set_event(doc.events[0].eid)
-        assert inspector.widget_for("event").isEnabled()
 
     def test_column_itself_stays_usable(self, inspector: Inspector) -> None:
         """Раньше гасла вся колонка — вместе с тем, что от реплики не зависит."""

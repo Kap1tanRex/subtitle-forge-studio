@@ -240,6 +240,23 @@ def build_qss(p: Palette) -> str:
     }}
     QLabel[role="warning"] {{ color: {p.warning}; }}
 
+    /* Полоса правки под кадром. Своим фоном и рамками она отделяется и от
+       кадра сверху, и от таймлайна снизу: иначе кнопки висят в пустоте и
+       непонятно, к чему относятся. */
+    QWidget[role="editbar"] {{
+        background: {p.bg_elevated};
+        border-top: 1px solid {p.border};
+        border-bottom: 1px solid {p.border};
+    }}
+    /* Кнопки на ней прозрачные: иначе каждая рисует общий фон QWidget и
+       выглядит тёмной плашкой на светлой полосе. */
+    QWidget[role="editbar"] QToolButton {{
+        background: transparent;
+        padding: 4px 12px;
+    }}
+    QWidget[role="editbar"] QToolButton:hover {{ background: {p.bg_sunken}; }}
+    QWidget[role="editbar"] QToolButton:pressed {{ background: {p.accent_muted}; }}
+
     QScrollBar:vertical {{ background: {p.bg_base}; width: 12px; margin: 0; }}
     QScrollBar:horizontal {{ background: {p.bg_base}; height: 12px; margin: 0; }}
     QScrollBar::handle {{

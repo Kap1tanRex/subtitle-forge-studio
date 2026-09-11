@@ -43,6 +43,8 @@ class VideoPane(QWidget):
     speed_changed = Signal(float)
     #: (eid, глобальная точка) — правый щелчок по реплике в кадре.
     context_requested = Signal(int, object)
+    #: Список путей, брошенных на кадр.
+    files_dropped = Signal(list)
 
     def __init__(
         self,
@@ -63,6 +65,58 @@ class VideoPane(QWidget):
         self._stack.setContentsMargins(0, 0, 0, 0)
         self._stack.addWidget(self.canvas)
         self.setMinimumSize(160, 90)
+
+        # Перетаскивание: файл уже под курсором в проводнике, и гонять
+        # человека через меню и диалог ради того же самого незачем.
+        self.setAcceptDrops(True)
+        self._drop_hint = ""
+
+    # -- перетаскивание ------------------------------------------------------------ #
+
+    def dragEnterEvent(self, event) -> None:  # noqa: N802
+        """Принимаем только то, что действительно откроем.
+
+        Подсказка считается здесь же: курсор с плюсом говорит «можно
+        бросить», но не говорит, что из этого выйдет, — а видео и субтитры
+        ведут себя совсем по-разному.
+        """
+        paths = _paths_of(event)
+        if not paths:
+            event.ignore()
+            return
+
+        from sfstudio.ui.drop import sort_drop
+
+        sorted_files = sort_drop(paths)
+        if sorted_files.is_empty:
+            event.ignore()
+            return
+
+        self._drop_hint = _hint_for(sorted_files)
+        self.overlay.drop_hint = self._drop_hint
+        self.update()
+        event.acceptProposedAction()
+
+    def dragMoveEvent(self, event) -> None:  # noqa: N802
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event) -> None:  # noqa: N802
+        self._clear_drop_hint()
+        event.accept()
+
+    def dropEvent(self, event) -> None:  # noqa: N802
+        paths = _paths_of(event)
+        self._clear_drop_hint()
+        if not paths:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self.files_dropped.emit(paths)
+
+    def _clear_drop_hint(self) -> None:
+        self._drop_hint = ""
+        self.overlay.drop_hint = ""
+        self.update()
 
     def _connect(self, widget: QWidget) -> None:
         widget.selection_changed.connect(self.selection_changed)
@@ -280,3 +334,31 @@ class VideoPane(QWidget):
             self._player.close()
             self._player = None
         self._has_video = False
+
+
+def _paths_of(event) -> list[Path]:
+    """Локальные пути из перетаскивания. Ссылки из браузера отсеиваются."""
+    data = event.mimeData()
+    if not data.hasUrls():
+        return []
+    paths = []
+    for url in data.urls():
+        local = url.toLocalFile()
+        if local:
+            paths.append(Path(local))
+    return paths
+
+
+def _hint_for(files) -> str:
+    """Подпись на кадре: что именно произойдёт при отпускании."""
+    parts = []
+    if files.project is not None:
+        parts.append(tr('открыть проект «{0}»').format(files.project.name))
+    if files.media is not None:
+        parts.append(tr('открыть видео «{0}»').format(files.media.name))
+    if files.subtitles is not None:
+        parts.append(tr('открыть субтитры «{0}»').format(files.subtitles.name))
+    text = "\n".join(parts)
+    if files.ignored:
+        text += "\n" + tr('остальные {0} — мимо').format(files.ignored)
+    return text

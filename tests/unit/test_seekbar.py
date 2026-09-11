@@ -118,9 +118,14 @@ class TestIcons:
         assert not icon.isNull()
         assert not icon.pixmap(18, 18).isNull()
 
-    def test_icon_is_not_blank(self, qapp: QApplication) -> None:
-        """Пустая картинка прошла бы проверку isNull, но выглядела бы дырой."""
-        image = make_icon("play", "#FFFFFF", 18).pixmap(18, 18).toImage()
+    @pytest.mark.parametrize("name", ICON_NAMES)
+    def test_icon_is_not_blank(self, qapp: QApplication, name: str) -> None:
+        """Пустая картинка прошла бы проверку isNull, но выглядела бы дырой.
+
+        Проверяются все значки: пока смотрели на один, новый мог рисовать
+        пустоту и проходить проверку.
+        """
+        image = make_icon(name, "#FFFFFF", 18).pixmap(18, 18).toImage()
         opaque = sum(
             1
             for y in range(image.height())

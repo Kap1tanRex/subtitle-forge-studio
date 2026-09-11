@@ -84,6 +84,7 @@ from sfstudio.ui.event_menu import (
     plural_events,
     status_submenu,
 )
+from sfstudio.ui.icons import paint_icon
 from sfstudio.ui.safe_text import menu_label, plain_tooltip
 from sfstudio.ui.theme import DARK, Palette
 
@@ -894,9 +895,8 @@ class TimelineWidget(QWidget):
             name_rect = QRectF(10, row.top, HEADER_W - 52, row.height)
             painter.drawText(name_rect, Qt.AlignVCenter | Qt.AlignLeft, track.display_name())
 
-            for glyph, rect in self._header_buttons(row):
-                painter.setPen(QColor(self._palette.text_muted))
-                painter.drawText(rect, Qt.AlignCenter, glyph)
+            for icon, rect in self._header_buttons(row):
+                paint_icon(painter, icon, self._palette.text_muted, rect)
 
             # Хваталка на границе: без неё возможность потянуть высоту
             # существует, но узнать о ней можно только случайно проведя
@@ -910,10 +910,10 @@ class TimelineWidget(QWidget):
 
         # Кнопки в углу над заголовками: слева — новая реплика, справа —
         # новая дорожка. Реплику создают несравнимо чаще, поэтому она первая.
-        painter.setPen(QColor(self._palette.accent))
-        painter.drawText(self._new_event_button_rect(), Qt.AlignCenter, "✎+")
-        painter.setPen(QColor(self._palette.text_muted))
-        painter.drawText(self._add_button_rect(), Qt.AlignCenter, "+")
+        paint_icon(painter, "event_add", self._palette.accent,
+                   self._new_event_button_rect())
+        paint_icon(painter, "track_add", self._palette.text_muted,
+                   self._add_button_rect())
 
         # Кнопка маркера — на своей полосе, слева от неё же: она относится
         # к полосе маркеров, а не к шкале времени, и стоять должна там.
@@ -943,17 +943,25 @@ class TimelineWidget(QWidget):
         return QRectF(HEADER_W - 22, TIME_LANE_H, 18, MARKER_LANE_H)
 
     def _header_buttons(self, row: _Row) -> list[tuple[str, QRectF]]:
-        """Иконки справа в заголовке: видимость и замок (у звука — заглушение)."""
+        """Значки справа в заголовке: видимость и замок (у звука — заглушение).
+
+        Возвращается имя значка, а не символ: эмодзи зависят от шрифта и на
+        чужой машине оборачиваются пустыми прямоугольниками, а значки
+        рисуются кодом и выглядят одинаково везде.
+        """
         track = row.track
         size = 18.0
         top = row.top + (row.height - size) / 2
         if track.kind is TrackKind.AUDIO:
-            return [("🔇" if track.muted else "🔊", QRectF(HEADER_W - 26, top, size, size))]
+            name = "mute" if track.muted else "volume"
+            return [(name, QRectF(HEADER_W - 26, top, size, size))]
         if track.kind is TrackKind.VIDEO:
             return []
         return [
-            ("👁" if track.visible else "—", QRectF(HEADER_W - 48, top, size, size)),
-            ("🔒" if track.locked else "🔓", QRectF(HEADER_W - 26, top, size, size)),
+            ("eye_open" if track.visible else "eye_closed",
+             QRectF(HEADER_W - 48, top, size, size)),
+            ("locked" if track.locked else "unlocked",
+             QRectF(HEADER_W - 26, top, size, size)),
         ]
 
     def _paint_rubber(self, painter: QPainter) -> None:
@@ -1157,13 +1165,13 @@ class TimelineWidget(QWidget):
         row = self._row_at(y)
         if row is None:
             return
-        for glyph, rect in self._header_buttons(row):
+        for icon, rect in self._header_buttons(row):
             if not rect.contains(x, y):
                 continue
             track = row.track
             if track.kind is TrackKind.AUDIO:
                 track.muted = not track.muted
-            elif glyph in ("👁", "—"):
+            elif icon.startswith("eye"):
                 self._undo.run(SetTrackFlags(track.layer, visible=not track.visible))
                 self.document_edited.emit()
             else:

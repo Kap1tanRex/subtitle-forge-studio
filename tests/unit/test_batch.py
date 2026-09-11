@@ -50,6 +50,21 @@ class TestTasks:
         assert doc.events[0].start == 0
         assert doc.events[0].end >= 0
 
+    def test_negative_shift_clamps_the_document_itself(self) -> None:
+        """Через файл этого не проверить: формат и сам не пишет минус.
+
+        ``format_srt`` обрезает отрицательное время до нуля, так что запись и
+        чтение дают ноль даже без зажима в самой задаче — и снятый зажим
+        прошёл бы незамеченным, оставив отрицательное время в документе.
+        """
+        from sfstudio.core.document import SubtitleDocument
+
+        doc = SubtitleDocument.blank()
+        doc.create_event(500, 2000, "Рано")
+        shift(-5000).apply(doc)
+        assert doc.events[0].start == 0
+        assert doc.events[0].end == 0
+
     def test_convert_changes_the_extension(self, folder) -> None:
         results = run_batch(sources(folder), [convert("ass")], output_dir=folder / "out")
         assert all(result.written.suffix == ".ass" for result in results)

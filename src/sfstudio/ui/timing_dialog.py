@@ -34,12 +34,12 @@ from sfstudio.core.time import FpsModel, format_ass
 from sfstudio.media.keyframes import KeyframeIndex
 from sfstudio.services.autotiming import TimingPlan, TimingSettings, build_plan
 
-__all__ = ["AutoTimingDialog", "ShiftTimesDialog"]
+__all__ = ["PREVIEW_ROWS", "AutoTimingDialog", "PreviewTree", "ShiftTimesDialog"]
 
 PREVIEW_ROWS = 40
 
 
-class _PreviewTree(QTreeWidget):
+class PreviewTree(QTreeWidget):
     """Список «было → стало»."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -177,7 +177,7 @@ class AutoTimingDialog(QDialog):
         root.addWidget(options)
 
         root.addWidget(QLabel(tr('Предпросмотр:')))
-        self.preview = _PreviewTree()
+        self.preview = PreviewTree()
         root.addWidget(self.preview, 1)
 
         self.summary = QLabel("")
@@ -299,7 +299,7 @@ class ShiftTimesDialog(QDialog):
         root.addLayout(form)
 
         root.addWidget(QLabel(tr('Предпросмотр:')))
-        self.preview = _PreviewTree()
+        self.preview = PreviewTree()
         root.addWidget(self.preview, 1)
 
         self.summary = QLabel("")

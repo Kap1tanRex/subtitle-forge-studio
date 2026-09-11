@@ -114,6 +114,10 @@ class OverlayController:
         self.show_guides = True
         self.show_safe_area = False
         self.video_mode = False
+        #: Подпись поверх кадра, пока над окном держат файл. Рисуется здесь,
+        #: а не в самой видеопанели: панель — контейнер, и её собственная
+        #: отрисовка оказывается под кадром, который рисует вложенный виджет.
+        self.drop_hint = ""
 
         self._dragging = False
         self._drag_eid: int | None = None
@@ -244,6 +248,9 @@ class OverlayController:
 
         self._paint_hud(painter)
 
+        if self.drop_hint:
+            self._paint_drop_hint(painter)
+
     def _paint_subtitles(self, painter: QPainter, vt: ViewTransform) -> None:
         """Настоящие битмапы libass, наложенные в порядке списка.
 
@@ -331,6 +338,27 @@ class OverlayController:
             else:
                 _, y = vt.script_to_widget(0, guide.value)
                 painter.drawLine(QPointF(video.left, y), QPointF(video.right, y))
+
+    def _paint_drop_hint(self, painter: QPainter) -> None:
+        """Рамка и подпись: что произойдёт, если отпустить файл здесь."""
+        width, height = self._host.overlay_size()
+        area = QRectF(8, 8, width - 16, height - 16)
+        if area.width() <= 0 or area.height() <= 0:
+            return
+
+        painter.fillRect(area, QColor(0, 0, 0, 120))
+        pen = QPen(QColor(255, 255, 255, 220))
+        pen.setWidth(2)
+        pen.setStyle(Qt.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRoundedRect(area, 10, 10)
+
+        font = QFont("Segoe UI")
+        font.setPixelSize(16)
+        painter.setFont(font)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(area, Qt.AlignCenter, self.drop_hint)
 
     def _paint_hud(self, painter: QPainter) -> None:
         info = self._doc.script_info

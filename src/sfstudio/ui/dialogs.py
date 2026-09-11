@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -22,8 +23,35 @@ from PySide6.QtWidgets import (
 from sfstudio.app.i18n import tr
 from sfstudio.io.container import CONTAINER_CODEC, MuxOptions, lossy_warning
 from sfstudio.media.probe import SubtitleTrackInfo
+from sfstudio.ui.icons import make_icon
+from sfstudio.ui.theme import DARK
 
-__all__ = ["MuxDialog", "TrackPickerDialog"]
+
+def warning_row(text: str, palette=DARK) -> QWidget:
+    """Предупреждение: нарисованный знак и текст рядом.
+
+    Знак рисуется, а не ставится символом ``⚠``: символьный вариант зависит
+    от шрифта, и там, где его нет, на месте предупреждения оказывается пустой
+    прямоугольник — то есть заметнее всего пропадает именно то, что важнее
+    всего заметить.
+    """
+    row = QWidget()
+    layout = QHBoxLayout(row)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(8)
+
+    mark = QLabel()
+    mark.setPixmap(make_icon("warning", palette.warning, 18).pixmap(QSize(18, 18)))
+    mark.setAlignment(Qt.AlignTop)
+    layout.addWidget(mark)
+
+    label = QLabel(text)
+    label.setProperty("role", "warning")
+    label.setWordWrap(True)
+    layout.addWidget(label, 1)
+    return row
+
+__all__ = ["MuxDialog", "TrackPickerDialog", "warning_row"]
 
 
 class TrackPickerDialog(QDialog):
@@ -150,10 +178,7 @@ class MuxDialog(QDialog):
 
         warning = lossy_warning(output)
         if warning:
-            note = QLabel("⚠ " + warning)
-            note.setProperty("role", "warning")
-            note.setWordWrap(True)
-            layout.addWidget(note)
+            layout.addWidget(warning_row(warning))
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.Save | QDialogButtonBox.Cancel, parent=self

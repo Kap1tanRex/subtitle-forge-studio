@@ -67,6 +67,7 @@ from sfstudio.services.qc import PROFILES, QcRunner, default_profile
 from sfstudio.services.style_presets import PresetLibrary
 from sfstudio.ui.actions import ActionRegistry
 from sfstudio.ui.detached import DetachedPanel
+from sfstudio.ui.edit_bar import EditBar
 from sfstudio.ui.event_table import (
     COL_ACTOR,
     COL_STYLE,
@@ -129,6 +130,10 @@ class MainWindow(QMainWindow):
         self._reference = None
         #: Глоссарий проекта: как переводить термины и имена.
         self._glossary = None
+
+        #: Частота, под которую сделаны субтитры. Известна только со слов
+        #: человека — в самих файлах субтитров её нет.
+        self._source_fps = None
 
         # Движки распознавания ищут скачанное сами — им нужен только путь.
         from sfstudio.app.storage import data_root
@@ -218,7 +223,7 @@ class MainWindow(QMainWindow):
         # именно у окна, а собирается он в одном месте и только здесь.
         self._palette = palette
 
-        for widget in (self.timeline, self.transport, self.qc_panel,
+        for widget in (self.timeline, self.transport, self.edit_bar, self.qc_panel,
                        self.video_pane.canvas, self.video_pane.overlay, self.model,
                        getattr(self, "style_forge", None)):
             with contextlib.suppress(AttributeError):
@@ -245,6 +250,7 @@ class MainWindow(QMainWindow):
         self.video_pane.status_message.connect(self._show_status)
         self.video_pane.position_changed.connect(self._on_player_position)
         self.video_pane.context_requested.connect(self._on_frame_context)
+        self.video_pane.files_dropped.connect(self.open_dropped)
 
         self.timeline = TimelineWidget(self._doc, self._undo)
         # Назначение говорящего из контекстного меню таймлайна идёт тем же
@@ -257,6 +263,7 @@ class MainWindow(QMainWindow):
         self.timeline.markers_changed.connect(self._on_markers_changed)
 
         self.transport = TransportBar()
+        self.edit_bar = EditBar()
         self.transport.play_pause.connect(self.video_pane.toggle_pause)
         self.transport.step_frame.connect(self.video_pane.frame_step)
         self.transport.seek_edge.connect(self._seek_edge)
@@ -367,6 +374,9 @@ class MainWindow(QMainWindow):
         center_layout.setSpacing(0)
         center_layout.addWidget(self.video_pane, 1)
         center_layout.addWidget(self.transport)
+        # Полоса правки ниже транспорта: она про субтитры, а не про кадр, и
+        # стоять ей ближе к таймлайну, на котором эти субтитры и лежат.
+        center_layout.addWidget(self.edit_bar)
         self.setCentralWidget(center)
         self.setDockNestingEnabled(True)
 
@@ -488,6 +498,9 @@ class MainWindow(QMainWindow):
             shortcut="Ctrl+T", menu=tr('Тайминг'))
         add("timing.shift", tr('Сдвиг таймингов…'), self.open_shift_times,
             shortcut="Ctrl+Shift+T", menu=tr('Тайминг'))
+        add("timing.fps", tr('Коррекция под частоту кадров…'), self.open_fps_sync,
+            menu=tr('Тайминг'),
+            tip=tr('Субтитры равномерно уезжают к концу — их делали под другую частоту'))
         add("timing.align", tr('Выровнять текст по речи…'), self.open_alignment,
             menu=tr('Тайминг'),
             tip=tr('Разложить готовый перевод по речи: тайминги считаются по распознаванию, '
@@ -598,6 +611,7 @@ class MainWindow(QMainWindow):
 
         actions = registry.build(self)
         self._install_menus(registry, actions)
+        self.edit_bar.set_actions(actions)
 
         self.mux_action = actions["file.mux"]
         self.mux_action.setEnabled(False)
@@ -1079,6 +1093,7 @@ class MainWindow(QMainWindow):
         self._settings.push_recent("projects", path)
         self._settings.save()
 
+        self._source_fps = project.fps
         self.set_reference(project.reference, announce=False)
         self._glossary = project.glossary
         self._qc.glossary = self._glossary
@@ -1203,6 +1218,10 @@ class MainWindow(QMainWindow):
             self._project = Project.new(path.stem, self._doc.script_info.play_res)
         self._project.document = self._doc
         self._project.media_path = self._media_path
+        # Частота хранится в проекте, а не в файле субтитров: в ASS и SRT её
+        # негде записать, и без проекта знание о ней теряется при закрытии.
+        if self._source_fps is not None:
+            self._project.fps = self._source_fps
         self._project.state = self._capture_state()
         self._project.reference = self._reference
         self._project.glossary = self._glossary
@@ -1597,17 +1616,58 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, tr('Открыть субтитры'), "", SUBTITLE_FILTER)
         if not path:
             return
+        self.open_subtitle_file(Path(path))
+
+    def open_dropped(self, paths: list) -> None:
+        """Открывает то, что бросили на кадр.
+
+        Порядок важен и обратен привычному. Проект открывается один и сам по
+        себе: он приносит и субтитры, и видео, и остальное рядом с ним только
+        мешало бы. Дальше субтитры, и лишь потом видео — потому что открытие
+        видео сверяет частоту кадров с документом, и делать это надо с тем
+        документом, который человек бросил, а не с предыдущим.
+        """
+        from sfstudio.ui.drop import sort_drop
+
+        files = sort_drop([Path(item) for item in paths])
+        if files.is_empty:
+            self._show_status(tr('Это не видео, не субтитры и не проект'))
+            return
+
+        if files.project is not None:
+            self.open_project_file(files.project)
+            return
+
+        if files.subtitles is not None:
+            self.open_subtitle_file(files.subtitles)
+        if files.media is not None:
+            self.load_media(files.media)
+
+    def open_subtitle_file(self, path: Path) -> None:
+        """Открывает файл субтитров, спросив про несохранённое."""
+        if not self._confirm_discard(tr('Открыть {0}, потеряв правки?').format(path.name)):
+            return
         try:
-            doc = registry.load(Path(path))
+            doc = registry.load(path)
         except Exception as exc:
             QMessageBox.critical(self, tr('Не удалось открыть'), f"{type(exc).__name__}: {exc}")
             return
         self._load_document(doc)
         note = tr('Открыт {0} · {1} событий · '
-               '{2}').format(Path(path).name, len(doc), doc.source_encoding)
+               '{2}').format(path.name, len(doc), doc.source_encoding)
         if doc.script_info.play_res_inferred:
             note += tr(' · PlayRes не задан, подставлен 1920×1080')
         self._show_status(note)
+
+    def _confirm_discard(self, question: str) -> bool:
+        """Спрашивает, если в документе есть несохранённые правки."""
+        if self._undo.is_clean:
+            return True
+        answer = QMessageBox.question(
+            self, tr('Несохранённые изменения'), question,
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        return answer == QMessageBox.Yes
 
     def open_media(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, tr('Открыть видео или аудио'), "", MEDIA_FILTER)
@@ -1673,6 +1733,7 @@ class MainWindow(QMainWindow):
             self._start_keyframes(path, token)
 
         self.timeline.fit_all()
+        self._offer_fps(path, info)
         self._offer_embedded_tracks(path, info)
         size = f"{info.video.display_size[0]}×{info.video.display_size[1]}" if info.video else "—"
         self._show_status(
@@ -1714,6 +1775,112 @@ class MainWindow(QMainWindow):
         task.signals.finished.connect(self._on_keyframes_ready)
         task.signals.failed.connect(self._on_task_failed)
         self._pool.start(task)
+
+    def _known_fps(self):
+        """Частота, под которую сделаны субтитры, — если её кто-то объявлял.
+
+        В самих файлах субтитров её нет: ASS и SRT хранят время, а не кадры.
+        Знание берётся только оттуда, где оно записано, — из проекта или из
+        прошлого ответа человека. ``None`` значит «никто не говорил», и это
+        честнее любой догадки: считать чужой файл сделанным под 25 и на этом
+        основании спрашивать про пересчёт — значит дёргать человека при
+        каждом открытии видео.
+        """
+        if self._source_fps is not None:
+            return self._source_fps
+        if self._project is not None:
+            return self._project.fps
+        return None
+
+    def _project_fps(self):
+        """То же, но с подстановкой 25 там, где выбрать что-то надо.
+
+        Нужно окнам: список частот не может стоять «ни на чём», и 25 —
+        разумное начало, потому что под неё сделано большинство файлов,
+        приходящих со стороны.
+        """
+        from fractions import Fraction
+
+        known = self._known_fps()
+        return known if known is not None else Fraction(25)
+
+    def _offer_fps(self, path: Path, info) -> None:
+        """Сверяет частоту видео с частотой проекта и предлагает решение.
+
+        Спрашиваем, а не чиним молча: пересчёт трогает все реплики, а видео
+        могли открыть просто чтобы посмотреть, что там вообще происходит.
+        """
+        from sfstudio.services.fps_sync import describe_rate
+
+        if info.video is None:
+            return
+
+        video_fps = info.video.fps.rate
+        known = self._known_fps()
+
+        if known is None or not self._doc.events:
+            # Сравнивать не с чем — или нечего пересчитывать. Частоту
+            # запоминаем молча, а о ней самой говорим в строке состояния:
+            # если субтитры всё-таки уезжают, человек будет знать, где
+            # искать, — и это лучше, чем вопрос на пустом месте.
+            self._adopt_fps(video_fps)
+            self._show_status(
+                tr('Частота проекта: {0} (из видео)').format(describe_rate(video_fps))
+            )
+            return
+
+        if video_fps == known:
+            return
+
+        if not bool(self._settings.get("media.ask_fps", True)):
+            return
+
+        from sfstudio.ui.media_offer import FpsOfferDialog
+
+        dialog = FpsOfferDialog(
+            media_name=path.name,
+            video_fps=video_fps,
+            project_fps=known,
+            span_ms=self._doc.duration,
+            events=len(self._doc),
+            parent=self,
+        )
+        dialog.exec()
+        choice = dialog.choice()
+        if choice.is_nothing:
+            return
+
+        if choice.rescale:
+            self._rescale_to_fps(known, video_fps)
+        else:
+            self._adopt_fps(video_fps)
+            self._show_status(
+                tr('Частота проекта: {0} (из видео)').format(describe_rate(video_fps))
+            )
+
+    def _adopt_fps(self, rate) -> None:
+        """Записывает частоту в проект — чтобы разговор не повторялся."""
+        self._source_fps = rate
+        if self._project is not None:
+            self._project.fps = rate
+
+    def _rescale_to_fps(self, source, target) -> None:
+        """Пересчитывает весь документ из одной частоты в другую."""
+        from sfstudio.services.fps_sync import FpsConversion
+
+        conversion = FpsConversion(source, target)
+        mapping = {}
+        for event in self._doc.events:
+            start = conversion.map_ms(event.start)
+            end = max(conversion.map_ms(event.end), start + 1)
+            if (start, end) != (event.start, event.end):
+                mapping[event.eid] = (start, end)
+        if not mapping:
+            self._adopt_fps(target)
+            return
+        self._apply_fps_mapping(
+            mapping, conversion, tr('Коррекция {0}').format(conversion.describe())
+        )
 
     def _offer_embedded_tracks(self, path: Path, info) -> None:
         """Предлагает открыть вшитую дорожку, если она есть.
@@ -2904,6 +3071,38 @@ class MainWindow(QMainWindow):
             return
         self._undo.run(ApplyTimings(mapping, label=dialog.describe()))
         self._show_status(tr('{0} · реплик: {1}').format(dialog.describe(), len(mapping)))
+
+    def open_fps_sync(self) -> None:
+        """Диалог коррекции под частоту кадров."""
+        from sfstudio.ui.fps_dialog import FpsSyncDialog
+
+        if not self._doc.events:
+            self._show_status(tr('Нет реплик — пересчитывать нечего'))
+            return
+
+        dialog = FpsSyncDialog(
+            self._doc,
+            self._timing_selection(),
+            video_fps=self.timeline._fps,
+            source_fps=self._source_fps,
+            parent=self,
+        )
+        if dialog.exec() != FpsSyncDialog.Accepted:
+            return
+        mapping = dialog.mapping()
+        if not mapping:
+            return
+        self._apply_fps_mapping(mapping, dialog.conversion(), dialog.describe())
+
+    def _apply_fps_mapping(self, mapping: dict, conversion, label: str) -> None:
+        """Пересчитывает тайминги и запоминает, из какой частоты пришли.
+
+        Запоминать нужно: следующий такой разговор должен начинаться не с
+        «субтитры сделаны для 25», а с того, что человек уже выбрал.
+        """
+        self._undo.run(ApplyTimings(mapping, label=label))
+        self._adopt_fps(conversion.target)
+        self._show_status(tr('{0} · реплик: {1}').format(label, len(mapping)))
 
     def open_style_presets(self) -> None:
         """Библиотека шаблонов. Применяет выбранное оформление к стилю события."""
