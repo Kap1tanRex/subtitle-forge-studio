@@ -24,7 +24,7 @@ import contextlib
 from collections.abc import Callable
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QOpenGLContext, QPainter, QSurfaceFormat
+from PySide6.QtGui import QOpenGLContext, QPainter
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
 from sfstudio.app.i18n import tr
@@ -33,22 +33,7 @@ from sfstudio.core.undo import UndoStack
 from sfstudio.media.player import MpvPlayer
 from sfstudio.ui.overlay import OverlayController
 
-__all__ = ["VideoWidget", "configure_surface_format"]
-
-
-def configure_surface_format() -> None:
-    """Задаёт формат GL по умолчанию.
-
-    Вызывать **до** создания ``QApplication``: формат подхватывается при
-    создании первого контекста, позже менять уже поздно.
-    """
-    fmt = QSurfaceFormat()
-    fmt.setVersion(3, 3)
-    fmt.setProfile(QSurfaceFormat.CoreProfile)
-    fmt.setDepthBufferSize(0)
-    fmt.setStencilBufferSize(0)
-    fmt.setSwapInterval(1)
-    QSurfaceFormat.setDefaultFormat(fmt)
+__all__ = ["VideoWidget"]
 
 
 class VideoWidget(QOpenGLWidget):

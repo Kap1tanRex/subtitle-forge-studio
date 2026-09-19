@@ -10,7 +10,6 @@ from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
 
 __all__ = [
-    "SetActor",
     "SetMargins",
     "SetNote",
     "SetStatus",
@@ -96,13 +95,6 @@ class SetStyle(_SetField):
 
     def __init__(self, eid: int, style_name: str) -> None:
         super().__init__(eid, style_name, label=tr('Смена стиля'))
-
-
-class SetActor(_SetField):
-    FIELD = "name"
-
-    def __init__(self, eid: int, actor: str) -> None:
-        super().__init__(eid, actor, label=tr('Смена актёра'))
 
 
 class SetNote(_SetField):

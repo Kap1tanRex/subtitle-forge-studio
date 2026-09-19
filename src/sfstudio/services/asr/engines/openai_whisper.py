@@ -16,7 +16,7 @@ from __future__ import annotations
 import time
 
 from sfstudio.app.i18n import tr
-from sfstudio.services.asr.audio import extract_audio
+from sfstudio.services.asr.audio import audio_for
 from sfstudio.services.asr.base import (
     CancelToken,
     EngineInfo,
@@ -86,13 +86,7 @@ class OpenAiWhisperEngine:
 
         if progress is not None:
             progress(0.1, tr('чтение звука'))
-        chunk = extract_audio(
-            request.media,
-            start_ms=request.start_ms,
-            end_ms=request.end_ms,
-            stream_index=request.audio_stream,
-            cancel=cancel,
-        )
+        chunk = audio_for(request, cancel)
         if len(chunk.samples) == 0:  # type: ignore[arg-type]
             return RecognitionResult(engine=self.key, model=name)
 

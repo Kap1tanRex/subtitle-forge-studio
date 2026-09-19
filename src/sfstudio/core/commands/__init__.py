@@ -17,11 +17,9 @@ from sfstudio.core.commands.marker_cmds import (
 )
 from sfstudio.core.commands.position import (
     ClearPosition,
-    SetAlignment,
     SetOverrideTag,
     SetOverrideTags,
     SetPosition,
-    SetRotation,
 )
 from sfstudio.core.commands.structure import (
     DeleteEvents,
@@ -33,12 +31,9 @@ from sfstudio.core.commands.structure import (
 from sfstudio.core.commands.style_cmds import (
     ApplyStyleToEvents,
     CreateStyle,
-    DeleteStyle,
-    RenameStyle,
     UpdateStyle,
 )
 from sfstudio.core.commands.text import (
-    SetActor,
     SetMargins,
     SetNote,
     SetStatus,
@@ -75,7 +70,6 @@ __all__ = [
     "CompositeCommand",
     "CreateStyle",
     "DeleteEvents",
-    "DeleteStyle",
     "DuplicateEvents",
     "InsertEvent",
     "LinearSync",
@@ -86,15 +80,11 @@ __all__ = [
     "RemoveMarker",
     "RemoveTrack",
     "RenameActor",
-    "RenameStyle",
-    "SetActor",
-    "SetAlignment",
     "SetMargins",
     "SetNote",
     "SetOverrideTag",
     "SetOverrideTags",
     "SetPosition",
-    "SetRotation",
     "SetStatus",
     "SetStyle",
     "SetText",

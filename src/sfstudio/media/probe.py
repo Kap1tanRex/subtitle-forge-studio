@@ -25,7 +25,6 @@ __all__ = [
     "SubtitleTrackInfo",
     "VideoStreamInfo",
     "probe",
-    "pyav_available",
 ]
 
 #: Кодеки субтитров, которые являются картинками, а не текстом.
@@ -42,14 +41,6 @@ TEXT_SUBTITLE_CODECS = frozenset(
 
 class MediaProbeError(RuntimeError):
     """Файл не удалось прочитать как медиа."""
-
-
-def pyav_available() -> bool:
-    try:
-        import av  # noqa: F401
-    except (ImportError, OSError):
-        return False
-    return True
 
 
 @dataclass(frozen=True, slots=True)

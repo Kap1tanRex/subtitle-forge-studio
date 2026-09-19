@@ -13,7 +13,7 @@ from sfstudio.app.i18n import tr
 
 __all__ = [
     "ACCENTS", "BUILTIN", "CONTRAST", "DARK", "LIGHT", "SEPIA", "THEMES", "Palette",
-    "build_qss", "is_dark", "mix", "palette_by_name", "repolish", "with_accent",
+    "build_qss", "is_dark", "mix", "repolish", "with_accent",
 ]
 
 
@@ -410,15 +410,6 @@ THEMES: dict[str, str] = {
 BUILTIN: dict[str, Palette] = {
     "dark": DARK, "light": LIGHT, "sepia": SEPIA, "contrast": CONTRAST,
 }
-
-
-def palette_by_name(name: str | None) -> Palette:
-    """Палитра встроенной темы по имени. Незнакомое имя — тёмная.
-
-    Незнакомое имя означает либо конфиг от будущей версии, либо правку
-    руками: в обоих случаях запуск с обычной темой лучше отказа.
-    """
-    return BUILTIN.get(str(name or "").strip().lower(), DARK)
 
 
 # --------------------------------------------------------------------------- #

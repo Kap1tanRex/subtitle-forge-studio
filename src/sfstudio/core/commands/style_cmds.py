@@ -10,7 +10,7 @@ from sfstudio.core.commands.base import Command
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.style import SubtitleStyle
 
-__all__ = ["ApplyStyleToEvents", "CreateStyle", "DeleteStyle", "RenameStyle", "UpdateStyle"]
+__all__ = ["ApplyStyleToEvents", "CreateStyle", "UpdateStyle"]
 
 
 class UpdateStyle(Command):
@@ -85,73 +85,6 @@ class CreateStyle(Command):
         doc.styles.pop(self.style.name, None)
         doc.bump_revision()
         return ChangeSet(styles_changed=True)
-
-
-class DeleteStyle(Command):
-    """Удаляет стиль, переназначая ссылающиеся события.
-
-    Просто убрать стиль нельзя: события продолжат на него ссылаться, и рендер
-    молча свалится на ``Default``. Поэтому события переводятся на явно
-    указанный стиль, и это же поведение отменяется целиком.
-    """
-
-    __slots__ = ("_moved", "_removed", "fallback", "label", "name")
-
-    def __init__(self, name: str, fallback: str = "Default") -> None:
-        self.name = name
-        self.fallback = fallback
-        self._removed: SubtitleStyle | None = None
-        self._moved: list[int] = []
-        self.label = tr('Удалить стиль «{0}»').format(name)
-
-    def apply(self, doc: SubtitleDocument) -> ChangeSet:
-        self._removed = replace(doc.styles[self.name]) if self.name in doc.styles else None
-        doc.styles.pop(self.name, None)
-        self._moved = [e.eid for e in doc.events if e.style == self.name]
-        for eid in self._moved:
-            doc.by_eid(eid).style = self.fallback
-        doc.bump_revision()
-        return ChangeSet(changed_eids=frozenset(self._moved), styles_changed=True)
-
-    def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        if self._removed is not None:
-            doc.styles[self.name] = replace(self._removed)
-        for eid in self._moved:
-            doc.by_eid(eid).style = self.name
-        doc.bump_revision()
-        return ChangeSet(changed_eids=frozenset(self._moved), styles_changed=True)
-
-
-class RenameStyle(Command):
-    """Переименовывает стиль и переводит на него ссылающиеся события."""
-
-    __slots__ = ("_moved", "label", "new_name", "old_name")
-
-    def __init__(self, old_name: str, new_name: str) -> None:
-        self.old_name = old_name
-        self.new_name = new_name
-        self._moved: list[int] = []
-        self.label = tr('Переименовать стиль в «{0}»').format(new_name)
-
-    def apply(self, doc: SubtitleDocument) -> ChangeSet:
-        style = doc.styles.pop(self.old_name, None)
-        if style is None:
-            return ChangeSet.EMPTY
-        doc.styles[self.new_name] = replace(style, name=self.new_name)
-        self._moved = [e.eid for e in doc.events if e.style == self.old_name]
-        for eid in self._moved:
-            doc.by_eid(eid).style = self.new_name
-        doc.bump_revision()
-        return ChangeSet(changed_eids=frozenset(self._moved), styles_changed=True)
-
-    def revert(self, doc: SubtitleDocument) -> ChangeSet:
-        style = doc.styles.pop(self.new_name, None)
-        if style is not None:
-            doc.styles[self.old_name] = replace(style, name=self.old_name)
-        for eid in self._moved:
-            doc.by_eid(eid).style = self.old_name
-        doc.bump_revision()
-        return ChangeSet(changed_eids=frozenset(self._moved), styles_changed=True)
 
 
 class ApplyStyleToEvents(Command):

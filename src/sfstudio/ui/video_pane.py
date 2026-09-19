@@ -296,14 +296,6 @@ class VideoPane(QWidget):
         self.overlay.show_safe_area = on
         self._current().update()
 
-    @property
-    def time_ms(self) -> int:
-        return self.overlay.time_ms
-
-    @property
-    def backend(self) -> str:
-        return self.overlay.backend
-
     def update(self) -> None:
         """Перерисовывает кадр, а не только пустую рамку вокруг него.
 

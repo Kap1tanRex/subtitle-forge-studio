@@ -29,9 +29,7 @@ __all__ = [
     "FfmpegNotFoundError",
     "ffmpeg_available",
     "find_ffmpeg",
-    "find_ffprobe",
     "run_ffmpeg",
-    "version_of",
 ]
 
 #: На Windows подпроцесс не должен мигать консольным окном.
@@ -61,28 +59,8 @@ def find_ffmpeg() -> Path | None:
     return _locate("ffmpeg")
 
 
-def find_ffprobe() -> Path | None:
-    return _locate("ffprobe")
-
-
 def ffmpeg_available() -> bool:
     return find_ffmpeg() is not None
-
-
-def version_of(path: Path | None = None) -> str:
-    """Первая строка ``ffmpeg -version`` или пояснение, почему её нет."""
-    binary = path or find_ffmpeg()
-    if binary is None:
-        return tr('не найден')
-    try:
-        result = subprocess.run(
-            [str(binary), "-version"],
-            capture_output=True, text=True, timeout=15,
-            creationflags=_NO_WINDOW,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        return tr('не запускается: {0}').format(exc)
-    return result.stdout.splitlines()[0] if result.stdout else tr('неизвестно')
 
 
 @dataclass(frozen=True, slots=True)

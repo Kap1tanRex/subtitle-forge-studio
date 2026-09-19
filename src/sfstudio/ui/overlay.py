@@ -33,7 +33,7 @@ from sfstudio.render import geometry as geo
 from sfstudio.render.geometry import Handle, Rect, Size, ViewTransform
 from sfstudio.ui.theme import DARK, Palette
 
-__all__ = ["OverlayController", "OverlayHost"]
+__all__ = ["OverlayController", "OverlayHost", "blit_layers"]
 
 try:
     from sfstudio.render.renderer import LibassMeasurer, LibassRenderer
@@ -87,6 +87,30 @@ def _ratio(current: float, start: float) -> float:
     if abs(start) < _MIN_RESIZE_ARM:
         return 1.0
     return current / start
+
+
+def blit_layers(painter: QPainter, layers, dx: float = 0.0, dy: float = 0.0) -> None:
+    """Кладёт слои libass на painter со смещением ``(dx, dy)``.
+
+    Слой libass — 8-битная альфа-маска одного цвета, а не готовая картинка:
+    её приходится подкрашивать через ``SourceIn``. Делается это одинаково в
+    кадре, в кузнице оформления и в библиотеке шаблонов, поэтому живёт здесь.
+    """
+    for layer in layers:
+        if layer.w <= 0 or layer.h <= 0:
+            continue
+        r, g, b, a = layer.rgba
+        if a == 0:
+            continue
+        mask = QImage(layer.data, layer.w, layer.h, layer.stride, QImage.Format_Alpha8)
+        tinted = QImage(layer.w, layer.h, QImage.Format_ARGB32_Premultiplied)
+        tinted.fill(0)
+        inner = QPainter(tinted)
+        inner.drawImage(0, 0, mask)
+        inner.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        inner.fillRect(tinted.rect(), QColor(r, g, b, a))
+        inner.end()
+        painter.drawImage(QPointF(dx + layer.x, dy + layer.y), tinted)
 
 
 class OverlayController:
@@ -273,21 +297,7 @@ class OverlayController:
 
         painter.save()
         painter.setClipRect(_qrect(rect))
-        for layer in layers:
-            if layer.w <= 0 or layer.h <= 0:
-                continue
-            r, g, b, a = layer.rgba
-            if a == 0:
-                continue
-            mask = QImage(layer.data, layer.w, layer.h, layer.stride, QImage.Format_Alpha8)
-            tinted = QImage(layer.w, layer.h, QImage.Format_ARGB32_Premultiplied)
-            tinted.fill(0)
-            inner = QPainter(tinted)
-            inner.drawImage(0, 0, mask)
-            inner.setCompositionMode(QPainter.CompositionMode_SourceIn)
-            inner.fillRect(tinted.rect(), QColor(r, g, b, a))
-            inner.end()
-            painter.drawImage(QPointF(rect.x + layer.x, rect.y + layer.y), tinted)
+        blit_layers(painter, layers, rect.x, rect.y)
         painter.restore()
 
     def _paint_safe_area(self, painter: QPainter, vt: ViewTransform) -> None:

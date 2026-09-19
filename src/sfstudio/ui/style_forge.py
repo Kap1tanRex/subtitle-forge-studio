@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -57,6 +57,7 @@ from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.style import ALIGNMENT_NAMES, BorderStyle, SubtitleStyle
 from sfstudio.io.formats.ass import format_style_line
 from sfstudio.ui.font_box import FontComboBox
+from sfstudio.ui.overlay import blit_layers
 from sfstudio.ui.theme import DARK, Palette
 
 __all__ = ["AlignmentPad", "PresetCards", "PreviewBackground", "StyleForge"]
@@ -326,23 +327,7 @@ class _Preview(QWidget):
             painter.end()
             return
 
-        for layer in layers:
-            if layer.w <= 0 or layer.h <= 0:
-                continue
-            r, g, b, a = layer.rgba
-            if a == 0:
-                continue
-            mask = QImage(
-                layer.data, layer.w, layer.h, layer.stride, QImage.Format_Alpha8
-            )
-            tinted = QImage(layer.w, layer.h, QImage.Format_ARGB32_Premultiplied)
-            tinted.fill(0)
-            inner = QPainter(tinted)
-            inner.drawImage(0, 0, mask)
-            inner.setCompositionMode(QPainter.CompositionMode_SourceIn)
-            inner.fillRect(tinted.rect(), QColor(r, g, b, a))
-            inner.end()
-            painter.drawImage(layer.x, layer.y, tinted)
+        blit_layers(painter, layers)
         painter.end()
 
     def _paint_background(self, painter: QPainter, rect) -> None:

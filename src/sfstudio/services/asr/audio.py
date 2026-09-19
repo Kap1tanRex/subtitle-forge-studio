@@ -29,7 +29,7 @@ from sfstudio.services.asr.base import (
     RecognitionError,
 )
 
-__all__ = ["SAMPLE_RATE", "AudioChunk", "extract_audio", "write_wav"]
+__all__ = ["SAMPLE_RATE", "AudioChunk", "audio_for", "extract_audio", "write_wav"]
 
 #: Частота, которую ждут модели Whisper и совместимые. Ресемплинг к ней —
 #: не оптимизация, а требование: на другой частоте модель выдаёт мусор.
@@ -189,3 +189,14 @@ def write_wav(chunk: AudioChunk, path: Path) -> Path:
         handle.setframerate(chunk.sample_rate)
         handle.writeframes(pcm.tobytes())
     return path
+
+
+def audio_for(request, cancel=None) -> AudioChunk:
+    """Звук для запроса распознавания: все три движка просят одно и то же."""
+    return extract_audio(
+        request.media,
+        start_ms=request.start_ms,
+        end_ms=request.end_ms,
+        stream_index=request.audio_stream,
+        cancel=cancel,
+    )

@@ -20,7 +20,6 @@ __all__ = [
     "FpsModel",
     "SnapMode",
     "format_ass",
-    "format_smpte",
     "format_srt",
     "format_vtt",
     "parse_timecode",
@@ -155,14 +154,6 @@ def format_vtt(ms: int) -> str:
     """``HH:MM:SS.mmm``."""
     h, m, s, msec = _split(ms)
     return f"{h:02d}:{m:02d}:{s:02d}.{msec:03d}"
-
-
-def format_smpte(ms: int, fps: FpsModel) -> str:
-    """``HH:MM:SS:FF`` — для отображения в полях таймкода."""
-    h, m, s, msec = _split(ms)
-    frame = int(msec * float(fps.rate) / 1000.0)
-    sep = ";" if fps.drop_frame else ":"
-    return f"{h:02d}:{m:02d}:{s:02d}{sep}{frame:02d}"
 
 
 def round_for_ass(start_ms: int, end_ms: int) -> tuple[int, int]:
