@@ -91,6 +91,25 @@ DEV_UNUSED = [
     "sqlite3", "pydoc_data", "lib2to3", "shiboken6_generator",
 ]
 
+# Тяжёлое, что попадает в сборку лишь потому, что стоит в том же Python:
+# torch с его CUDA (4 ГБ) тянут необязательные импорты transformers и
+# huggingface, numba/llvmlite и sklearn — чужие проекты в общем окружении.
+# Программа их не импортирует: распознавание идёт через ctranslate2.
+# Без этого списка бинарник вырос с 0,2 до 3,4 ГБ.
+FOREIGN = [
+    "torch", "torchaudio", "torchvision", "transformers", "numba", "llvmlite",
+    "sklearn", "librosa", "resemblyzer", "webrtcvad", "tensorflow", "keras",
+]
+
+#: Библиотеки видеокарты, которые в exe не кладём. onnxruntime в GPU-сборке
+#: тянет свои провайдеры CUDA и TensorRT, а они — cuBLAS 13 из CUDA Toolkit
+#: (полгигабайта). onnxruntime нужен только детектору речи на процессоре;
+#: cuBLAS для ctranslate2 кладётся рядом с программой, в папку «cuda».
+#: cuDNN не трогаем: ctranslate2 держит его у себя и грузит для видеокарты.
+GPU_BINARIES = (
+    "onnxruntime_providers_cuda", "onnxruntime_providers_tensorrt", "cublas",
+)
+
 a = Analysis(
     [str(SPEC_DIR / "entry.py")],
     pathex=[str(SRC)],
@@ -102,10 +121,15 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=QT_UNUSED + DEV_UNUSED,
+    excludes=QT_UNUSED + DEV_UNUSED + FOREIGN,
     noarchive=False,
     optimize=0,
 )
+
+a.binaries = [
+    entry for entry in a.binaries
+    if not any(part in Path(entry[0]).name.lower() for part in GPU_BINARIES)
+]
 
 pyz = PYZ(a.pure)
 
