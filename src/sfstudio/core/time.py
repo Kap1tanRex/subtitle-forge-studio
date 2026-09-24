@@ -20,6 +20,7 @@ __all__ = [
     "FpsModel",
     "SnapMode",
     "format_ass",
+    "format_short",
     "format_srt",
     "format_vtt",
     "parse_timecode",
@@ -148,6 +149,17 @@ def format_srt(ms: int) -> str:
     """``HH:MM:SS,mmm``."""
     h, m, s, msec = _split(ms)
     return f"{h:02d}:{m:02d}:{s:02d},{msec:03d}"
+
+
+def format_short(ms: int) -> str:
+    """``MM:SS,mmm`` — для списков, где часы почти всегда нули.
+
+    Часы появляются, только когда они есть: ``1:02:03,400``. Колонка времени
+    в узкой таблице иначе на треть состояла бы из «00:».
+    """
+    h, m, s, msec = _split(ms)
+    head = f"{h:d}:{m:02d}" if h else f"{m:02d}"
+    return f"{head}:{s:02d},{msec:03d}"
 
 
 def format_vtt(ms: int) -> str:

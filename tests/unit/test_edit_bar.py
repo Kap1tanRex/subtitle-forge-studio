@@ -1,4 +1,4 @@
-"""Полоса правки под кадром: кнопки, их размер и связь с действиями."""
+"""Шапка списка реплик: поиск, кнопки, их размер и связь с действиями."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ import pytest
 pytest.importorskip("PySide6", reason="нужен PySide6")
 
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QApplication, QFrame, QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
-from sfstudio.ui.edit_bar import BUTTON_H, EditBar
+from sfstudio.ui.edit_bar import BAR_H, EditBar
 
 pytestmark = pytest.mark.needs_gui
 
-KEYS = ("edit.insert", "edit.duplicate", "edit.delete", "edit.add_track")
+KEYS = ("edit.insert", "edit.duplicate", "edit.delete")
 
 
 def _widgets(bar: EditBar) -> int:
@@ -57,7 +57,7 @@ def bar(qapp: QApplication, actions: dict[str, QAction]) -> EditBar:
 
 
 class TestComposition:
-    def test_all_four_commands_are_there(self, bar: EditBar) -> None:
+    def test_all_three_commands_are_there(self, bar: EditBar) -> None:
         assert bar.keys() == list(KEYS)
 
     def test_missing_commands_are_skipped(self, qapp, actions) -> None:
@@ -81,44 +81,44 @@ class TestComposition:
         bar.set_actions(actions)
         assert _widgets(bar) == before
 
-    def test_tracks_are_separated_from_events(self, bar: EditBar) -> None:
-        """Дорожка — про другое, и стоять ей за чертой."""
-        lines = [
-            index for index in range(bar.layout().count())
-            if isinstance(bar.layout().itemAt(index).widget(), QFrame)
-        ]
-        assert len(lines) == 1
-
-    def test_separator_does_not_lead_the_row(self, qapp, actions) -> None:
-        """Если реплик в полосе нет, черта в начале — мусор."""
+    def test_new_track_lives_on_the_timeline(self, qapp, actions, host) -> None:
+        """Дорожка — про таймлайн, и кнопка её там, а не в шапке списка."""
         widget = EditBar()
-        widget.set_actions({"edit.add_track": actions["edit.add_track"]})
-        first = widget.layout().itemAt(0).widget()
-        assert not isinstance(first, QFrame)
+        widget.set_actions({**actions, "edit.add_track": QAction("t", host)})
+        assert widget.button("edit.add_track") is None
+
+
+class TestSearch:
+    def test_enter_asks_to_search(self, bar: EditBar) -> None:
+        asked = []
+        bar.search_requested.connect(asked.append)
+        bar.search.setText("маяк")
+        bar.search.returnPressed.emit()
+        assert asked == ["маяк"]
+
+    def test_search_comes_first(self, bar: EditBar) -> None:
+        """Поиск слева и растягивается: место в узкой колонке — ему."""
+        assert bar.layout().itemAt(0).widget() is bar.search
 
 
 class TestHitArea:
     """Мимо кнопки промахиваться не должно."""
 
     @pytest.mark.parametrize("key", KEYS)
-    def test_button_is_tall_enough(self, bar: EditBar, key: str) -> None:
-        assert bar.button(key).height() >= BUTTON_H
+    def test_button_is_big_enough(self, bar: EditBar, key: str) -> None:
+        assert bar.button(key).height() >= 28
+        assert bar.button(key).width() >= 28
 
-    @pytest.mark.parametrize("key", KEYS)
-    def test_button_is_wide_enough(self, bar: EditBar, key: str) -> None:
-        """Подпись рядом со значком — кнопка выходит заведомо широкой."""
-        assert bar.button(key).width() >= 80
-
-    @pytest.mark.parametrize("key", KEYS)
-    def test_button_is_captioned_by_the_bar(self, bar, actions, key: str) -> None:
-        """Подпись своя, короткая — а не полное название команды из меню.
-
-        Без неё кнопка берёт заголовок действия: «Новое событие» вместо
-        «Реплика», и четыре такие подписи растягивают полосу.
-        """
-        caption = bar.button(key).text().strip()
+    def test_main_button_is_captioned_by_the_bar(self, bar, actions) -> None:
+        """Подпись своя, короткая — «Реплика», а не «Новое событие» из меню."""
+        caption = bar.button("edit.insert").text().strip()
         assert caption
-        assert caption != actions[key].text()
+        assert caption != actions["edit.insert"].text()
+
+    @pytest.mark.parametrize("key", ("edit.duplicate", "edit.delete"))
+    def test_rare_buttons_are_icons_with_a_name(self, bar, key: str) -> None:
+        """Без подписи на экране — но с именем для экранного диктора."""
+        assert bar.button(key).accessibleName()
 
     @pytest.mark.parametrize("key", KEYS)
     def test_button_has_an_icon(self, bar: EditBar, key: str) -> None:
@@ -144,7 +144,7 @@ class TestActions:
         assert "Ctrl+Return" in widget.button("edit.insert").toolTip()
 
     def test_tip_without_a_shortcut_is_just_the_name(self, bar) -> None:
-        assert bar.button("edit.add_track").toolTip() == "edit.add_track"
+        assert bar.button("edit.delete").toolTip() == "edit.delete"
 
 
 class TestTheme:
@@ -165,5 +165,6 @@ class TestTheme:
         """Без этого свойства правило темы до полосы не доходит."""
         from PySide6.QtCore import Qt
 
-        assert bar.property("role") == "editbar"
+        assert bar.property("role") == "toolhead"
+        assert bar.height() == BAR_H
         assert bar.testAttribute(Qt.WA_StyledBackground)

@@ -22,6 +22,7 @@ from __future__ import annotations
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QSizePolicy,
@@ -44,7 +45,8 @@ __all__ = ["SPEED_PRESETS", "TransportBar"]
 #: паузу между сценами; между ними значения, которыми реально пользуются.
 SPEED_PRESETS: tuple[float, ...] = (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 4.0)
 
-BUTTON_SIZE = 30
+BUTTON_SIZE = 32
+PLAY_SIZE = 38
 
 
 def _format_speed(value: float) -> str:
@@ -69,99 +71,136 @@ class TransportBar(QWidget):
         # Пока идёт программное обновление, сигналы виджетов игнорируются:
         # иначе выставление скорости из плеера тут же отправило бы её обратно.
         self._syncing = False
+        self._paused = True
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(10, 4, 10, 6)
-        outer.setSpacing(2)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
+        # Полоса перемотки — своей полосой над кнопками, во всю ширину:
+        # по ней ищут место, и чем она длиннее, тем точнее попадание.
+        strip = QWidget()
+        strip.setProperty("role", "seekstrip")
+        strip.setAttribute(Qt.WA_StyledBackground, True)
+        strip_row = QHBoxLayout(strip)
+        strip_row.setContentsMargins(16, 0, 16, 0)
         self.seek = SeekBar(palette)
         self.seek.seek_requested.connect(self.seek_requested)
-        outer.addWidget(self.seek)
+        strip_row.addWidget(self.seek)
+        outer.addWidget(strip)
 
-        row = QHBoxLayout()
-        row.setSpacing(3)
+        bar = QWidget()
+        bar.setProperty("role", "bar")
+        bar.setAttribute(Qt.WA_StyledBackground, True)
+        bar.setFixedHeight(48)
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(16, 0, 12, 0)
+        row.setSpacing(12)
 
+        # Слева — время, справа — звук и скорость, кнопки ровно посередине:
+        # у крайних блоков равный вес, иначе середина уезжала бы вслед за
+        # длиной таймкода.
+        self.time_label = QLabel("00:00:00,000")
+        self.time_label.setProperty("role", "timecode")
+        self.time_label.setToolTip(tr('Текущее положение'))
+        self.total_label = QLabel("/ 00:00:00,000")
+        self.total_label.setProperty("role", "hint")
+        self.total_label.setToolTip(tr('Длительность'))
+        left = QHBoxLayout()
+        left.setSpacing(6)
+        left.addWidget(self.time_label)
+        left.addWidget(self.total_label)
+        left.addStretch(1)
+        row.addLayout(left, 1)
+
+        buttons = QHBoxLayout()
+        buttons.setSpacing(4)
         self.btn_start = self._button("start", tr('В начало'),
                                       lambda: self.seek_edge.emit(False))
         self.btn_prev = self._button("prev_frame", tr('Кадр назад (←)'),
                                      lambda: self.step_frame.emit(False))
         self.btn_play = self._button("play", tr('Играть / Пауза (Пробел)'),
                                      self.play_pause.emit)
+        # Главная кнопка крупнее и залита акцентом: её ищут глазами чаще
+        # всех остальных вместе взятых.
+        self.btn_play.setFixedSize(PLAY_SIZE, PLAY_SIZE)
+        self.btn_play.setProperty("role", "play")
         self.btn_next = self._button("next_frame", tr('Кадр вперёд (→)'),
                                      lambda: self.step_frame.emit(True))
         self.btn_end = self._button("end", tr('В конец'), lambda: self.seek_edge.emit(True))
-
         for button in (self.btn_start, self.btn_prev, self.btn_play,
                        self.btn_next, self.btn_end):
-            row.addWidget(button)
+            buttons.addWidget(button)
 
-        row.addSpacing(6)
+        divider = QFrame()
+        divider.setFixedSize(1, 20)
+        divider.setProperty("role", "divider")
+        buttons.addSpacing(4)
+        buttons.addWidget(divider)
+        buttons.addSpacing(4)
         self.btn_loop = self._button("loop", tr('Зациклить текущую реплику'), None)
         self.btn_loop.setCheckable(True)
         self.btn_loop.toggled.connect(self._on_loop)
-        row.addWidget(self.btn_loop)
+        buttons.addWidget(self.btn_loop)
+        row.addLayout(buttons)
 
-        row.addSpacing(12)
-
-        self.time_label = QLabel("00:00:00,000")
-        self.time_label.setProperty("role", "timecode")
-        self.time_label.setToolTip(tr('Текущее положение'))
-        row.addWidget(self.time_label)
-
-        self.total_label = QLabel("/ 00:00:00,000")
-        self.total_label.setProperty("role", "hint")
-        self.total_label.setToolTip(tr('Длительность'))
-        row.addWidget(self.total_label)
-
-        row.addStretch(1)
-
-        # -- громкость ---------------------------------------------------- #
-        self.btn_mute = self._button("volume", tr('Заглушить (M)'), None)
-        self.btn_mute.setCheckable(True)
-        self.btn_mute.toggled.connect(self._on_mute)
-        row.addWidget(self.btn_mute)
-
-        self.volume_slider = QSlider(Qt.Horizontal)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(80)
-        self.volume_slider.setFixedWidth(96)
-        self.volume_slider.setToolTip(tr('Громкость'))
-        self.volume_slider.valueChanged.connect(self._on_volume)
-        row.addWidget(self.volume_slider)
-
-        self.volume_label = QLabel("80 %")
-        self.volume_label.setProperty("role", "hint")
-        self.volume_label.setFixedWidth(38)
-        row.addWidget(self.volume_label)
-
-        row.addSpacing(10)
-
-        speed_caption = QLabel(tr('Скорость'))
-        speed_caption.setProperty("role", "hint")
-        row.addWidget(speed_caption)
-
+        right = QHBoxLayout()
+        right.setSpacing(10)
+        right.addStretch(1)
         self.speed_box = QComboBox()
         for value in SPEED_PRESETS:
             self.speed_box.addItem(_format_speed(value), value)
         self.speed_box.setCurrentIndex(SPEED_PRESETS.index(1.0))
         self.speed_box.setToolTip(tr('Скорость воспроизведения ([ и ])'))
+        self.speed_box.setAccessibleName(tr('Скорость'))
         self.speed_box.currentIndexChanged.connect(self._on_speed)
         self.speed_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        row.addWidget(self.speed_box)
+        right.addWidget(self.speed_box)
 
-        outer.addLayout(row)
+        self.btn_mute = self._button("volume", tr('Заглушить (M)'), None)
+        self.btn_mute.setCheckable(True)
+        self.btn_mute.toggled.connect(self._on_mute)
+        right.addWidget(self.btn_mute)
+
+        self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(80)
+        self.volume_slider.setFixedWidth(72)
+        self.volume_slider.setToolTip(tr('Громкость'))
+        self.volume_slider.valueChanged.connect(self._on_volume)
+        right.addWidget(self.volume_slider)
+
+        self.volume_label = QLabel("80 %")
+        self.volume_label.setProperty("role", "kbd")
+        self.volume_label.setFixedWidth(38)
+        right.addWidget(self.volume_label)
+        row.addLayout(right, 1)
+        outer.addWidget(bar)
 
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.set_enabled_transport(False)
 
-
     def set_palette(self, palette: Palette) -> None:
-        """Меняет тему на лету — см. :meth:`TimelineWidget.set_palette`."""
+        """Меняет тему на лету: значки запечены в пиксели и перекрашиваются."""
         self._palette = palette
+        for button in (self.btn_start, self.btn_prev, self.btn_next, self.btn_end):
+            button.setIcon(make_icon(button.property("transport_icon"), palette.text_primary))
+        self._paint_loop_icon()
+        self.set_paused(self._paused)
+        self._paint_mute_icon()
+        self.seek.set_palette(palette)
         self.update()
+
+    def _paint_loop_icon(self) -> None:
+        on = self.btn_loop.isChecked()
+        self.btn_loop.setIcon(make_icon(
+            "loop", self._palette.accent_text if on else self._palette.text_primary
+        ))
 
     def _button(self, icon: str, tip: str, slot) -> QToolButton:
         button = QToolButton()
+        button.setProperty("transport_icon", icon)
+        button.setAccessibleName(tip)
         button.setIcon(make_icon(icon, self._palette.text_primary))
         button.setIconSize(QSize(18, 18))
         button.setFixedSize(BUTTON_SIZE, BUTTON_SIZE)
@@ -176,8 +215,9 @@ class TransportBar(QWidget):
 
     def set_paused(self, paused: bool) -> None:
         """Обновляет вид кнопки. Ничего не переключает — только отражает."""
+        self._paused = paused
         self.btn_play.setIcon(
-            make_icon("play" if paused else "pause", self._palette.text_primary)
+            make_icon("play" if paused else "pause", self._palette.on_accent)
         )
         self.btn_play.setToolTip(tr('Играть (Пробел)') if paused else tr('Пауза (Пробел)'))
 
@@ -278,6 +318,7 @@ class TransportBar(QWidget):
             self.speed_selected.emit(float(value))
 
     def _on_loop(self, on: bool) -> None:
+        self._paint_loop_icon()
         if not self._syncing:
             self.loop_toggled.emit(on)
 

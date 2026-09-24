@@ -139,11 +139,16 @@ class TestFields:
         assert result.alignment == 8
         assert result.border_style == BorderStyle.OPAQUE_BOX
 
-    def test_slider_and_field_stay_together(self, forge: StyleForge) -> None:
-        forge.size_slider.setValue(64)
-        assert forge.size_spin.value() == 64
-        forge.size_spin.setValue(30)
-        assert forge.size_slider.value() == 30
+    def test_new_fields_reach_the_style(self, forge: StyleForge) -> None:
+        """Зачёркивание, разрядка, масштаб и угол — из прежних вкладок
+        «Формат» и «Кадр»; теперь они здесь и уходят в стиль."""
+        forge.strike_check.setChecked(True)
+        forge.spacing_spin.setValue(2.5)
+        forge.scale_x_spin.setValue(90)
+        forge.angle_spin.setValue(15)
+        result = forge.style()
+        assert result.strikeout
+        assert (result.spacing, result.scale_x, result.angle) == (2.5, 90, 15)
 
     def test_style_name_is_not_lost(self, forge: StyleForge) -> None:
         """Имя стиля — то, на что ссылаются реплики; менять его тут нечего."""
@@ -226,21 +231,38 @@ class TestResponsiveLayout:
 
 
 class TestApplying:
-    def test_apply_to_all_is_announced(self, forge: StyleForge) -> None:
+    """«Применить к»: выделенным репликам или стилю целиком."""
+
+    def test_selection_decides_the_target(self, forge: StyleForge) -> None:
+        """Выделили реплики — правим их, сняли выделение — правим стиль."""
+        forge.set_target(3, "Default")
+        assert not forge.applies_to_style()
+        assert "3" in forge.target.button(0).text()
+        forge.set_target(0, "Default")
+        assert forge.applies_to_style()
+
+    def test_selection_is_unavailable_without_one(self, forge: StyleForge) -> None:
+        forge.set_target(0, "Default")
+        assert not forge.target.button(0).isEnabled()
+
+    def test_switching_is_announced(self, forge: StyleForge) -> None:
+        forge.set_target(2, "Default")
         seen = []
-        forge.apply_requested.connect(lambda _style, to_all: seen.append(to_all))
-        forge.apply_all_button.click()
+        forge.target_changed.connect(seen.append)
+        forge.target.button(1).click()
         assert seen == [True]
 
-    def test_apply_to_selection_is_announced(self, forge: StyleForge) -> None:
-        seen = []
-        forge.apply_requested.connect(lambda _style, to_all: seen.append(to_all))
-        forge.apply_selected_button.click()
-        assert seen == [False]
+    def test_position_belongs_to_the_cue(self, forge: StyleForge) -> None:
+        """У стиля ручного положения нет — поля гаснут."""
+        forge.set_target(0, "Default")
+        assert not forge.pos_x.isEnabled()
+        forge.set_target(1, "Default")
+        assert forge.pos_x.isEnabled()
 
-    def test_applied_style_carries_the_fields(self, forge: StyleForge) -> None:
-        forge.size_spin.setValue(64)
+    def test_clearing_the_position_is_announced(self, forge: StyleForge) -> None:
+        forge.set_target(1, "Default")
+        forge.set_position((100, 200))
         seen = []
-        forge.apply_requested.connect(lambda style, _to_all: seen.append(style))
-        forge.apply_all_button.click()
-        assert seen[0].fontsize == 64
+        forge.position_changed.connect(seen.append)
+        forge.clear_pos_button.click()
+        assert seen == [None]

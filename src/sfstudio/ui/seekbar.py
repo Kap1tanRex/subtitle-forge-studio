@@ -26,14 +26,14 @@ from sfstudio.ui.theme import DARK, Palette
 
 __all__ = ["SeekBar"]
 
-BAR_H = 6.0
+BAR_H = 8.0
 KNOB_R = 7.0
-MARK_H = 3.0
-#: Зазор между отметками и полосой. Без него отметки читаются как продолжение
-#: самой полосы — проверено на глаз, вплотную они сливаются.
-MARK_GAP = 4.0
-#: Высота виджета: полоса, ручка и место под отметки реплик.
-WIDGET_H = 30
+#: Отметки реплик — короткие засечки внутри самой полосы, как в макете:
+#: над полосой они отнимали высоту и читались отдельной строкой.
+MARK_W = 2.0
+MARK_H = 4.0
+#: Высота виджета: полоса по центру и место под ручку.
+WIDGET_H = 28
 
 
 class SeekBar(QWidget):
@@ -102,8 +102,7 @@ class SeekBar(QWidget):
 
     def _track_rect(self) -> QRectF:
         margin = KNOB_R + 1
-        # Полоса смещена вниз: сверху остаётся место под отметки реплик.
-        top = self.height() - BAR_H - KNOB_R + 2
+        top = (self.height() - BAR_H) / 2
         return QRectF(margin, top, max(1.0, self.width() - margin * 2), BAR_H)
 
     def _x_of(self, ms: int) -> float:
@@ -129,24 +128,26 @@ class SeekBar(QWidget):
         radius = BAR_H / 2
 
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(self._palette.bg_sunken))
+        painter.setBrush(QColor(self._palette.bg_raised))
         painter.drawRoundedRect(track, radius, radius)
 
-        self._paint_marks(painter, track)
-
+        # Пройденное — приглушённым акцентом: засечки реплик поверх него
+        # должны оставаться видны, а яркая заливка их гасила.
         if self._duration_ms > 0:
             played = QRectF(track)
             played.setRight(self._x_of(self._position_ms))
-            painter.setBrush(QColor(self._palette.accent))
+            painter.setBrush(QColor(self._palette.accent_muted))
             painter.drawRoundedRect(played, radius, radius)
+
+        self._paint_marks(painter, track)
 
         # Ручка. Рисуется всегда, в том числе при нулевой длительности:
         # пустая полоса без ручки читается как «сломано», а не «нет файла».
         knob_x = self._x_of(self._position_ms)
         knob_y = track.center().y()
-        painter.setBrush(QColor(self._palette.text_primary))
-        painter.setPen(QPen(QColor(self._palette.bg_base), 1))
-        painter.drawEllipse(QPointF(knob_x, knob_y), KNOB_R, KNOB_R)
+        painter.setBrush(QColor(self._palette.bg_field))
+        painter.setPen(QPen(QColor(self._palette.accent), 2))
+        painter.drawEllipse(QPointF(knob_x, knob_y), KNOB_R - 1, KNOB_R - 1)
 
         if self._hover_x is not None and self._duration_ms > 0:
             self._paint_hover(painter, track)
@@ -157,23 +158,27 @@ class SeekBar(QWidget):
         """Тонкие штрихи там, где есть реплики."""
         if not self._marks or self._duration_ms <= 0:
             return
-        # Приглушённый серый, а не оттенок синего: синим залита проигранная
-        # часть полосы, и вторым синим отметки сливались бы с ней.
+        # Приглушённый серый, а не оттенок акцента: акцентом залита
+        # проигранная часть полосы, и отметки сливались бы с ней.
         color = QColor(self._palette.text_muted)
-        color.setAlpha(150)
+        color.setAlpha(140)
         painter.setBrush(color)
         painter.setPen(Qt.NoPen)
-        top = track.top() - MARK_GAP - MARK_H
-        for start, end in self._marks:
-            x0 = self._x_of(start)
-            x1 = self._x_of(end)
-            painter.drawRect(QRectF(x0, top, max(1.0, x1 - x0), MARK_H))
+        top = track.top() + (BAR_H - MARK_H) / 2
+        last = -10.0
+        for start, _end in self._marks:
+            x = self._x_of(start)
+            # Засечки ближе трёх пикселей сливаются в полосу — одной хватит.
+            if x - last < 3:
+                continue
+            last = x
+            painter.drawRoundedRect(QRectF(x, top, MARK_W, MARK_H), 1, 1)
 
     def _paint_hover(self, painter: QPainter, track: QRectF) -> None:
         painter.setPen(QPen(QColor(self._palette.text_muted), 1))
         painter.drawLine(
-            QPointF(self._hover_x, track.top() - MARK_GAP - MARK_H),
-            QPointF(self._hover_x, track.bottom() + 2),
+            QPointF(self._hover_x, track.top() - 3),
+            QPointF(self._hover_x, track.bottom() + 3),
         )
 
     # -- ввод ------------------------------------------------------------------------ #

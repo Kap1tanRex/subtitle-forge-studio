@@ -30,20 +30,19 @@ from __future__ import annotations
 from dataclasses import replace
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
-    QLabel,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSizePolicy,
-    QSlider,
     QSpinBox,
     QSplitter,
     QToolButton,
@@ -59,6 +58,7 @@ from sfstudio.io.formats.ass import format_style_line
 from sfstudio.ui.font_box import FontComboBox
 from sfstudio.ui.overlay import blit_layers
 from sfstudio.ui.theme import DARK, Palette
+from sfstudio.ui.widgets import Segmented, caption, hbox, kbd_button, label, section
 
 __all__ = ["AlignmentPad", "PresetCards", "PreviewBackground", "StyleForge"]
 
@@ -143,7 +143,7 @@ class PresetCards(QWidget):
     chosen = Signal(str)
 
     #: Наименьшая ширина карточки, при которой название ещё умещается.
-    CARD_W = 168
+    CARD_W = 190
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -169,7 +169,8 @@ class PresetCards(QWidget):
             button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             button.setIcon(_dot_icon(style.primary))
             button.setIconSize(QSize(12, 12))
-            button.setMinimumHeight(30)
+            button.setMinimumHeight(28)
+            button.setProperty("role", "chip")
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             button.clicked.connect(lambda _c, name=preset.name: self.chosen.emit(name))
             self._buttons.append(button)
@@ -262,7 +263,7 @@ class _Preview(QWidget):
         self._doc = SubtitleDocument.blank((1920, 1080))
         self._doc.create_event(0, 10_000, PREVIEW_TEXT)
         self._renderer = None
-        self.setMinimumHeight(200)
+        self.setMinimumHeight(110)
         self._init_renderer()
         self.set_style(SubtitleStyle())
 
@@ -300,7 +301,7 @@ class _Preview(QWidget):
             self.update()
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(480, 270)
+        return QSize(427, 150)
 
     def paintEvent(self, _event) -> None:  # noqa: N802
         painter = QPainter(self)
@@ -351,12 +352,15 @@ class _Preview(QWidget):
 
 
 class StyleForge(QWidget):
-    """Настройка стиля с живым кадром."""
+    """Настройка оформления с живым кадром."""
 
-    #: Стиль изменился — вызывающий решает, куда его применить.
+    #: Оформление изменилось — окно применяет его туда, куда смотрит
+    #: переключатель «Применить к».
     style_changed = Signal(object)
-    #: Нажали «Применить»: стиль и признак «ко всем, а не к выделенным».
-    apply_requested = Signal(object, bool)
+    #: Переключили «Применить к»: ``True`` — к стилю, ``False`` — к выделенным.
+    target_changed = Signal(bool)
+    #: Ручное положение реплики: ``(x, y)`` или ``None`` — убрать.
+    position_changed = Signal(object)
 
     def __init__(
         self,
@@ -371,74 +375,76 @@ class StyleForge(QWidget):
         self._font_chosen = False
         #: Раздали ли место между настройками и кадром. См. ``_share_space``.
         self._space_shared = False
+        #: Сколько реплик выделено — от этого зависит, куда пойдёт правка.
+        self._selected = 0
         self._style = replace(style) if style is not None else SubtitleStyle()
+        self.setProperty("scrolls", True)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
         root.addWidget(self._header())
 
-        # Сплиттер, а не жёсткая раскладка: во вкладке инспектора кадр нужен
+        # Сплиттер, а не жёсткая раскладка: во вкладке колонки кадр нужен
         # сверху, в отдельном окне — сбоку, и границу между ними человек
         # двигает сам.
         self._splitter = QSplitter(Qt.Vertical)
-        self._splitter.addWidget(self._controls())
         self._splitter.addWidget(self._preview_side())
-        # Настройкам места больше: их много и они мелкие, а кадр читается и
-        # в половинном размере. Поровну делить нельзя — в узкой колонке
-        # половина настроек уходила под прокрутку сразу при открытии.
-        self._splitter.setStretchFactor(0, 3)
-        self._splitter.setStretchFactor(1, 2)
+        self._splitter.addWidget(self._controls())
+        self._splitter.setStretchFactor(0, 1)
+        self._splitter.setStretchFactor(1, 4)
+        self._splitter.setCollapsible(1, False)
         root.addWidget(self._splitter, 1)
 
         self._syncing = False
         self.set_style(self._style)
+        self.set_target(0, self._style.name)
 
     # -- построение --------------------------------------------------------------- #
 
     def _header(self) -> QWidget:
+        """«Применить к»: выделенным репликам или стилю целиком.
+
+        Разные операции по сути. Выделенным — правка ложится тегами в текст
+        реплик, стиль не трогается. Стилю — меняется именованный стиль, а с
+        ним все реплики на нём.
+        """
         box = QWidget()
-        row = QHBoxLayout(box)
-        row.setContentsMargins(8, 6, 8, 6)
-
-        title = QLabel(tr('Оформление'))
-        font = QFont(title.font())
-        font.setBold(True)
-        title.setFont(font)
-        row.addWidget(title)
-        row.addStretch(1)
-
-        self.apply_selected_button = QPushButton(tr('К выделенным'))
-        self.apply_selected_button.setToolTip(
-            tr('Присвоить этот стиль выделенным репликам')
-        )
-        self.apply_selected_button.clicked.connect(
-            lambda: self.apply_requested.emit(self.style(), False)
-        )
-        row.addWidget(self.apply_selected_button)
-
-        self.apply_all_button = QPushButton(tr('Ко всем репликам'))
-        self.apply_all_button.setToolTip(tr('Переписать стиль всего документа'))
-        self.apply_all_button.clicked.connect(
-            lambda: self.apply_requested.emit(self.style(), True)
-        )
-        row.addWidget(self.apply_all_button)
+        column = QVBoxLayout(box)
+        column.setContentsMargins(16, 12, 16, 8)
+        column.setSpacing(6)
+        self.target = Segmented(["", ""])
+        self.target.changed.connect(self._on_target)
+        column.addLayout(hbox(label(tr('Применить к'), "hint"), self.target, spacing=10))
+        self.target_hint = label("", "hint")
+        self.target_hint.setWordWrap(True)
+        column.addWidget(self.target_hint)
         return box
 
     def _controls(self) -> QWidget:
         inner = QWidget()
         column = QVBoxLayout(inner)
-        column.setContentsMargins(8, 4, 8, 8)
-        column.setSpacing(10)
+        column.setContentsMargins(16, 8, 16, 12)
+        column.setSpacing(14)
         column.addWidget(self._presets_group())
         column.addWidget(self._typography_group())
         column.addWidget(self._colors_group())
         column.addWidget(self._placement_group())
+
+        # Строка ``Style:`` — как она уйдёт в файл. Кто правит ASS руками,
+        # сверит её глазами; кто не правит — не заметит.
+        self.line = QPlainTextEdit()
+        self.line.setReadOnly(True)
+        self.line.setFixedHeight(52)
+        self.line.setToolTip(tr('Строка, которая уйдёт в секцию [V4+ Styles]'))
+        self.line.setProperty("role", "styleline")
+        column.addWidget(self.line)
         column.addStretch(1)
 
         area = QScrollArea()
         area.setWidgetResizable(True)
         area.setFrameShape(QFrame.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         area.setWidget(inner)
         return area
 
@@ -448,68 +454,91 @@ class StyleForge(QWidget):
         box = QWidget()
         column = QVBoxLayout(box)
         column.setContentsMargins(0, 0, 0, 0)
-        column.setSpacing(6)
-
-        label = QLabel(title.upper())
-        label.setProperty("role", "hint")
-        font = QFont(label.font())
-        font.setBold(True)
-        label.setFont(font)
-        column.addWidget(label)
+        column.setSpacing(8)
+        column.addWidget(section(title))
         return box, column
 
     def _presets_group(self) -> QWidget:
-        box, column = self._section(tr('Готовый набор'))
         self.presets = PresetCards()
         self.presets.chosen.connect(self._apply_preset)
-        column.addWidget(self.presets)
-        return box
+        return self.presets
 
     def _typography_group(self) -> QWidget:
-        box, column = self._section(tr('Шрифт и начертание'))
+        box, column = self._section(tr('Шрифт'))
 
         self.font_box = FontComboBox()
+        self.font_box.setAccessibleName(tr('Гарнитура'))
+        # Список шрифтов по умолчанию широк, как самое длинное имя в системе,
+        # и растягивал всю вкладку за край колонки.
+        self.font_box.setMinimumContentsLength(8)
+        self.font_box.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.font_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.font_box.currentFontChanged.connect(self._on_font_chosen)
-        column.addWidget(self.font_box)
-
-        size_row = QHBoxLayout()
-        self.size_slider = QSlider(Qt.Horizontal)
-        self.size_slider.setRange(8, 200)
-        self.size_slider.valueChanged.connect(self._on_size_slider)
-        size_row.addWidget(self.size_slider, 1)
         self.size_spin = QSpinBox()
-        self.size_spin.setRange(8, 200)
-        self.size_spin.setSuffix(" px")
-        # Ширину задаём явно: в колонке шириной в треть экрана поле иначе
-        # растягивается и уезжает за край вместе со стрелками.
-        self.size_spin.setFixedWidth(86)
-        self.size_spin.valueChanged.connect(self._on_size_spin)
-        size_row.addWidget(self.size_spin)
-        column.addLayout(size_row)
+        self.size_spin.setRange(8, 400)
+        self.size_spin.setPrefix(tr('Кегль') + "  ")
+        self.size_spin.setAccessibleName(tr('Кегль'))
+        self.size_spin.setFixedWidth(110)
+        self.size_spin.valueChanged.connect(self._on_change)
+        column.addLayout(hbox(self.font_box, self.size_spin, spacing=8))
 
-        face_row = QHBoxLayout()
-        self.bold_check = QToolButton()
-        self.bold_check.setText(tr('Ж'))
-        self.italic_check = QToolButton()
-        self.italic_check.setText(tr('К'))
-        self.underline_check = QToolButton()
-        self.underline_check.setText(tr('Ч'))
-        for button, tip in (
-            (self.bold_check, tr('Полужирный')),
-            (self.italic_check, tr('Курсив')),
-            (self.underline_check, tr('Подчёркнутый')),
-        ):
-            button.setCheckable(True)
-            button.setToolTip(tip)
-            button.setMinimumWidth(38)
-            button.toggled.connect(self._on_change)
-            face_row.addWidget(button)
-        face_row.addStretch(1)
-        column.addLayout(face_row)
+        faces = QFrame()
+        faces.setProperty("role", "segment")
+        faces.setFixedHeight(30)
+        faces_row = QHBoxLayout(faces)
+        faces_row.setContentsMargins(2, 2, 2, 2)
+        faces_row.setSpacing(2)
+        self.bold_check = self._face(tr('Ж'), tr('Полужирный'), "font-weight: 700;")
+        self.italic_check = self._face(tr('К'), tr('Курсив'), "font-style: italic;")
+        self.underline_check = self._face(tr('Ч'), tr('Подчёркнутый'),
+                                          "text-decoration: underline;")
+        self.strike_check = self._face(tr('З'), tr('Зачёркнутый'),
+                                       "text-decoration: line-through;")
+        for button in (self.bold_check, self.italic_check,
+                       self.underline_check, self.strike_check):
+            faces_row.addWidget(button)
+
+        self.spacing_spin = self._number(-50.0, 50.0, 0.5, 1, tr('Разрядка'))
+        self.scale_x_spin = self._number(1.0, 1000.0, 5.0, 0, tr('Масштаб X'))
+        self.scale_y_spin = self._number(1.0, 1000.0, 5.0, 0, "Y")
+        column.addLayout(hbox(faces, None, spacing=6))
+        numbers = QGridLayout()
+        numbers.setSpacing(6)
+        for index, spin in enumerate((self.spacing_spin, self.scale_x_spin,
+                                      self.scale_y_spin)):
+            spin.setMinimumWidth(60)
+            numbers.addWidget(spin, 0, index)
+            numbers.setColumnStretch(index, 1)
+        column.addLayout(numbers)
         return box
 
+    def _face(self, text: str, tip: str, css: str) -> QToolButton:
+        button = QToolButton()
+        button.setText(text)
+        button.setToolTip(tip)
+        button.setAccessibleName(tip)
+        button.setCheckable(True)
+        button.setProperty("role", "seg")
+        button.setFixedWidth(30)
+        # Буква сама показывает, что делает кнопка: жирная, курсив, черта.
+        button.setStyleSheet(f"font-family: Georgia, serif; font-size: 14px; {css}")
+        button.toggled.connect(self._on_change)
+        return button
+
+    def _number(self, low: float, high: float, step: float, decimals: int,
+                title: str) -> QDoubleSpinBox:
+        spin = QDoubleSpinBox()
+        spin.setRange(low, high)
+        spin.setSingleStep(step)
+        spin.setDecimals(decimals)
+        spin.setPrefix(title + " ")
+        spin.setAccessibleName(title)
+        spin.setButtonSymbols(QDoubleSpinBox.NoButtons)
+        spin.valueChanged.connect(self._on_change)
+        return spin
+
     def _colors_group(self) -> QWidget:
-        box, column = self._section(tr('Цвет, обводка и тень'))
+        box, column = self._section(tr('Цвет'))
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
@@ -517,22 +546,20 @@ class StyleForge(QWidget):
         self.primary_swatch = _Swatch(RGBA(255, 255, 255))
         self.outline_swatch = _Swatch(RGBA(0, 0, 0))
         self.shadow_swatch = _Swatch(RGBA(0, 0, 0, 180))
-        for column_index, (title, swatch) in enumerate((
-            (tr('Основной'), self.primary_swatch),
-            (tr('Обводка'), self.outline_swatch),
-            (tr('Тень'), self.shadow_swatch),
+        self.outline_spin = self._thickness(tr('Толщина обводки'))
+        self.shadow_spin = self._thickness(tr('Глубина тени'))
+        for index, (title, swatch, extra) in enumerate((
+            (tr('Текст'), self.primary_swatch, None),
+            (tr('Обводка'), self.outline_swatch, self.outline_spin),
+            (tr('Тень'), self.shadow_swatch, self.shadow_spin),
         )):
-            caption = QLabel(title)
-            caption.setProperty("role", "hint")
-            grid.addWidget(caption, 0, column_index)
+            grid.addWidget(caption(title), 0, index)
             swatch.changed.connect(self._on_change)
-            grid.addWidget(swatch, 1, column_index)
+            grid.addWidget(swatch, 1, index)
+            if extra is not None:
+                grid.addWidget(extra, 2, index)
+            grid.setColumnStretch(index, 1)
         column.addLayout(grid)
-
-        self.outline_spin = self._thickness_row(
-            column, tr('Толщина обводки'), 0.0, 20.0, 0.5
-        )
-        self.shadow_spin = self._thickness_row(column, tr('Глубина тени'), 0.0, 20.0, 0.5)
 
         self.box_check = QCheckBox(tr('Плашка вместо обводки'))
         self.box_check.setToolTip(
@@ -542,98 +569,81 @@ class StyleForge(QWidget):
         column.addWidget(self.box_check)
         return box
 
-    def _thickness_row(
-        self, column: QVBoxLayout, title: str, low: float, high: float, step: float
-    ) -> QDoubleSpinBox:
-        row = QHBoxLayout()
-        caption = QLabel(title)
-        caption.setProperty("role", "hint")
-        caption.setMinimumWidth(120)
-        row.addWidget(caption)
-
+    def _thickness(self, title: str) -> QDoubleSpinBox:
         spin = QDoubleSpinBox()
-        spin.setRange(low, high)
-        spin.setSingleStep(step)
+        spin.setRange(0.0, 20.0)
+        spin.setSingleStep(0.5)
         spin.setDecimals(1)
         spin.setSuffix(" px")
+        spin.setToolTip(title)
+        spin.setAccessibleName(title)
         spin.valueChanged.connect(self._on_change)
-        row.addWidget(spin)
-        row.addStretch(1)
-        column.addLayout(row)
         return spin
 
     def _placement_group(self) -> QWidget:
-        box, column = self._section(tr('Положение в кадре'))
+        box, column = self._section(tr('Положение'))
 
-        row = QHBoxLayout()
         self.pad = AlignmentPad()
         self.pad.changed.connect(self._on_change)
-        row.addWidget(self.pad)
 
-        margins = QGridLayout()
-        margins.setHorizontalSpacing(6)
-        self.margin_l = self._margin_spin()
-        self.margin_r = self._margin_spin()
-        self.margin_v = self._margin_spin()
-        for index, (title, spin) in enumerate((
-            (tr('Слева'), self.margin_l),
-            (tr('Справа'), self.margin_r),
-            (tr('По верт.'), self.margin_v),
-        )):
-            caption = QLabel(title)
-            caption.setProperty("role", "hint")
-            margins.addWidget(caption, 0, index)
-            margins.addWidget(spin, 1, index)
-        row.addLayout(margins, 1)
-        column.addLayout(row)
+        self.pos_x = self._coordinate("X")
+        self.pos_y = self._coordinate("Y")
+        self.angle_spin = self._number(-360.0, 360.0, 1.0, 1, tr('Угол'))
+        self.angle_spin.setSuffix("°")
+        self.margin_l = self._margin_spin(tr('Поле Л'))
+        self.margin_r = self._margin_spin(tr('П'))
+        self.margin_v = self._margin_spin(tr('В'))
+        self.clear_pos_button = kbd_button(tr('Убрать ручное положение'), "Ctrl+Shift+P")
+        self.clear_pos_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.clear_pos_button.clicked.connect(lambda: self.position_changed.emit(None))
+
+        numbers = QGridLayout()
+        numbers.setSpacing(6)
+        for index, widget in enumerate((self.pos_x, self.pos_y, self.angle_spin,
+                                        self.margin_l, self.margin_r, self.margin_v)):
+            widget.setMinimumWidth(50)
+            numbers.addWidget(widget, index // 3, index % 3)
+        numbers.addWidget(self.clear_pos_button, 2, 0, 1, 3)
+        column.addLayout(hbox(self.pad, numbers, spacing=14))
         return box
 
-    def _margin_spin(self) -> QSpinBox:
+    def _coordinate(self, title: str) -> QSpinBox:
+        spin = QSpinBox()
+        spin.setRange(-10000, 10000)
+        spin.setPrefix(title + " ")
+        spin.setAccessibleName(tr('Положение {0}').format(title))
+        spin.setButtonSymbols(QSpinBox.NoButtons)
+        spin.setToolTip(tr('Ручное положение реплики — тег \\pos'))
+        spin.editingFinished.connect(self._on_position)
+        return spin
+
+    def _margin_spin(self, title: str) -> QSpinBox:
         spin = QSpinBox()
         spin.setRange(0, 2000)
         spin.setSingleStep(5)
-        spin.setMaximumWidth(96)
+        spin.setPrefix(title + " ")
+        spin.setAccessibleName(title)
+        spin.setButtonSymbols(QSpinBox.NoButtons)
         spin.valueChanged.connect(self._on_change)
         return spin
 
     def _preview_side(self) -> QWidget:
         box = QWidget()
         column = QVBoxLayout(box)
-        column.setContentsMargins(8, 4, 8, 8)
+        column.setContentsMargins(16, 0, 16, 8)
         column.setSpacing(6)
-
-        head = QHBoxLayout()
-        caption = QLabel(tr('ПРЕДПРОСМОТР'))
-        caption.setProperty("role", "hint")
-        font = QFont(caption.font())
-        font.setBold(True)
-        caption.setFont(font)
-        head.addWidget(caption)
-        head.addStretch(1)
-
-        self.background_group = QButtonGroup(self)
-        self.background_group.setExclusive(True)
-        for key, title in PreviewBackground.TITLES:
-            button = QToolButton()
-            button.setText(title)
-            button.setCheckable(True)
-            button.setChecked(key == PreviewBackground.GRADIENT)
-            button.clicked.connect(lambda _c, k=key: self.preview.set_background(k))
-            self.background_group.addButton(button)
-            head.addWidget(button)
-        column.addLayout(head)
 
         self.preview = _Preview(self._palette)
         column.addWidget(self.preview, 1)
 
-        self.line = QPlainTextEdit()
-        self.line.setReadOnly(True)
-        self.line.setFixedHeight(58)
-        self.line.setToolTip(tr('Строка, которая уйдёт в секцию [V4+ Styles]'))
-        font = QFont("Consolas")
-        font.setPixelSize(11)
-        self.line.setFont(font)
-        column.addWidget(self.line)
+        # Фон под кадром — сегментами под ним: белую обводку не видно на
+        # светлом, чёрную — на тёмном, и проверять надо на всех.
+        self.background = Segmented([title for _key, title in PreviewBackground.TITLES])
+        self.background.setToolTip(tr('Фон предпросмотра'))
+        keys = [key for key, _title in PreviewBackground.TITLES]
+        self.background.set_index(keys.index(PreviewBackground.GRADIENT))
+        self.background.changed.connect(lambda i: self.preview.set_background(keys[i]))
+        column.addWidget(self.background)
         return box
 
     # -- обмен значениями ---------------------------------------------------------- #
@@ -658,6 +668,11 @@ class StyleForge(QWidget):
             bold=self.bold_check.isChecked(),
             italic=self.italic_check.isChecked(),
             underline=self.underline_check.isChecked(),
+            strikeout=self.strike_check.isChecked(),
+            spacing=self.spacing_spin.value(),
+            scale_x=self.scale_x_spin.value(),
+            scale_y=self.scale_y_spin.value(),
+            angle=self.angle_spin.value(),
             outline=self.outline_spin.value(),
             shadow=self.shadow_spin.value(),
             border_style=(
@@ -678,13 +693,17 @@ class StyleForge(QWidget):
             self._style = replace(style)
             self.font_box.set_family(style.fontname)
             self.size_spin.setValue(round(style.fontsize))
-            self.size_slider.setValue(round(style.fontsize))
             self.primary_swatch.set_colour(style.primary)
             self.outline_swatch.set_colour(style.outline_color)
             self.shadow_swatch.set_colour(style.back_color)
             self.bold_check.setChecked(style.bold)
             self.italic_check.setChecked(style.italic)
             self.underline_check.setChecked(style.underline)
+            self.strike_check.setChecked(style.strikeout)
+            self.spacing_spin.setValue(style.spacing)
+            self.scale_x_spin.setValue(style.scale_x)
+            self.scale_y_spin.setValue(style.scale_y)
+            self.angle_spin.setValue(style.angle)
             self.outline_spin.setValue(style.outline)
             self.shadow_spin.setValue(style.shadow)
             self.box_check.setChecked(style.border_style == BorderStyle.OPAQUE_BOX)
@@ -695,6 +714,43 @@ class StyleForge(QWidget):
         finally:
             self._syncing = False
         self._refresh()
+
+    def set_target(self, selected: int, style_name: str) -> None:
+        """Сколько выделено и как зовётся стиль — подписи «Применить к».
+
+        Положение переключателя следует за выделением: выделили реплики —
+        правим их, сняли выделение — правим стиль. Так было и до
+        переключателя, и переучивать никого не нужно.
+        """
+        self._selected = selected
+        self.target.set_text(0, tr('Выделенным · {0}').format(selected))
+        self.target.set_text(1, tr('Стилю {0}').format(style_name or "Default"))
+        self.target.button(0).setEnabled(selected > 0)
+        self.target.set_index(0 if selected else 1)
+        self._show_target()
+
+    def applies_to_style(self) -> bool:
+        """Куда пойдёт правка: ``True`` — в стиль, ``False`` — выделенным."""
+        return self.target.index() != 0
+
+    def set_position(self, position: tuple[float, float] | None) -> None:
+        """Ручное положение выделенной реплики, если оно задано."""
+        for spin, value in ((self.pos_x, position[0] if position else 0),
+                            (self.pos_y, position[1] if position else 0)):
+            spin.blockSignals(True)
+            spin.setValue(int(value))
+            spin.blockSignals(False)
+        self.clear_pos_button.setEnabled(position is not None and not self.applies_to_style())
+
+    def _show_target(self) -> None:
+        to_style = self.applies_to_style()
+        self.target_hint.setText(
+            tr('Меняется стиль — а с ним все реплики на нём') if to_style
+            else tr('Правки пишутся тегами в текст реплики, стиль не меняется')
+        )
+        # Ручное положение бывает только у реплики, у стиля его нет.
+        for widget in (self.pos_x, self.pos_y):
+            widget.setEnabled(not to_style)
 
     def set_palette(self, palette: Palette) -> None:
         self._palette = palette
@@ -710,6 +766,14 @@ class StyleForge(QWidget):
 
     # -- реакции ------------------------------------------------------------------- #
 
+    def _on_target(self, _index: int) -> None:
+        self._show_target()
+        self.target_changed.emit(self.applies_to_style())
+
+    def _on_position(self) -> None:
+        if not self._syncing and not self.applies_to_style():
+            self.position_changed.emit((self.pos_x.value(), self.pos_y.value()))
+
     def _on_change(self, *_args) -> None:
         if self._syncing:
             return
@@ -721,22 +785,6 @@ class StyleForge(QWidget):
         if self._syncing:
             return
         self._font_chosen = True
-        self._on_change()
-
-    def _on_size_slider(self, value: int) -> None:
-        if self._syncing:
-            return
-        self._syncing = True
-        self.size_spin.setValue(value)
-        self._syncing = False
-        self._on_change()
-
-    def _on_size_spin(self, value: int) -> None:
-        if self._syncing:
-            return
-        self._syncing = True
-        self.size_slider.setValue(value)
-        self._syncing = False
         self._on_change()
 
     def _apply_preset(self, name: str) -> None:
@@ -756,7 +804,7 @@ class StyleForge(QWidget):
         self.line.setPlainText(format_style_line(style))
 
     def resizeEvent(self, event) -> None:  # noqa: N802
-        """Узко — кадр под настройками, широко — рядом.
+        """Узко — кадр над настройками, широко — рядом.
 
         Порог в 900 пикселей: при меньшей ширине два столбца дают колонку
         настроек в 300 пикселей, где подписи начинают переноситься по слогам.
@@ -770,18 +818,17 @@ class StyleForge(QWidget):
             self._share_space()
 
     def _share_space(self) -> None:
-        """Делит место между настройками и кадром: три к двум.
+        """Делит место между кадром и настройками.
 
         Коэффициенты растяжения тут не работают — они управляют только тем,
         как расходится **добавленное** место, а первичную раскладку Qt берёт
-        из подсказок размера. Кадр просит двести пикселей минимум и в узкой
-        колонке забирал бы себе половину, оставляя настройки под прокруткой.
+        из подсказок размера. Узко — кадру полоса в полторы сотни пикселей,
+        как в макете; широко — две пятых ширины.
         """
-        total = (
-            self._splitter.width() if self._splitter.orientation() == Qt.Horizontal
-            else self._splitter.height()
-        )
+        vertical = self._splitter.orientation() == Qt.Vertical
+        total = self._splitter.height() if vertical else self._splitter.width()
         if total <= 0:
             return
-        self._splitter.setSizes([total * 3 // 5, total * 2 // 5])
+        first = min(170, total // 3) if vertical else total * 2 // 5
+        self._splitter.setSizes([first, total - first])
         self._space_shared = True

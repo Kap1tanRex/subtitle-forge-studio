@@ -10,8 +10,8 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -107,10 +107,9 @@ class EventTableModel(QAbstractTableModel):
         self._undo = undo
         self._palette = palette
         self._tc_cache: dict[int, str] = {}
-        #: Готовые кисти по имени актора. Акторов единицы, реплик тысячи, а
-        #: цвет для каждой ячейки строился заново — с разбором hex-строки и
-        #: созданием QColor. На видимой таблице это была самая дорогая роль.
-        self._actor_cache: dict[tuple[str, bool], QColor | None] = {}
+        #: Готовые квадратики по имени актора. Акторов единицы, реплик тысячи,
+        #: а цвет для каждой ячейки строился бы заново — с разбором hex-строки.
+        self._actor_cache: dict[str, QIcon | None] = {}
         #: Источник вердиктов QC. Необязателен: таблица работает и без него.
         self._qc = qc
         #: Оригинал для перевода. ``None`` — колонка пуста и скрыта.
@@ -174,7 +173,9 @@ class EventTableModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole):  # noqa: N802
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
             return None
-        return HEADERS[section]
+        # У пометки шапка пустая: кружок в строке говорит сам за себя, а
+        # подпись в двадцать пикселей не поместилась бы.
+        return "" if section == COL_STATUS else HEADERS[section]
 
     #: Роли, на которые модель вообще отвечает. Qt спрашивает у ячейки два
     #: десятка ролей — шрифт, подсказку, размер, состояние флажка. Проходить
@@ -221,9 +222,6 @@ class EventTableModel(QAbstractTableModel):
         if role == _ROLE_ALIGNMENT and col in _NUMERIC_COLUMNS:
             return _ALIGN_RIGHT
 
-        if role == _ROLE_BACKGROUND:
-            return self._actor_background(event, col)
-
         if role == _ROLE_FOREGROUND:
             if col == COL_REFERENCE:
                 # Приглушённым: это чужой текст, который не правят, и он не
@@ -231,20 +229,19 @@ class EventTableModel(QAbstractTableModel):
                 return QColor(self._palette.text_muted)
             if event.comment:
                 return QColor(self._palette.text_muted)
-            if col == COL_ACTOR:
-                color = self._doc.actor_color(event)
-                if color is not None:
-                    return QColor(color.to_hex())
             if col == COL_CPS:
                 cps = event.cps()
                 if cps >= CPS_DANGER:
-                    return QColor(self._palette.danger)
+                    return QColor(self._palette.danger_text)
                 if cps >= CPS_WARNING:
-                    return QColor(self._palette.warning)
+                    return QColor(self._palette.warning_text)
             return None
 
         if role == _ROLE_DECORATION and col == COL_STATUS:
             return self._status_marker(event)
+
+        if role == _ROLE_DECORATION and col == COL_ACTOR:
+            return self._actor_square(event)
 
         if role == _ROLE_DECORATION:
             return self._qc_marker(event.eid) if col == COL_INDEX else None
@@ -370,44 +367,39 @@ class EventTableModel(QAbstractTableModel):
             return event.name
         if col == COL_TEXT:
             # Одна строка: переводы показываем символом, чтобы не растягивать ряд.
-            return event.plain.replace("\n", " ⏎ ")
+            return event.plain.replace("\n", " ↵ ")
         if col == COL_REFERENCE:
-            return self.reference_for(event).replace("\n", " ⏎ ")
+            return self.reference_for(event).replace("\n", " ↵ ")
         return ""
 
-    def _actor_background(self, event, col: int) -> QColor | None:
-        """Подложка строки цветом актора.
+    def _actor_square(self, event) -> QIcon | None:
+        """Квадратик цвета актора перед его именем.
 
-        Цвет сильно разбавлен: он должен опознаваться боковым зрением при
-        прокрутке, но не спорить с выделением строки и не мешать читать текст.
-        Насыщенным остаётся только сам столбец «Актёр» — там цвет и есть
-        содержание ячейки.
+        Раньше цветом актора заливалась вся строка. В узкой колонке с
+        выделением, пометками и цветом скорости чтения это давало пёструю
+        таблицу, где выделенную строку не найти; квадрат у имени говорит то
+        же самое и не спорит с остальным.
         """
         name = event.name
         if not name:
             return None
-
-        key = (name, col == COL_ACTOR)
-        cached = self._actor_cache.get(key, _MISSING)
+        cached = self._actor_cache.get(name, _MISSING)
         if cached is not _MISSING:
             return cached
-
         color = self._doc.actors.color_of(name)
-        if color is None:
-            self._actor_cache[key] = None
-            return None
-        tint = QColor(color.to_hex())
-        tint.setAlpha(70 if key[1] else 28)
-        self._actor_cache[key] = tint
-        return tint
+        icon = _square(QColor(color.to_hex())) if color is not None else None
+        self._actor_cache[name] = icon
+        return icon
 
     def _status_marker(self, event) -> object | None:
         """Кружок рабочей пометки. Цвет говорит, что со строкой не так."""
         status = getattr(event, "status", "")
         if not status:
             return None
+        if status == STATUS_DRAFT:
+            # Черновик — пустое кольцо: работа начата, но не закончена.
+            return _dot(QColor(self._palette.text_muted), ring=True)
         colours = {
-            STATUS_DRAFT: self._palette.text_muted,
             STATUS_DONE: self._palette.success,
             STATUS_QUESTION: self._palette.warning,
         }
@@ -478,7 +470,7 @@ class EventTableModel(QAbstractTableModel):
         """Форматирование таймкодов заметно в профиле — поэтому с кэшем."""
         cached = self._tc_cache.get(ms)
         if cached is None:
-            cached = timemod.format_ass(ms)
+            cached = timemod.format_short(ms)
             if len(self._tc_cache) > 20_000:
                 self._tc_cache.clear()
             self._tc_cache[ms] = cached
@@ -539,39 +531,67 @@ class EventTableModel(QAbstractTableModel):
         return None
 
 
-def _dot(colour: QColor) -> QIcon:
-    """Кружок заданного цвета. Кэшируется: иконок всего три на всю таблицу."""
-    cached = _DOT_CACHE.get(colour.name())
+def _dot(colour: QColor, *, ring: bool = False) -> QIcon:
+    """Кружок заданного цвета, залитый или кольцом.
+
+    Кэшируется: иконок всего несколько на всю таблицу.
+    """
+    key = (colour.name(), ring)
+    cached = _DOT_CACHE.get(key)
     if cached is not None:
         return cached
-    pixmap = QPixmap(10, 10)
+    pixmap = QPixmap(20, 20)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    if ring:
+        painter.setPen(QPen(colour, 3))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawEllipse(3, 3, 14, 14)
+    else:
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(colour)
+        painter.drawEllipse(2, 2, 16, 16)
+    painter.end()
+    pixmap.setDevicePixelRatio(2)
+    icon = QIcon(pixmap)
+    _DOT_CACHE[key] = icon
+    return icon
+
+
+def _square(colour: QColor) -> QIcon:
+    """Квадратик цвета актора со скруглёнными углами."""
+    pixmap = QPixmap(20, 20)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
     painter.setPen(Qt.NoPen)
     painter.setBrush(colour)
-    painter.drawEllipse(1, 1, 8, 8)
+    painter.drawRoundedRect(2, 2, 16, 16, 4, 4)
     painter.end()
-    icon = QIcon(pixmap)
-    _DOT_CACHE[colour.name()] = icon
-    return icon
+    pixmap.setDevicePixelRatio(2)
+    return QIcon(pixmap)
 
 
-_DOT_CACHE: dict[str, QIcon] = {}
+_DOT_CACHE: dict[tuple[str, bool], QIcon] = {}
 
 
 #: Ширины колонок по умолчанию. Компактнее прежних: список реплик — главное
 #: рабочее место, и каждый лишний пиксель в служебной колонке отнят у текста.
 COLUMN_WIDTHS = {
-    COL_INDEX: 40,
-    COL_STATUS: 30,
-    COL_START: 78,
-    COL_END: 78,
-    COL_DURATION: 54,
-    COL_CPS: 42,
+    COL_INDEX: 38,
+    COL_STATUS: 22,
+    COL_START: 80,
+    COL_END: 80,
+    COL_DURATION: 50,
+    COL_CPS: 44,
     COL_STYLE: 84,
-    COL_ACTOR: 76,
+    COL_ACTOR: 90,
 }
+
+#: Колонки, которых по умолчанию нет: конец следует из начала и длительности,
+#: стиль виден на вкладке «Реплика». Включаются правым щелчком по шапке.
+HIDDEN_BY_DEFAULT = (COL_END, COL_STYLE)
 
 #: Порядок, в котором колонки уступают место при нехватке ширины. Первой
 #: уходит та, без которой обходятся чаще всего. «Начало» и «Текст» не
@@ -604,11 +624,12 @@ class EventTableView(QTableView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         #: Колонки, о которых пользователь высказался явно.
-        self._pinned: dict[int, bool] = {}
+        self._pinned: dict[int, bool] = dict.fromkeys(HIDDEN_BY_DEFAULT, False)
 
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.setAlternatingRowColors(True)
+        self.setAlternatingRowColors(False)
+        self.setIconSize(QSize(10, 10))
         self.setShowGrid(False)
         self.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
@@ -616,18 +637,17 @@ class EventTableView(QTableView):
 
         vertical = self.verticalHeader()
         vertical.setVisible(False)
-        vertical.setDefaultSectionSize(22)
+        vertical.setDefaultSectionSize(28)
         vertical.setMinimumSectionSize(16)
 
         header = self.horizontalHeader()
         header.setStretchLastSection(True)
+        header.setFixedHeight(28)
+        header.setHighlightSections(False)
+        header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         header.setSectionResizeMode(QHeaderView.Interactive)
-        header.setSectionResizeMode(COL_TEXT, QHeaderView.Stretch)
-        header.setSectionResizeMode(COL_REFERENCE, QHeaderView.Stretch)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._column_menu)
-        for column, width in COLUMN_WIDTHS.items():
-            self.setColumnWidth(column, width)
 
     def setModel(self, model) -> None:  # noqa: N802
         """Ставит модель и заново раскладывает колонки.
@@ -642,12 +662,21 @@ class EventTableView(QTableView):
             return
 
         header = self.horizontalHeader()
+        # Ширины — тоже здесь: заданные до модели, они пропадали, и все
+        # колонки выходили по сто пикселей с прокруткой вбок.
+        for column, width in COLUMN_WIDTHS.items():
+            self.setColumnWidth(column, width)
+        header.setSectionResizeMode(COL_TEXT, QHeaderView.Stretch)
+        header.setSectionResizeMode(COL_REFERENCE, QHeaderView.Stretch)
         # Оригинал показывается слева от перевода: читают слева направо, и
         # смотреть на исходник после результата неудобно. Логический номер
         # при этом остаётся последним — так новая колонка ничего не сдвинула.
         header.moveSection(
             header.visualIndex(COL_REFERENCE), header.visualIndex(COL_TEXT)
         )
+        # Пометка — первой, перед номером: состояние строки ищут взглядом
+        # по левому краю.
+        header.moveSection(header.visualIndex(COL_STATUS), 0)
         self.show_reference(bool(getattr(model, "reference", None)))
 
     def show_reference(self, on: bool) -> None:
@@ -718,7 +747,7 @@ class EventTableView(QTableView):
             self.setColumnWidth(column, COLUMN_WIDTHS.get(column, 60))
 
     def _unpin_all(self) -> None:
-        self._pinned.clear()
+        self._pinned = dict.fromkeys(HIDDEN_BY_DEFAULT, False)
         self.adapt_columns()
 
     # -- меню по правому щелчку на строках ---------------------------------- #

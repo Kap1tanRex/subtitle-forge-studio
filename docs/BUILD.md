@@ -45,7 +45,7 @@ python build/vendor_libs.py --check
 
 Список `excludes` в `onefile.spec` убирает то, что PySide6 тянет по умолчанию:
 QtWebEngine, Qt3D, QtMultimedia, QtQml и прочее. Приложению нужны только
-QtCore, QtGui, QtWidgets и QtOpenGLWidgets. Без этого списка бинарник
+QtCore, QtGui, QtWidgets, QtOpenGLWidgets и QtSvg (значки). Без этого списка бинарник
 получается примерно вдвое больше.
 
 ## Цена одного файла

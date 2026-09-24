@@ -254,22 +254,22 @@ class TestTransport:
 
 
 class TestActorColouring:
-    def test_row_takes_actor_colour(self, qapp: QApplication, doc) -> None:
+    def test_actor_gets_a_colour_square(self, qapp: QApplication, doc) -> None:
+        """Цвет говорящего — квадратиком у имени, а не заливкой строки."""
         model = EventTableModel(doc)
         doc.actors.add("Анна", RGBA.from_hex("#FF8800"))
         doc.events[0].name = "Анна"
-        colour = model.data(model.index(0, COL_TEXT), Qt.BackgroundRole)
-        assert colour is not None
-        assert (colour.red(), colour.green(), colour.blue()) == (0xFF, 0x88, 0x00)
+        square = model.data(model.index(0, COL_ACTOR), Qt.DecorationRole)
+        assert square is not None
+        pixel = square.pixmap(20, 20).toImage().pixelColor(10, 10)
+        assert (pixel.red(), pixel.green(), pixel.blue()) == (0xFF, 0x88, 0x00)
 
-    def test_actor_column_is_more_saturated(self, qapp: QApplication, doc) -> None:
-        """В столбце «Актор» цвет и есть содержание — там он ярче."""
+    def test_row_is_not_tinted(self, qapp: QApplication, doc) -> None:
+        """Заливка строки спорила с выделением и цветом скорости чтения."""
         model = EventTableModel(doc)
         doc.actors.add("Анна", RGBA.from_hex("#FF8800"))
         doc.events[0].name = "Анна"
-        actor_cell = model.data(model.index(0, COL_ACTOR), Qt.BackgroundRole)
-        text_cell = model.data(model.index(0, COL_TEXT), Qt.BackgroundRole)
-        assert actor_cell.alpha() > text_cell.alpha()
+        assert model.data(model.index(0, COL_TEXT), Qt.BackgroundRole) is None
 
     def test_unregistered_actor_is_not_coloured(self, qapp: QApplication, doc) -> None:
         """Имя из чужого файла без записи в реестре цвета не получает."""

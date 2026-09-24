@@ -10,13 +10,14 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QColorDialog,
     QDialog,
     QDialogButtonBox,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -40,6 +42,7 @@ from sfstudio.core.commands import (
 )
 from sfstudio.core.document import SubtitleDocument
 from sfstudio.core.undo import UndoStack
+from sfstudio.ui.widgets import hbox, icon_button, label, set_icon
 
 __all__ = ["ActorsDialog", "ActorsPanel"]
 
@@ -61,6 +64,8 @@ class ActorsPanel(QWidget):
     document_edited = Signal()
     #: Назначить этого актора выделенным репликам.
     assign_requested = Signal(str)
+    #: Переписать метки говорящих в тексте реплик.
+    relabel_requested = Signal()
 
     def __init__(
         self,
@@ -73,52 +78,91 @@ class ActorsPanel(QWidget):
         self._undo = undo
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Шапка: завести актора, занести встреченных, правка выбранного.
+        head = QWidget()
+        head.setProperty("role", "toolhead")
+        head.setAttribute(Qt.WA_StyledBackground, True)
+        head.setFixedHeight(40)
+        head_row = QHBoxLayout(head)
+        head_row.setContentsMargins(8, 0, 8, 0)
+        head_row.setSpacing(6)
+        add = QToolButton()
+        add.setText(tr('Актёр'))
+        add.setProperty("role", "outlined")
+        add.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        add.setFixedHeight(28)
+        set_icon(add, "event_add", "text")
+        add.setToolTip(tr('Завести актора'))
+        add.clicked.connect(self._add)
+        head_row.addWidget(add)
+        self.import_button = QPushButton(tr('Занести встреченных'))
+        self.import_button.clicked.connect(self._import_used)
+        head_row.addWidget(self.import_button)
+        head_row.addStretch(1)
+        for icon, tip, slot in (
+            ("pencil", tr('Переименовать'), self._rename),
+            ("note", tr('Заметка…'), self._set_note),
+            ("event_delete", tr('Удалить актора'), self._remove),
+        ):
+            button = icon_button(icon, tip)
+            button.clicked.connect(slot)
+            head_row.addWidget(button)
+        self.total = label("", "hint")
+        head_row.addWidget(self.total)
+        layout.addWidget(head)
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels([tr('Цвет'), tr('Имя'), tr('Реплик'), tr('Заметка')])
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(40)
+        self.table.setShowGrid(False)
+        self.table.setFrameShape(QFrame.NoFrame)
+        self.table.setIconSize(QSize(18, 18))
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         header = self.table.horizontalHeader()
+        header.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        header.setFixedHeight(28)
         header.setSectionResizeMode(COL_COLOR, QHeaderView.Fixed)
-        header.resizeSection(COL_COLOR, 56)
+        header.resizeSection(COL_COLOR, 48)
         header.setSectionResizeMode(COL_NAME, QHeaderView.Stretch)
         header.setSectionResizeMode(COL_COUNT, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(COL_NOTE, QHeaderView.Stretch)
         self.table.cellDoubleClicked.connect(self._on_double_click)
         layout.addWidget(self.table, 1)
 
-        buttons = QHBoxLayout()
-        for caption, slot in (
-            (tr('Добавить'), self._add),
-            (tr('Переименовать'), self._rename),
-            (tr('Цвет…'), self._recolor),
-            (tr('Заметка…'), self._set_note),
-            (tr('Удалить'), self._remove),
-        ):
-            button = QPushButton(caption)
-            button.clicked.connect(slot)
-            buttons.addWidget(button)
-        buttons.addStretch(1)
-        layout.addLayout(buttons)
+        self.hint = QLabel("")
+        self.hint.setProperty("role", "hint")
+        self.hint.setWordWrap(True)
+        self.hint.setContentsMargins(12, 6, 12, 6)
+        layout.addWidget(self.hint)
 
+        # Подвал: главное действие вкладки — назначить выбранного актора.
+        foot = QWidget()
+        foot.setProperty("role", "footer")
+        foot.setAttribute(Qt.WA_StyledBackground, True)
+        foot_column = QVBoxLayout(foot)
+        foot_column.setContentsMargins(16, 12, 16, 16)
+        foot_column.setSpacing(10)
+        self.relabel_button = QPushButton(tr('Обновить метки'))
+        self.relabel_button.setToolTip(
+            tr('Переписать имена говорящих в тексте реплик по настройкам')
+        )
+        self.relabel_button.clicked.connect(self.relabel_requested)
+        foot_column.addLayout(hbox(label(tr('Имя в тексте — в настройках'), "hint"), None,
+                                   self.relabel_button))
         self.assign_button = QPushButton(tr('Назначить выделенным репликам'))
+        self.assign_button.setProperty("role", "primary")
         self.assign_button.setToolTip(
             tr('Выберите реплики в таблице или на таймлайне, затем актора здесь')
         )
         self.assign_button.clicked.connect(self._assign)
-        layout.addWidget(self.assign_button)
-
-        self.import_button = QPushButton(tr('Занести встреченных'))
-        self.import_button.clicked.connect(self._import_used)
-        layout.addWidget(self.import_button)
-
-        self.hint = QLabel("")
-        self.hint.setProperty("role", "hint")
-        self.hint.setWordWrap(True)
-        layout.addWidget(self.hint)
+        foot_column.addWidget(self.assign_button)
+        layout.addWidget(foot)
 
         self.refresh()
 
@@ -144,7 +188,8 @@ class ActorsPanel(QWidget):
             self.table.insertRow(row)
 
             swatch = QTableWidgetItem("")
-            swatch.setBackground(QColor(actor.color.to_hex()))
+            swatch.setIcon(_swatch(QColor(actor.color.to_hex())))
+            swatch.setToolTip(tr('Цвет — двойной щелчок, чтобы сменить'))
             swatch.setData(Qt.UserRole, actor.name)
             self.table.setItem(row, COL_COLOR, swatch)
 
@@ -153,11 +198,12 @@ class ActorsPanel(QWidget):
             self.table.setItem(row, COL_NAME, name_item)
 
             count_item = QTableWidgetItem(str(counts.get(actor.name, 0)))
-            count_item.setTextAlignment(Qt.AlignCenter)
+            count_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.table.setItem(row, COL_COUNT, count_item)
 
             self.table.setItem(row, COL_NOTE, QTableWidgetItem(actor.note))
 
+        self.total.setText(tr('Актёров: {0}').format(len(self._doc.actors)))
         unregistered = sorted(set(counts) - set(self._doc.actors.names()))
         self.import_button.setEnabled(bool(unregistered))
         if unregistered:
@@ -274,6 +320,20 @@ class ActorsPanel(QWidget):
             self._set_note()
         else:
             self._rename()
+
+
+def _swatch(colour: QColor) -> QIcon:
+    """Квадратик цвета актора — как в списке реплик."""
+    pixmap = QPixmap(36, 36)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(Qt.NoPen)
+    painter.setBrush(colour)
+    painter.drawRoundedRect(0, 0, 36, 36, 8, 8)
+    painter.end()
+    pixmap.setDevicePixelRatio(2)
+    return QIcon(pixmap)
 
 
 class ActorsDialog(QDialog):

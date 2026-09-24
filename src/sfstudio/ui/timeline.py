@@ -86,7 +86,7 @@ from sfstudio.ui.event_menu import (
 )
 from sfstudio.ui.icons import paint_icon
 from sfstudio.ui.safe_text import menu_label, plain_tooltip
-from sfstudio.ui.theme import DARK, Palette
+from sfstudio.ui.theme import DARK, Palette, is_dark, mix
 
 #: Ширина колонки заголовков. Влезает «Субтитры 10» и две иконки справа.
 HEADER_W = 148.0
@@ -95,9 +95,9 @@ HEADER_W = 148.0
 #: Своя полоса, а не значки поверх шкалы: маркер и подпись времени иначе
 #: наезжают друг на друга ровно там, где маркер и ставят, — на границе
 #: сцены, у круглой отметки времени.
-MARKER_LANE_H = 13.0
+MARKER_LANE_H = 14.0
 #: Шкала времени: подписи и деления.
-TIME_LANE_H = 22.0
+TIME_LANE_H = 28.0
 #: Вся шапка таймлайна. Дорожки начинаются под ней.
 RULER_H = TIME_LANE_H + MARKER_LANE_H
 SUB_TRACK_H = 44.0
@@ -261,6 +261,8 @@ class TimelineWidget(QWidget):
     tracks_changed = Signal()
     #: Поставили, изменили или убрали маркер.
     markers_changed = Signal()
+    #: Кнопка магнитов: включить или выключить. Решает окно — у него пункт меню.
+    snapping_requested = Signal(bool)
 
     def __init__(
         self,
@@ -413,6 +415,7 @@ class TimelineWidget(QWidget):
 
     def set_snapping(self, on: bool) -> None:
         self._snap_enabled = on
+        self.update()  # кнопка магнитов в углу показывает состояние
 
     @property
     def time_ms(self) -> int:
@@ -605,44 +608,57 @@ class TimelineWidget(QWidget):
         painter.end()
 
     def _paint_row_backgrounds(self, painter: QPainter, rows: list[_Row]) -> None:
-        for index, row in enumerate(rows):
+        line = QPen(QColor(self._palette.line), 1)
+        for row in rows:
             area = QRectF(HEADER_W, row.top, self._content_w, row.height)
-            shade = self._palette.bg_base if index % 2 == 0 else self._palette.bg_sunken
+            # Дорожка видео — углублением: на ней только засечки ключевых
+            # кадров, и она не должна спорить с дорожками реплик.
+            shade = (self._palette.bg_sunken if row.track.kind is TrackKind.VIDEO
+                     else self._palette.bg_base)
             painter.fillRect(area, QColor(shade))
-            painter.setPen(QPen(QColor(self._palette.border), 1))
+            painter.setPen(line)
             painter.drawLine(QPointF(HEADER_W, row.bottom), QPointF(self.width(), row.bottom))
 
     def _paint_ruler(self, painter: QPainter) -> None:
-        rect = QRectF(0, 0, self.width(), RULER_H)
+        rect = QRectF(0, 0, self.width(), TIME_LANE_H)
         painter.fillRect(rect, QColor(self._palette.bg_elevated))
-        # Полоса маркеров чуть темнее шкалы: без этого пустая полоса читается
-        # как случайный отступ, и человек не догадывается, что туда можно
-        # ставить отметки.
+        # Полоса маркеров — цветом дорожек: это место, куда ставят отметки,
+        # а не часть шкалы.
         painter.fillRect(
             QRectF(0, TIME_LANE_H, self.width(), MARKER_LANE_H),
-            QColor(self._palette.bg_sunken),
+            QColor(self._palette.bg_base),
         )
         painter.setPen(QPen(QColor(self._palette.border), 1))
+        painter.drawLine(QPointF(0, TIME_LANE_H), QPointF(self.width(), TIME_LANE_H))
+        painter.setPen(QPen(QColor(self._palette.line), 1))
         painter.drawLine(QPointF(0, RULER_H), QPointF(self.width(), RULER_H))
 
         step = self._grid_step()
-        font = QFont("Segoe UI")
-        font.setPixelSize(10)
+        font = QFont("JetBrains Mono")
+        font.setStyleHint(QFont.Monospace)
+        font.setPixelSize(11)
         painter.setFont(font)
 
-        start = int(self._view_start_ms // step) * step
-        t = start
+        tick = QPen(QColor(self._palette.border_strong), 1)
+        grid = QPen(QColor(self._palette.line), 1, Qt.DotLine)
+        label = QColor(self._palette.text_muted)
+        # Засечки трёх ростов: подписанная, основная и половинная.
+        minor = step / 2
+        t = int(self._view_start_ms // minor) * minor
         end = self.view_end_ms
         while t <= end:
             x = self.ms_to_x(t)
-            if x >= HEADER_W - 60:
-                painter.setPen(QPen(QColor(self._palette.border), 1))
-                painter.drawLine(QPointF(x, TIME_LANE_H - 6), QPointF(x, TIME_LANE_H))
-                painter.setPen(QColor(self._palette.text_muted))
-                painter.drawText(QPointF(x + 3, TIME_LANE_H - 8), _short_time(t))
-                painter.setPen(QPen(QColor(self._palette.border), 1, Qt.DotLine))
-                painter.drawLine(QPointF(x, RULER_H), QPointF(x, self.height()))
-            t += step
+            major = abs(t / step - round(t / step)) < 1e-6
+            if x >= HEADER_W:
+                painter.setPen(tick)
+                height = 10 if major else 4
+                painter.drawLine(QPointF(x, TIME_LANE_H - height), QPointF(x, TIME_LANE_H))
+                if major:
+                    painter.setPen(label)
+                    painter.drawText(QPointF(x + 4, 15), _short_time(t))
+                    painter.setPen(grid)
+                    painter.drawLine(QPointF(x, RULER_H), QPointF(x, self.height()))
+            t += minor
 
     def _paint_markers(self, painter: QPainter) -> None:
         """Флажки на своей полосе. Протяжённые — с хвостом до конца отрезка.
@@ -693,22 +709,20 @@ class TimelineWidget(QWidget):
         return _GRID_STEPS[-1]
 
     def _paint_video(self, painter: QPainter, row: _Row) -> None:
-        area = QRectF(HEADER_W, row.top + 2, self._content_w, row.height - 4)
-        painter.fillRect(area, QColor(self._palette.accent_muted))
-
-        if self._keyframes:
-            painter.setPen(QPen(QColor(self._palette.accent), 1))
-            for t in self._keyframes.in_range(int(self._view_start_ms), int(self.view_end_ms)):
-                x = self.ms_to_x(t)
-                painter.drawLine(QPointF(x, area.top()), QPointF(x, area.bottom()))
-
-        if self._media_name:
-            font = QFont("Segoe UI")
-            font.setPixelSize(10)
-            painter.setFont(font)
-            painter.setPen(QColor(self._palette.text_primary))
-            painter.drawText(area.adjusted(6, 0, -6, 0),
-                             Qt.AlignVCenter | Qt.AlignLeft, self._media_name)
+        # Ключевые кадры — засечками по центру дорожки. Больше на ней ничего
+        # не нужно: имя файла и так в заголовке окна.
+        if not self._keyframes:
+            return
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(self._palette.border_strong))
+        height = min(11.0, row.height - 6)
+        top = row.top + (row.height - height) / 2
+        for t in self._keyframes.in_range(int(self._view_start_ms), int(self.view_end_ms)):
+            x = self.ms_to_x(t)
+            painter.drawRoundedRect(QRectF(x, top, 2, height), 1, 1)
+        painter.restore()
 
     def _paint_wave(self, painter: QPainter, row: _Row) -> None:
         top = row.top + 2
@@ -754,29 +768,43 @@ class TimelineWidget(QWidget):
         t0 = int(self._view_start_ms)
         t1 = int(self.view_end_ms)
         font = QFont("Segoe UI")
-        font.setPixelSize(10)
+        font.setPixelSize(12)
         painter.setFont(font)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        line_h = painter.fontMetrics().height()
 
         by_layer = {r.track.layer: r for r in rows if r.track.is_subtitle}
 
-        # Цвета готовим один раз на кадр. Раньше QColor и to_hex() считались
-        # для каждой реплики: на документе в три тысячи строк это тридцать
-        # тысяч разборов строки за перерисовку — треть времени отрисовки.
-        track_colors: dict[int, QColor] = {}
-        for layer, row in by_layer.items():
-            color = QColor(row.track.color.to_hex())
-            color.setAlpha(80 if not row.track.visible else 190)
-            track_colors[layer] = color
-        # Цвета акторов тоже считаем один раз на кадр, а не на реплику: у
-        # одного говорящего их сотни, и разбор строки повторялся бы для
-        # каждой. Кэш живёт кадр — за это время документ не меняется.
-        actor_colors: dict[int, QColor | None] = {}
-        selected_color = QColor(self._palette.accent)
-        selected_color.setAlpha(150)
-        comment_color = QColor(self._palette.bg_elevated)
-        edge_pen = QPen(QColor(self._palette.accent), 1)
-        edge_pen_selected = QPen(QColor(self._palette.accent), 2)
+        # Реплика — цветом говорящего (или дорожки), разбавленным фоном:
+        # заливка и рамка из одного цвета разной силы. Цвета считаем один
+        # раз на кадр: на документе в три тысячи строк разбор строки цвета
+        # для каждой реплики съедал треть времени отрисовки.
+        dark = is_dark(self._palette)
+        fill_share, line_share = (0.34, 0.72) if dark else (0.22, 0.68)
+        tones: dict[tuple[str, bool, bool], tuple[QColor, QColor]] = {}
+
+        def tone(color: str, selected: bool, visible: bool) -> tuple[QColor, QColor]:
+            key = (color, selected, visible)
+            found = tones.get(key)
+            if found is None:
+                base = self._palette.bg_base
+                share = fill_share + (0.16 if selected else 0.0)
+                fill = QColor(mix(base, color, share))
+                edge = QColor(self._palette.accent if selected else mix(base, color, line_share))
+                if not visible:
+                    # Скрытая дорожка бледнее: она не рисуется в кадре.
+                    fill.setAlpha(110)
+                    edge.setAlpha(110)
+                found = tones[key] = (fill, edge)
+            return found
+
+        comment_fill = QColor(self._palette.bg_elevated)
+        comment_edge = QColor(self._palette.border)
         text_color = QColor(self._palette.text_primary)
+        muted_color = QColor(self._palette.text_muted)
+        handle = QColor(self._palette.accent)
+        actor_hex: dict[str, str | None] = {}
+        track_hex = {layer: row.track.color.to_hex() for layer, row in by_layer.items()}
 
         for event in self._doc.in_range(t0, t1):
             row = by_layer.get(event.layer)
@@ -785,162 +813,133 @@ class TimelineWidget(QWidget):
 
             lanes = max(1, self._sublanes_on.get(event.layer, 1))
             lane = min(self._sublane_of.get(event.eid, 0), lanes - 1)
-            lane_h = (row.height - 4) / lanes
-            top = row.top + 2 + lane * lane_h
-            bottom = top + lane_h - 1
+            lane_h = (row.height - 10) / lanes
+            top = row.top + 5 + lane * lane_h
+            height = lane_h - (2 if lanes > 1 else 0)
 
             x0 = self.ms_to_x(event.start)
             x1 = self.ms_to_x(event.end)
-            rect = QRectF(x0, top, max(2.0, x1 - x0), bottom - top)
-
+            rect = QRectF(x0 + 0.5, top + 0.5, max(2.0, x1 - x0 - 2), height - 1)
             selected = event.eid in self._selection
-            # Цвет актора заливает реплику целиком. Полоской по краю он был
-            # незаметен: на фильме из тысяч реплик разглядеть три пикселя
-            # слева невозможно, а понять с одного взгляда, кто где говорит, —
-            # ровно то, ради чего акторов и заводят. Выделение при этом
-            # показывается рамкой, а не заливкой, иначе оно затирало бы цвет.
-            actor_color = actor_colors.get(event.eid, _MISSING)
-            if actor_color is _MISSING:
-                color = self._doc.actor_color(event)
-                actor_color = self._actor_brush(color, event.layer) if color else None
-                actor_colors[event.eid] = actor_color
 
             if event.comment:
-                brush = comment_color
-            elif actor_color is not None:
-                brush = actor_color
-            elif selected:
-                brush = selected_color
+                fill, edge = comment_fill, comment_edge
             else:
-                brush = track_colors.get(event.layer, comment_color)
+                name = event.name
+                if name not in actor_hex:
+                    found = self._doc.actor_color(event)
+                    actor_hex[name] = found.to_hex() if found else None
+                color = actor_hex[name] or track_hex.get(event.layer, self._palette.accent)
+                fill, edge = tone(color, selected, row.track.visible)
 
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(brush)
-            painter.drawRect(rect)
-
-            # Реплика уже пары пикселей: боковые грани сливаются с заливкой, а
-            # стоят двух вызовов рисования из трёх. При обзоре всего фильма
-            # таких реплик — почти все.
+            # Реплика уже пары пикселей: обводка и текст ей ни к чему, а
+            # стоят больше заливки. При обзоре всего фильма таких — почти все.
             if rect.width() < _THIN_EVENT_PX:
+                painter.fillRect(rect, fill)
                 continue
 
-            if selected and actor_color is not None:
-                # У выделенной реплики с актором рамка идёт по всему
-                # периметру: иначе выделение потерялось бы среди одноцветных
-                # соседей той же роли.
-                painter.setPen(edge_pen_selected)
-                painter.setBrush(Qt.NoBrush)
-                painter.drawRect(rect.adjusted(0.5, 0.5, -0.5, -0.5))
-            else:
-                painter.setPen(edge_pen_selected if selected else edge_pen)
-                painter.drawLine(QPointF(rect.left(), top), QPointF(rect.left(), bottom))
-                painter.drawLine(QPointF(rect.right(), top),
-                                 QPointF(rect.right(), bottom))
+            painter.setPen(QPen(edge, 2 if selected else 1))
+            painter.setBrush(fill)
+            painter.drawRoundedRect(rect, 4, 4)
 
-            if rect.width() > 28 and lane_h >= 11:
-                # Текст поверх цвета актора: тот выбирается человеком и бывает
-                # каким угодно, поэтому светлая надпись на светлом фоне —
-                # вопрос времени. Цвет надписи считаем от яркости подложки.
-                painter.setPen(_readable_on(brush) if actor_color is not None
-                               else text_color)
-                painter.drawText(rect.adjusted(6, 0, -4, 0),
-                                 Qt.AlignVCenter | Qt.AlignLeft,
-                                 event.plain.replace("\n", " "))
+            if selected and rect.width() > 16:
+                # Ручки на краях: за них тянут, и их надо видеть.
+                mid = rect.center().y()
+                painter.fillRect(QRectF(rect.left() + 1.5, mid - 9, 3, 18), handle)
+                painter.fillRect(QRectF(rect.right() - 4.5, mid - 9, 3, 18), handle)
 
-    def _actor_brush(self, color, layer: int) -> QColor:
-        """Цвет актора с прозрачностью скрытой дорожки.
-
-        Скрытая дорожка гасится и здесь: иначе яркая заливка по говорящему
-        сообщала бы, что реплика видна в кадре, тогда как она выключена.
-        """
-        brush = QColor(color.to_hex())
-        track = self._doc.tracks.by_layer(layer)
-        brush.setAlpha(190 if track is None or track.visible else 80)
-        return brush
-
-    def _event_brush(self, event: SubtitleEvent, track: Track, selected: bool) -> QColor:
-        if event.comment:
-            return QColor(self._palette.bg_elevated)
-        if selected:
-            color = QColor(self._palette.accent)
-            color.setAlpha(150)
-            return color
-        color = QColor(track.color.to_hex())
-        # Скрытая дорожка заметно бледнее: она не рисуется в кадре, и путать
-        # её с обычной нельзя.
-        color.setAlpha(80 if not track.visible else 190)
-        return color
+            if rect.width() > 28 and height >= 14:
+                text = event.plain.split("\n")
+                inner = rect.adjusted(7, 4, -6, -3)
+                painter.setPen(text_color)
+                first = painter.fontMetrics().elidedText(text[0], Qt.ElideRight,
+                                                          int(inner.width()))
+                if len(text) > 1 and height >= 2 * line_h + 8:
+                    painter.drawText(inner, Qt.AlignLeft | Qt.AlignTop, first)
+                    painter.setPen(muted_color)
+                    second = painter.fontMetrics().elidedText(text[1], Qt.ElideRight,
+                                                               int(inner.width()))
+                    painter.drawText(inner.adjusted(0, line_h, 0, 0),
+                                     Qt.AlignLeft | Qt.AlignTop, second)
+                else:
+                    one = painter.fontMetrics().elidedText(
+                        " ".join(text), Qt.ElideRight, int(inner.width()))
+                    align = Qt.AlignTop if height >= 2 * line_h + 8 else Qt.AlignVCenter
+                    painter.drawText(inner, Qt.AlignLeft | align, one)
+        painter.setRenderHint(QPainter.Antialiasing, False)
 
     def _paint_headers(self, painter: QPainter, rows: list[_Row]) -> None:
-        painter.fillRect(QRectF(0, RULER_H, HEADER_W, self.height() - RULER_H),
+        painter.fillRect(QRectF(0, 0, HEADER_W, self.height()),
                          QColor(self._palette.bg_elevated))
+        painter.setPen(QPen(QColor(self._palette.border), 1))
+        painter.drawLine(QPointF(HEADER_W - 0.5, 0), QPointF(HEADER_W - 0.5, self.height()))
+        painter.drawLine(QPointF(0, RULER_H), QPointF(HEADER_W, RULER_H))
 
         font = QFont("Segoe UI")
-        font.setPixelSize(11)
-        painter.setFont(font)
+        font.setPixelSize(12)
+        active = self._default_layer()
 
         for row in rows:
             track = row.track
-            painter.setPen(QPen(QColor(self._palette.border), 1))
+            current = track.is_subtitle and track.layer == active
+            if current:
+                # Дорожка, куда встанет новая реплика, — приподнята.
+                painter.fillRect(QRectF(0, row.top, HEADER_W - 1, row.height),
+                                 QColor(self._palette.bg_raised))
+            painter.setPen(QPen(QColor(self._palette.line), 1))
             painter.drawLine(QPointF(0, row.bottom), QPointF(HEADER_W, row.bottom))
 
-            # Цветная метка дорожки слева — та же, что заливка её реплик.
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(track.color.to_hex()))
-            painter.drawRect(QRectF(0, row.top + 1, 4.0, row.height - 2))
-
-            painter.setPen(QColor(
-                self._palette.text_primary if track.visible else self._palette.text_muted
-            ))
-            name_rect = QRectF(10, row.top, HEADER_W - 52, row.height)
+            font.setWeight(QFont.DemiBold if current else QFont.Normal)
+            painter.setFont(font)
+            muted = not track.visible or track.kind is TrackKind.VIDEO or not track.is_subtitle
+            painter.setPen(QColor(self._palette.text_muted if muted
+                                  else self._palette.text_primary))
+            name_rect = QRectF(10, row.top, HEADER_W - 60, row.height)
             painter.drawText(name_rect, Qt.AlignVCenter | Qt.AlignLeft, track.display_name())
 
             for icon, rect in self._header_buttons(row):
                 paint_icon(painter, icon, self._palette.text_muted, rect)
 
-            # Хваталка на границе: без неё возможность потянуть высоту
-            # существует, но узнать о ней можно только случайно проведя
-            # мышью по нужным пяти пикселям.
-            if track.is_subtitle:
-                painter.setPen(QPen(QColor(self._palette.text_muted), 1))
-                middle = HEADER_W / 2
-                for offset in (-6.0, 0.0, 6.0):
-                    painter.drawLine(QPointF(middle + offset - 2, row.bottom - 2),
-                                     QPointF(middle + offset + 2, row.bottom - 2))
+        # Инструменты в углу над заголовками — в порядке частоты: новая
+        # реплика, маркер, магниты, новая дорожка.
+        for name, rect, on in self._tool_buttons():
+            if on:
+                painter.save()
+                painter.setRenderHint(QPainter.Antialiasing, True)
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(self._palette.accent_muted))
+                painter.drawRoundedRect(rect, 5, 5)
+                painter.restore()
+            colour = self._palette.accent_text if on else self._palette.text_primary
+            paint_icon(painter, name, colour, rect.adjusted(6, 6, -6, -6))
 
-        # Кнопки в углу над заголовками: слева — новая реплика, справа —
-        # новая дорожка. Реплику создают несравнимо чаще, поэтому она первая.
-        paint_icon(painter, "event_add", self._palette.accent,
-                   self._new_event_button_rect())
-        paint_icon(painter, "track_add", self._palette.text_muted,
-                   self._add_button_rect())
+    def _tool_buttons(self) -> list[tuple[str, QRectF, bool]]:
+        return [
+            ("pencil", self._new_event_button_rect(), False),
+            ("flag", self._marker_button_rect(), False),
+            ("magnet", self._snap_button_rect(), self._snap_enabled),
+            ("track_add", self._add_button_rect(), False),
+        ]
 
-        # Кнопка маркера — на своей полосе, слева от неё же: она относится
-        # к полосе маркеров, а не к шкале времени, и стоять должна там.
-        self._paint_marker_button(painter)
+    def _tool_rect(self, slot: int) -> QRectF:
+        """Место кнопки в углу над заголовками: четыре в ряд по 28 px."""
+        return QRectF(8 + slot * 32, (RULER_H - 28) / 2, 28, 28)
 
-    def _paint_marker_button(self, painter: QPainter) -> None:
-        """Флажок слева от полосы маркеров: поставить отметку на курсоре."""
-        rect = self._marker_button_rect()
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(color_value(self._marker_color)))
-        height = rect.height() - 2
-        painter.drawPolygon(_flag_shape(rect.left() + 2, rect.top() + 1, height))
-        painter.restore()
+    def _new_event_button_rect(self) -> QRectF:
+        """Кнопка «новая реплика» — первая: её жмут чаще остальных."""
+        return self._tool_rect(0)
+
+    def _marker_button_rect(self) -> QRectF:
+        """Кнопка «поставить маркер на курсоре»."""
+        return self._tool_rect(1)
+
+    def _snap_button_rect(self) -> QRectF:
+        """Переключатель магнитов."""
+        return self._tool_rect(2)
 
     def _add_button_rect(self) -> QRectF:
         """Кнопка «добавить дорожку»."""
-        return QRectF(HEADER_W - 22, 2, 18, TIME_LANE_H - 4)
-
-    def _new_event_button_rect(self) -> QRectF:
-        """Кнопка «новая реплика» — слева от кнопки дорожки."""
-        return QRectF(HEADER_W - 44, 2, 18, TIME_LANE_H - 4)
-
-    def _marker_button_rect(self) -> QRectF:
-        """Кнопка «поставить маркер» — в левом краю полосы маркеров."""
-        return QRectF(HEADER_W - 22, TIME_LANE_H, 18, MARKER_LANE_H)
+        return self._tool_rect(3)
 
     def _header_buttons(self, row: _Row) -> list[tuple[str, QRectF]]:
         """Значки справа в заголовке: видимость и замок (у звука — заглушение).
@@ -959,9 +958,9 @@ class TimelineWidget(QWidget):
             return []
         return [
             ("eye_open" if track.visible else "eye_closed",
-             QRectF(HEADER_W - 48, top, size, size)),
+             QRectF(HEADER_W - 50, top, size, size)),
             ("locked" if track.locked else "unlocked",
-             QRectF(HEADER_W - 26, top, size, size)),
+             QRectF(HEADER_W - 28, top, size, size)),
         ]
 
     def _paint_rubber(self, painter: QPainter) -> None:
@@ -977,14 +976,29 @@ class TimelineWidget(QWidget):
 
     def _paint_playhead(self, painter: QPainter) -> None:
         x = self.ms_to_x(self._time_ms)
-        if HEADER_W - 2 <= x <= self.width() + 2:
-            painter.setPen(QPen(QColor(self._palette.playhead), 1))
-            painter.drawLine(QPointF(x, 0), QPointF(x, self.height()))
-            painter.setBrush(QColor(self._palette.playhead))
-            painter.setPen(Qt.NoPen)
-            painter.drawPolygon(
-                QPolygonF([QPointF(x - 4, 0), QPointF(x + 4, 0), QPointF(x, 6)])
-            )
+        if not HEADER_W - 2 <= x <= self.width() + 2:
+            return
+        colour = QColor(self._palette.playhead)
+        painter.setPen(QPen(colour, 1))
+        painter.drawLine(QPointF(x, 0), QPointF(x, self.height()))
+        # Плашка со временем на шкале: где стоит курсор, видно без подсказки.
+        font = QFont("JetBrains Mono")
+        font.setStyleHint(QFont.Monospace)
+        font.setPixelSize(11)
+        font.setWeight(QFont.Medium)
+        painter.setFont(font)
+        text = _playhead_time(self._time_ms)
+        width = painter.fontMetrics().horizontalAdvance(text) + 10
+        left = min(x + 4, self.width() - width - 2)
+        box = QRectF(left, 5, width, 18)
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(colour)
+        painter.drawRoundedRect(box, 3, 3)
+        painter.setPen(QColor(self._palette.on_playhead))
+        painter.drawText(box, Qt.AlignCenter, text)
+        painter.restore()
 
     def _rebuild_sublanes_if_needed(self) -> None:
         """Раскладывает пересекающиеся реплики по подстрокам внутри дорожки.
@@ -1044,6 +1058,11 @@ class TimelineWidget(QWidget):
                 return
             if self._marker_button_rect().contains(pos):
                 self.add_marker_at_playhead()
+                return
+            if self._snap_button_rect().contains(pos):
+                # Через окно, а не напрямую: пункт меню «Магниты» и F8
+                # должны показывать то же состояние, что и кнопка.
+                self.snapping_requested.emit(not self._snap_enabled)
                 return
 
             if pos.x() < HEADER_W:
@@ -2170,6 +2189,13 @@ def _envelope(upper, lower, mid: float, scale: float, x0: float = 0.0) -> QPolyg
         QPointF(x0 + i, mid - float(lower[i]) * scale) for i in range(n - 1, -1, -1)
     ]
     return QPolygonF(points)
+
+
+def _playhead_time(ms: int) -> str:
+    """Время курсора на плашке: ``01:13,200``."""
+    from sfstudio.core.time import format_short
+
+    return format_short(int(ms))
 
 
 def _short_time(ms: float) -> str:

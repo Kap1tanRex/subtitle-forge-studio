@@ -9,7 +9,6 @@ pytest.importorskip("PySide6", reason="нужен PySide6")
 from PySide6.QtWidgets import QApplication, QLabel
 
 from sfstudio.core.document import SubtitleDocument
-from sfstudio.core.undo import UndoStack
 from sfstudio.ui.detached import DetachedPanel
 from sfstudio.ui.inspector import Inspector
 from sfstudio.ui.layout import LayoutPreset
@@ -30,13 +29,43 @@ def doc() -> SubtitleDocument:
 
 
 @pytest.fixture
-def inspector(qapp: QApplication, doc: SubtitleDocument) -> Inspector:
-    return Inspector(doc, UndoStack(doc))
+def inspector(qapp: QApplication) -> Inspector:
+    """Колонка с четырьмя панелями-формами: сама она вкладок не заводит."""
+    from PySide6.QtWidgets import QWidget
+
+    column = Inspector()
+    for key, title in (("event", "Реплика"), ("format", "Формат"),
+                       ("frame", "Кадр"), ("checks", "Проверки")):
+        column.add_panel(key, title, QWidget(), event_bound=key == "event")
+    return column
 
 
 class TestPanelHost:
-    def test_builtin_tabs_are_registered(self, inspector: Inspector) -> None:
+    def test_panels_keep_their_order(self, inspector: Inspector) -> None:
         assert inspector.panel_keys() == ["event", "format", "frame", "checks"]
+
+    def test_badge_sits_on_the_tab(self, inspector: Inspector) -> None:
+        from PySide6.QtWidgets import QTabBar
+
+        inspector.set_badge("checks", "3")
+        mark = inspector.tabBar().tabButton(3, QTabBar.RightSide)
+        assert mark is not None and mark.text() == "3"
+        inspector.set_badge("checks", "")
+        assert inspector.tabBar().tabButton(3, QTabBar.RightSide) is None
+
+    def test_badge_survives_detaching(self, inspector: Inspector) -> None:
+        from PySide6.QtWidgets import QTabBar
+
+        inspector.set_badge("checks", "2")
+        inspector.take_panel("checks")
+        inspector.restore_panel("checks")
+        assert inspector.tabBar().tabButton(3, QTabBar.RightSide).text() == "2"
+
+    def test_event_panel_goes_dark_without_selection(self, inspector) -> None:
+        inspector.set_event(None)
+        assert not inspector.widget_for("event").isEnabled()
+        inspector.set_event(1)
+        assert inspector.widget_for("event").isEnabled()
 
     def test_added_panel_becomes_a_tab(self, inspector: Inspector) -> None:
         before = inspector.count()
@@ -200,12 +229,12 @@ class TestInMainWindow:
 
     def test_all_panels_live_in_the_column(self, window) -> None:
         assert window.inspector.panel_keys() == [
-            "table", "editor", "event", "format", "frame", "checks",
-            "style", "actors", "qc",
+            "table", "event", "style", "qc", "actors",
         ]
 
     def test_every_panel_is_reachable_by_name(self, window) -> None:
-        """Вкладок семь, и часть уезжает под стрелки — меню обязано их дать."""
+        """Вкладок пять, и в узкой колонке часть уезжает под стрелки —
+        меню обязано их дать."""
         for key in window.inspector.panel_keys():
             window.show_panel(key)
             assert window.inspector.current_key() == key
@@ -246,13 +275,22 @@ class TestInMainWindow:
         window._save_session()
         assert window._settings.get("ui.inspector_tab") == "style"
 
-    def test_events_and_text_are_tabs_now(self, window) -> None:
-        """Список реплик и их текст — там же, где остальное, и выносятся так же."""
-        assert window.inspector.widget_for("table") is window.table
-        window.detach_panel("editor")
-        assert window.inspector.is_detached("editor")
-        window.attach_panel("editor")
-        assert window.inspector.current_key() == "editor"
+    def test_list_and_text_share_a_tab(self, window) -> None:
+        """Список реплик и их текст — одна вкладка: текст пишут, глядя на
+        соседние строки. Выносится она так же, как остальные."""
+        page = window.inspector.widget_for("table")
+        assert page.isAncestorOf(window.table)
+        assert page.isAncestorOf(window.editor)
+        window.detach_panel("table")
+        assert window.inspector.is_detached("table")
+        window.attach_panel("table")
+        assert window.inspector.current_key() == "table"
+
+    def test_qc_badge_counts_issues(self, window) -> None:
+        window._doc.create_event(0, 100, "Очень быстрая реплика на сто миллисекунд")
+        window._qc.run_all(window._doc)
+        window._refresh_qc_badge()
+        assert window.inspector.badge("qc") != ""
 
     def test_only_two_docks_are_left(self, window) -> None:
         """Колонка и таймлайн: остальное живёт вкладками внутри колонки."""

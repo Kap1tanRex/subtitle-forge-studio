@@ -96,17 +96,20 @@ class TestTitle:
 
 
 class TestEditBar:
-    """Полоса правки под кадром — она же команды меню «Правка»."""
+    """Шапка списка реплик — она же команды меню «Правка»."""
 
-    def test_bar_sits_under_the_frame(self, window) -> None:
-        centre = window.centralWidget().layout()
-        order = [centre.itemAt(i).widget() for i in range(centre.count())]
-        assert order.index(window.edit_bar) > order.index(window.video_pane)
+    def test_bar_heads_the_list(self, window) -> None:
+        page = window.inspector.widget_for("table")
+        assert page.isAncestorOf(window.edit_bar)
 
     def test_buttons_are_filled_from_the_registry(self, window) -> None:
-        assert window.edit_bar.keys() == [
-            "edit.insert", "edit.duplicate", "edit.delete", "edit.add_track",
-        ]
+        assert window.edit_bar.keys() == ["edit.insert", "edit.duplicate", "edit.delete"]
+
+    def test_search_selects_the_next_match(self, window) -> None:
+        window._doc.create_event(90_000, 91_000, "Где маяк?")
+        window.model.reset_document(window._doc)
+        window.find_next_text("МАЯК")
+        assert window._doc.by_eid(window._current_eid()).plain == "Где маяк?"
 
     def test_new_line_button_adds_a_line(self, window) -> None:
         before = len(window._doc.events)
@@ -114,9 +117,22 @@ class TestEditBar:
         assert len(window._doc.events) == before + 1
 
     def test_new_track_button_adds_a_track(self, window) -> None:
+        """Кнопка дорожки — в углу таймлайна, над заголовками дорожек."""
+        from PySide6.QtCore import QPointF, Qt
+        from PySide6.QtGui import QMouseEvent
+
         before = len(window._doc.tracks.subtitles)
-        window.edit_bar.button("edit.add_track").click()
+        point = window.timeline._add_button_rect().center()
+        press = QMouseEvent(QMouseEvent.MouseButtonPress, QPointF(point), QPointF(point),
+                            Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+        window.timeline.mousePressEvent(press)
         assert len(window._doc.tracks.subtitles) == before + 1
+
+    def test_magnet_button_follows_the_menu(self, window) -> None:
+        """Кнопка магнитов и пункт меню — одно состояние, а не два."""
+        window.timeline.snapping_requested.emit(False)
+        assert not window._actions_registry.action("view.snapping").isChecked()
+        assert not window.timeline._snap_enabled
 
     def test_buttons_carry_their_shortcuts(self, window) -> None:
         """Подсказка учит сочетанию, а не просто повторяет надпись."""

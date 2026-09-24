@@ -25,11 +25,10 @@ from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QLabel,
     QMainWindow,
     QMessageBox,
-    QPlainTextEdit,
     QProgressBar,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -66,6 +65,7 @@ from sfstudio.plugins import PluginState
 from sfstudio.services.qc import PROFILES, QcRunner, default_profile
 from sfstudio.services.style_presets import PresetLibrary
 from sfstudio.ui.actions import ActionRegistry
+from sfstudio.ui.cue_editor import CueEditor, CuePanel
 from sfstudio.ui.detached import DetachedPanel
 from sfstudio.ui.edit_bar import EditBar
 from sfstudio.ui.event_table import (
@@ -80,10 +80,12 @@ from sfstudio.ui.layout import DockSpec, LayoutManager, LayoutPreset
 from sfstudio.ui.motion import flash
 from sfstudio.ui.qc_panel import QcPanel
 from sfstudio.ui.quick_format import QuickFormatPanel
+from sfstudio.ui.status_bar import CommandButton, StatusStrip
 from sfstudio.ui.style_forge import StyleForge
 from sfstudio.ui.timeline import TimelineWidget
 from sfstudio.ui.transport import TransportBar
 from sfstudio.ui.video_pane import VideoPane
+from sfstudio.ui.widgets import recolor
 
 #: Пауза перед тем, как живая правка оформления уйдёт в документ.
 #: Ползунок кегля выдаёт десятки значений за одно движение мыши; без паузы
@@ -98,6 +100,23 @@ PROJECT_FILTER = tr('Проект SubtitleForge (*{0});;Все файлы (*)').
 MEDIA_FILTER = (
     tr('Видео и аудио (*.mkv *.mp4 *.mov *.webm *.avi *.m4v *.ts *.wav *.mp3 *.aac);;Все файлы (*)')
 )
+
+
+def _as_effective(event, style):
+    """Стиль, каким реплика выглядит на деле: поверх него — её теги."""
+    from dataclasses import replace
+
+    from sfstudio.core.effective import effective_style
+
+    eff = effective_style(event, style)
+    return replace(
+        style,
+        fontname=eff.fontname, fontsize=eff.fontsize, bold=eff.bold,
+        italic=eff.italic, underline=eff.underline, strikeout=eff.strikeout,
+        primary=eff.primary, outline_color=eff.outline_color,
+        alignment=eff.alignment, scale_x=eff.scale_x, scale_y=eff.scale_y,
+        spacing=eff.spacing, angle=eff.angle,
+    )
 
 
 class MainWindow(QMainWindow):
@@ -152,6 +171,7 @@ class MainWindow(QMainWindow):
         # чистым, даже если в нём есть проблемы.
         self._qc.run_all(self._doc)
         self.model.refresh_qc()
+        self._refresh_qc_badge()
         self._refresh_seek_marks()
         self._restore_layout()
 
@@ -225,9 +245,12 @@ class MainWindow(QMainWindow):
 
         for widget in (self.timeline, self.transport, self.edit_bar, self.qc_panel,
                        self.video_pane.canvas, self.video_pane.overlay, self.model,
-                       getattr(self, "style_forge", None)):
+                       getattr(self, "style_forge", None), self.status_bar,
+                       getattr(self, "command_button", None)):
             with contextlib.suppress(AttributeError):
                 widget.set_palette(palette)
+        # Значки кнопок запечены в пиксели — перекрашиваем разом.
+        recolor(self, palette)
         if hasattr(self, "_speller"):
             self._speller.set_colour(palette.danger)
         self.update()
@@ -280,9 +303,10 @@ class MainWindow(QMainWindow):
         self.quick_format = QuickFormatPanel(self._doc, self._undo, parent=self)
         self.quick_format.tag_requested.connect(self._on_quick_tag)
 
-        self.inspector = Inspector(self._doc, self._undo)
-        self.inspector.document_edited.connect(self._on_widget_edit)
-        self.inspector.actors_requested.connect(self.open_actors)
+        self.inspector = Inspector()
+        self.cue_panel = CuePanel(self._doc, self._undo, actor_command=self.actor_command)
+        self.cue_panel.document_edited.connect(self._on_widget_edit)
+        self.cue_panel.step_requested.connect(self._step_row)
 
         self.model = EventTableModel(
             self._doc, qc=self._qc, undo=self._undo,
@@ -306,63 +330,54 @@ class MainWindow(QMainWindow):
         self.table.selectionModel().selectionChanged.connect(self._on_table_selection)
         self.table.insert_requested.connect(self.insert_event)
 
-        self.editor = QPlainTextEdit()
-        self.editor.setPlaceholderText(tr('Текст реплики (\\N — перевод строки)'))
-        self.editor.setMaximumHeight(96)
+        # Текст реплики — под списком, во вкладке «Список»: пишут его, глядя
+        # на соседние строки. Номер, время и скорость чтения — в шапке блока,
+        # стиль и говорящий — под полем.
+        self.cue_editor = CueEditor()
+        self.editor = self.cue_editor.editor
+        self.original = self.cue_editor.original
         self.editor.textChanged.connect(self._on_editor_changed)
+        self.editor.setToolTip(
+            tr('Кадр: тяните субтитр мышью, Shift — вдоль оси, Alt — без '
+               'магнитов, Esc — отмена жеста.') + "\n"
+            + tr('Таймлайн: тяните края реплики, Ctrl+колесо — зум по времени, '
+                 'Alt+колесо — высота дорожек, Ctrl+клик по пустому — новая реплика.')
+        )
+        self.cue_editor.style_chosen.connect(self._set_current_style)
+        self.cue_editor.actor_chosen.connect(self._set_current_actor)
         self._setup_spellcheck()
 
-        # Подсказка в одну строку, подробности — по наведению. Двух строк она
-        # стоила постоянно, а читают её один раз: место под редактором нужнее
-        # тексту реплики.
-        self.hint = QLabel(
-            tr('Кадр: тяните субтитр · Таймлайн: края реплики, Ctrl+колесо — зум')
-        )
-        self.hint.setProperty("role", "hint")
-        # Перенос по словам обязателен: без него подсказка в одну длинную
-        # строку задавала наименьшую ширину всей колонке, и ужать её было
-        # нельзя.
-        self.hint.setWordWrap(True)
-        self.hint.setToolTip(
-            "Кадр: тяните субтитр мышью, Shift — вдоль оси, Alt — без "
-            "магнитов, Esc — отмена жеста.\n"
-            "Таймлайн: тяните края реплики, Ctrl+колесо — зум по времени, "
-            "Alt+колесо — высота дорожек, Ctrl+клик по пустому — новая "
-            "реплика.\n"
-            "Высоту дорожки тяните за её нижнюю границу — и в колонке имён, "
-            "и в самой дорожке.\n"
-            "Выделение: обведите реплики рамкой по пустому месту, Shift — "
-            "добавить к выделенному, Ctrl+клик по реплике — включить или "
-            "исключить её. Выделенную группу двигают как одну."
-        )
+        # Список и текст делят вкладку по высоте; границу двигают сами.
+        self.list_split = QSplitter(Qt.Vertical)
+        self.list_split.setObjectName("list_split")
+        self.list_split.setHandleWidth(7)
+        self.list_split.addWidget(self.table)
+        self.list_split.addWidget(self.cue_editor)
+        self.list_split.setStretchFactor(0, 1)
+        self.list_split.setStretchFactor(1, 0)
+        self.list_split.setCollapsible(0, False)
 
-        # Оригинал над переводом: взгляд идёт сверху вниз, и читать исходник
-        # после собственного текста неудобно. Только для чтения — это чужой
-        # текст, и править его здесь нечего.
-        self.original = QPlainTextEdit()
-        self.original.setReadOnly(True)
-        self.original.setMaximumHeight(64)
-        self.original.setPlaceholderText(tr('Оригинал'))
-        self.original.setProperty("role", "reference")
-        self.original.setVisible(False)
-
-        editor_box = QWidget()
-        editor_layout = QVBoxLayout(editor_box)
-        editor_layout.setContentsMargins(6, 4, 6, 4)
-        editor_layout.setSpacing(4)
-        editor_layout.addWidget(self.original)
-        editor_layout.addWidget(self.editor)
-        editor_layout.addWidget(self.hint)
+        list_page = QWidget()
+        list_page.setProperty("scrolls", True)
+        list_layout = QVBoxLayout(list_page)
+        list_layout.setContentsMargins(0, 0, 0, 0)
+        list_layout.setSpacing(0)
+        list_layout.addWidget(self.edit_bar)
+        list_layout.addWidget(self.list_split, 1)
+        self.edit_bar.search_requested.connect(self.find_next_text)
 
         from sfstudio.ui.actors_dialog import ActorsPanel
 
         self.actors_panel = ActorsPanel(self._doc, self._undo)
         self.actors_panel.document_edited.connect(self._on_widget_edit)
         self.actors_panel.assign_requested.connect(self._assign_actor)
+        self.actors_panel.relabel_requested.connect(self.relabel_all)
 
         self.qc_panel = QcPanel(self._qc, self._doc)
         self.qc_panel.issue_activated.connect(self._select_eid)
         self.qc_panel.profile_changed.connect(self._on_qc_profile)
+        self.qc_panel.report_requested.connect(self.save_qc_report)
+        self.qc_panel.next_requested.connect(self.goto_next_issue)
 
         # Кадр — центральный виджет, а не панель: он не закрывается и не
         # отрывается, потому что вокруг него всё и построено. Под ним —
@@ -374,9 +389,6 @@ class MainWindow(QMainWindow):
         center_layout.setSpacing(0)
         center_layout.addWidget(self.video_pane, 1)
         center_layout.addWidget(self.transport)
-        # Полоса правки ниже транспорта: она про субтитры, а не про кадр, и
-        # стоять ей ближе к таймлайну, на котором эти субтитры и лежат.
-        center_layout.addWidget(self.edit_bar)
         self.setCentralWidget(center)
         self.setDockNestingEnabled(True)
 
@@ -384,7 +396,12 @@ class MainWindow(QMainWindow):
         # одной стопкой вкладок вместо четырёх панелей, спорящих за правый
         # край. Любую вкладку можно вынести в своё окно кнопкой в её углу.
         self.style_forge = StyleForge(self._default_style())
-        self.style_forge.apply_requested.connect(self._apply_forged_style)
+        # Переключили «Применить к» — показать то, что теперь правится:
+        # оформление самой реплики или её стиль.
+        self.style_forge.target_changed.connect(
+            lambda _to_style: self._sync_forge(self._current_eid())
+        )
+        self.style_forge.position_changed.connect(self._set_forge_position)
         # Правка ползунком применяется сама, без нажатия кнопок: человек
         # крутит кегль, чтобы увидеть его на кадре, а не чтобы потом ещё раз
         # подтвердить выбор. Кнопки остаются для случая, когда область нужна
@@ -401,11 +418,11 @@ class MainWindow(QMainWindow):
         # свойства от общего к частному. Список и текст встают в начало,
         # хотя добавляются последними: инспектор заводит свои вкладки в
         # конструкторе, до того как главное окно соберёт остальные панели.
-        self.inspector.add_panel("table", tr('События'), self.table, at=0)
-        self.inspector.add_panel("editor", tr('Текст'), editor_box, at=1)
+        self.inspector.add_panel("table", tr('Список'), list_page)
+        self.inspector.add_panel("event", tr('Реплика'), self.cue_panel)
         self.inspector.add_panel("style", tr('Оформление'), self.style_forge)
-        self.inspector.add_panel("actors", tr('Акторы'), self.actors_panel)
-        self.inspector.add_panel("qc", tr('Замечания'), self.qc_panel)
+        self.inspector.add_panel("qc", tr('Проверки'), self.qc_panel)
+        self.inspector.add_panel("actors", tr('Актёры'), self.actors_panel)
         self.inspector.detach_requested.connect(self.detach_panel)
         self._detached: dict[str, DetachedPanel] = {}
 
@@ -417,14 +434,36 @@ class MainWindow(QMainWindow):
             DockSpec("timeline", tr('Таймлайн'), self.timeline, Qt.BottomDockWidgetArea)
         )
         self.inspector_dock = self._layout.dock("inspector")
+        # Заголовков у панелей нет: колонку и так видно по её вкладкам, а
+        # таймлайн — по дорожкам. Полоса «Инспектор» отнимала высоту у
+        # списка и ничего не сообщала.
+        for key in ("inspector", "timeline"):
+            dock = self._layout.dock(key)
+            if dock is not None:
+                dock.setTitleBarWidget(QWidget())
 
         self.progress = QProgressBar()
         self.progress.setMaximumWidth(160)
+        self.progress.setMaximumHeight(4)
         self.progress.setTextVisible(False)
         self.progress.hide()
-        self.status_label = QLabel("")
+        # Вход в палитру команд — справа в строке меню, как в макете.
+        # Ставится до пунктов меню: поставленный после, угол строка меню
+        # не пересчитывает, и от кнопки оставалась полоска.
+        self.command_button = CommandButton()
+        self.command_button.clicked.connect(self.open_command_palette)
+        corner = QWidget(self.menuBar())  # без родителя его собрал бы сборщик мусора
+        corner_row = QVBoxLayout(corner)
+        corner_row.setContentsMargins(0, 0, 6, 0)
+        corner_row.addWidget(self.command_button)
+        self.menuBar().setCornerWidget(corner, Qt.TopRightCorner)
+        self.status_bar = StatusStrip()
+        self.status_bar.issues_clicked.connect(lambda: self.show_panel("qc"))
+        self.status_bar.set_saved(tr('Без изменений'))
+        self._was_clean = True
+        self.statusBar().addWidget(self.status_bar.saved)
         self.statusBar().addPermanentWidget(self.progress)
-        self.statusBar().addPermanentWidget(self.status_label)
+        self.statusBar().addPermanentWidget(self.status_bar)
         self._show_status(tr('Готово'))
 
     def _build_actions(self) -> None:
@@ -612,6 +651,12 @@ class MainWindow(QMainWindow):
         actions = registry.build(self)
         self._install_menus(registry, actions)
         self.edit_bar.set_actions(actions)
+        self.cue_panel.set_actions(actions)
+        self.timeline.snapping_requested.connect(actions["view.snapping"].setChecked)
+
+        self.command_button.set_keys(
+            actions["help.palette"].shortcut().toString() or "Ctrl+P"
+        )
 
         self.mux_action = actions["file.mux"]
         self.mux_action.setEnabled(False)
@@ -816,7 +861,7 @@ class MainWindow(QMainWindow):
         self.model.reset_document(doc)
         self.video_pane.set_document(doc, self._undo)
         self.timeline.set_document(doc, self._undo)
-        self.inspector.set_document(doc, self._undo)
+        self.cue_panel.set_document(doc, self._undo)
         self.quick_format.set_document(doc, self._undo)
         # Дорожки восстанавливаются из слоёв реплик: файл мог прийти от другой
         # программы, где описания дорожек нет, а слои проставлены.
@@ -1049,7 +1094,7 @@ class MainWindow(QMainWindow):
         self._qc.reference = self._reference
         self.model.set_reference(self._reference)
         self.table.show_reference(self._reference is not None)
-        self.original.setVisible(self._reference is not None)
+        self.cue_editor.set_reference_visible(self._reference is not None)
         self.original.clear()
 
         current = self._current_eid()
@@ -1699,6 +1744,7 @@ class MainWindow(QMainWindow):
             # Зазор между репликами задан в кадрах, поэтому проверки зависят
             # от частоты кадров источника.
             self._qc.fps = info.video.fps
+            self.cue_panel.frame_ms = info.video.fps.frame_duration_ms
             self._qc.run_all(self._doc)
             self.model.refresh_qc()
             # PlayRes подставляется из видео, только если в файле субтитров
@@ -2139,6 +2185,7 @@ class MainWindow(QMainWindow):
         self.timeline.update()
         self._sync_undo_actions()
         self._refresh_title()
+        self._refresh_status()
 
         current = self._current_eid()
         if current is not None and current in changes.changed_eids:
@@ -2157,8 +2204,11 @@ class MainWindow(QMainWindow):
         else:
             return
         self.model.refresh_qc()
+        self._refresh_qc_badge()
         if self.panel_visible("qc"):
             self.qc_panel.refresh()
+        else:
+            self.qc_panel.set_event(self._current_eid())
 
     def _toggle_qc(self, visible: bool) -> None:
         """F4: показать проверки или убрать колонку с глаз.
@@ -2384,7 +2434,8 @@ class MainWindow(QMainWindow):
         self._refresh_seek_marks()
         # Инспектор не хранит своё состояние: после правки из любого места
         # он обязан перечитать документ, иначе покажет устаревшие значения.
-        self.inspector.refresh()
+        self.cue_panel.refresh()
+        self._refresh_qc_badge()
 
     def _refresh_seek_marks(self) -> None:
         """Отметки реплик и длительность на полосе.
@@ -2399,9 +2450,59 @@ class MainWindow(QMainWindow):
 
     def _sync_inspector(self, eid: int | None) -> None:
         self.inspector.set_event(eid)
-        if eid is not None:
-            self.inspector.set_qc_notes([str(i) for i in self._qc.issues_for(eid)])
+        self.cue_panel.set_event(eid)
+        self.qc_panel.set_event(eid)
+        if eid is None:
+            self.cue_editor.clear()
         self._sync_forge(eid)
+
+    def _refresh_qc_badge(self) -> None:
+        """Число замечаний на вкладке «Проверки» и в строке состояния."""
+        from sfstudio.services.qc import Severity
+
+        counts = self._qc.counts()
+        found = counts[Severity.ERROR] + counts[Severity.WARNING]
+        self.inspector.set_badge("qc", str(found) if found else "")
+        if hasattr(self, "status_bar"):
+            self.status_bar.set_issues(counts[Severity.ERROR], counts[Severity.WARNING])
+
+    def _step_row(self, direction: int) -> None:
+        """К соседней реплике — кнопками ▲▼ вкладки «Реплика»."""
+        current = self._current_eid()
+        row = self.model.row_of_eid(current) if current is not None else -1
+        target = max(0, min(len(self._doc.events) - 1, row + direction))
+        eid = self.model.eid_at_row(target)
+        if eid is not None:
+            self._select_eid(eid)
+
+    def find_next_text(self, text: str) -> None:
+        """Поиск из шапки списка: следующая реплика с этим текстом, по кругу."""
+        needle = text.strip().casefold()
+        if not needle or not self._doc.events:
+            return
+        events = self._doc.events
+        current = self._current_eid()
+        start = self.model.row_of_eid(current) + 1 if current is not None else 0
+        for step in range(len(events)):
+            event = events[(start + step) % len(events)]
+            if needle in event.plain.casefold():
+                self._select_eid(event.eid)
+                return
+        self._show_status(tr('«{0}» не найдено').format(text.strip()))
+
+    def _set_current_style(self, name: str) -> None:
+        eid = self._current_eid()
+        if eid is not None and name in self._doc.styles and name != self._doc.by_eid(eid).style:
+            from sfstudio.core.commands import SetStyle
+
+            self._undo.run(SetStyle(eid, name))
+            self._on_widget_edit()
+
+    def _set_current_actor(self, name: str) -> None:
+        eid = self._current_eid()
+        if eid is not None and name != self._doc.by_eid(eid).name:
+            self._undo.run(self.actor_command([eid], name))
+            self._on_actors_changed()
 
     def _sync_forge(self, eid: int | None) -> None:
         """Показывает во вкладке оформления стиль выделенной реплики.
@@ -2411,18 +2512,40 @@ class MainWindow(QMainWindow):
         Пока правка идёт, стиль не перечитываем: подстановка чужих значений
         под руками — верный способ потерять начатое.
         """
-        if eid is None or not self._doc.has(eid):
-            return
+        from sfstudio.ui.event_menu import editable_eids
+
+        event = self._doc.by_eid(eid) if eid is not None and self._doc.has(eid) else None
         # Проверяем именно фокус внутри вкладки, а не активность окна:
         # isActiveWindow() истинно у любого виджета активного окна, и
         # синхронизация не срабатывала бы никогда.
         focused = QApplication.focusWidget()
         if focused is not None and self.style_forge.isAncestorOf(focused):
             return
-        style = self._doc.styles.get(self._doc.by_eid(eid).style)
+        chosen = editable_eids(self._doc, self._selected_eids())
+        name = event.style if event is not None else self.style_forge.style().name
+        self.style_forge.set_target(len(chosen), name)
+        if event is None:
+            self.style_forge.set_position(None)
+            return
+        style = self._doc.styles.get(event.style)
         if style is not None:
+            # Правим выделенные — показываем, как реплика выглядит на деле,
+            # со всеми её тегами. Правим стиль — сам стиль: иначе теги одной
+            # реплики утекли бы в оформление всех остальных.
+            if not self.style_forge.applies_to_style():
+                style = _as_effective(event, style)
             self.style_forge.set_style(style)
-        self.style_forge.set_preview_text(self._doc.by_eid(eid).text)
+        self.style_forge.set_position(event.position())
+        self.style_forge.set_preview_text(event.text)
+
+    def _set_forge_position(self, position) -> None:
+        """Ручное положение выделенных реплик — тегом ``\\pos``."""
+        chosen = self._editable_selection()
+        if not chosen:
+            return
+        commands = [SetOverrideTag(eid, "pos", position) for eid in chosen]
+        self._undo.run(CompositeCommand(commands, label=tr('Положение')))
+        self._after_restyle()
 
     # -- транспорт ------------------------------------------------------------- #
 
@@ -2595,6 +2718,16 @@ class MainWindow(QMainWindow):
         event = self._doc.by_eid(eid)
         self._set_editor_text(event.text.replace("\\N", "\n"))
         self._load_original(event)
+        self.cue_editor.show_event(self._doc, eid)
+        self._count_spelling(event)
+
+    def _count_spelling(self, event) -> None:
+        """Сколько слов с ошибкой в реплике — под полем текста."""
+        speller = getattr(self, "spelling", None)
+        if speller is None or not speller.enabled:
+            self.cue_editor.set_spelling(None)
+            return
+        self.cue_editor.set_spelling(len(speller.check(event.plain)))
 
     def _load_original(self, event) -> None:
         """Показывает оригинал этой реплики над полем перевода."""
@@ -2658,29 +2791,37 @@ class MainWindow(QMainWindow):
             name = tr('Без имени')
         media = f" — {self._media_path.name}" if self._media_path else ""
         dirty = "" if self._undo.is_clean else " •"
+        if hasattr(self, "status_bar") and self._undo.is_clean != self._was_clean:
+            from datetime import datetime
+
+            self._was_clean = self._undo.is_clean
+            self.status_bar.set_saved(
+                tr('Сохранено в {0}').format(datetime.now().strftime("%H:%M"))
+                if self._was_clean else tr('Есть несохранённые правки')
+            )
         self.setWindowTitle(f"{name}{dirty}{media} — SubtitleForge Studio")
 
     def _show_status(self, text: str) -> None:
         self.statusBar().showMessage(text, 6000)
-        self.status_label.setText(
-            tr('{0} событий{1}   |   {2}×{3}   |   {4}').format(
-                len(self._doc),
-                self._progress_note(),
-                self._doc.script_info.play_res_x,
-                self._doc.script_info.play_res_y,
-                self._doc.source_format.upper())
-        )
+        self._refresh_status()
 
-    def _progress_note(self) -> str:
-        """«готово 120 из 480» — если пометки вообще расставлены.
+    def _refresh_status(self) -> None:
+        """Постоянная часть строки состояния: готовность, кадр, частота, формат.
 
-        Пока не отмечено ни одной реплики, счётчика нет: он мешал бы тем,
-        кто пометками не пользуется.
+        Счётчик «готово» появляется, только когда отмечена хоть одна реплика:
+        тем, кто пометками не пользуется, он бы только мешал.
         """
         from sfstudio.core.workflow import progress
 
-        done, total = progress(self._doc.events)
-        return tr('   |   готово {0} из {1}').format(done, total) if done else ""
+        self.status_bar.set_progress(*progress(self._doc.events))
+        info = self._doc.script_info
+        fps = self._qc.fps
+        rate = f"{fps.as_float:.3f}".rstrip("0").rstrip(".") if fps is not None else ""
+        self.status_bar.set_info(
+            f"{info.play_res_x}×{info.play_res_y}",
+            tr('{0} к/с').format(rate.replace(".", ",")) if rate else "",
+            self._doc.source_format.upper(),
+        )
 
     def _timing_selection(self) -> list:
         """Выделенные события, либо пусто."""
@@ -2958,7 +3099,7 @@ class MainWindow(QMainWindow):
         style = self._pending_style
         self._pending_style = None
         if style is not None:
-            self._apply_forged_style(style)
+            self._apply_forged_style(style, to_all=self.style_forge.applies_to_style())
 
     # -- маркеры ------------------------------------------------------------- #
 

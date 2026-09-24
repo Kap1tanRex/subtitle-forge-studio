@@ -12,8 +12,8 @@
 
 Про исключения. Список ``excludes`` вычищает то, что PySide6 тянет по
 умолчанию: веб-движок, 3D, мультимедиа, графы состояний. Каждый пункт —
-десятки мегабайт, а приложению нужны только QtCore, QtGui, QtWidgets и
-QtOpenGLWidgets (последний тянет QtOpenGL сам).
+десятки мегабайт, а приложению нужны только QtCore, QtGui, QtWidgets,
+QtOpenGLWidgets (последний тянет QtOpenGL сам) и QtSvg — им рисуются значки.
 """
 
 import sys
@@ -75,7 +75,7 @@ QT_UNUSED = [
     "PySide6.QtQuickControls2", "PySide6.QtQuickWidgets", "PySide6.QtRemoteObjects",
     "PySide6.QtScxml", "PySide6.QtSensors", "PySide6.QtSerialBus",
     "PySide6.QtSerialPort", "PySide6.QtSpatialAudio", "PySide6.QtSql",
-    "PySide6.QtStateMachine", "PySide6.QtSvg", "PySide6.QtSvgWidgets",
+    "PySide6.QtStateMachine", "PySide6.QtSvgWidgets",
     "PySide6.QtTest", "PySide6.QtTextToSpeech", "PySide6.QtUiTools",
     "PySide6.QtWebChannel", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineQuick",
     "PySide6.QtWebEngineWidgets", "PySide6.QtWebSockets", "PySide6.QtXml",

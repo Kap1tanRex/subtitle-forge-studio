@@ -1,13 +1,12 @@
-"""Полоса правки под кадром: создать реплику, дублировать, удалить, дорожка.
+"""Шапка списка реплик: поиск, новая реплика, дублировать, удалить.
 
 Это те же команды, что в меню «Правка», но на виду. Работа с субтитрами —
-это сотни однотипных действий, и лезть за каждым в меню третьего уровня или
-вспоминать сочетание клавиш незачем.
+это сотни однотипных действий, и лезть за каждым в меню или вспоминать
+сочетание клавиш незачем.
 
-Кнопки крупные и с подписями. В программах монтажа полоса инструментов
-собрана из одних значков, и каждый раз приходится вспоминать, который из
-них нужен, а потом ещё и попадать по нему мышью. Здесь подпись написана
-рядом со значком, а кнопка ростом с палец: по ней промахнуться трудно.
+Главная кнопка одна и с подписью — «Реплика»: её жмут в десятки раз чаще
+остальных. Дублировать и удалить — значками рядом: они нужны реже, и место в
+узкой колонке нужнее полю поиска.
 
 Действия берутся из общего реестра, а не заводятся заново. Так кнопка,
 пункт меню и горячая клавиша остаются одним и тем же действием: изменилось
@@ -16,54 +15,67 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (
-    QFrame,
-    QHBoxLayout,
-    QSizePolicy,
-    QToolButton,
-    QWidget,
-)
+from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QSizePolicy, QToolButton, QWidget
 
 from sfstudio.app.i18n import tr
 from sfstudio.ui.icons import make_icon
 from sfstudio.ui.theme import DARK, Palette
+from sfstudio.ui.widgets import recolor, set_icon
 
-__all__ = ["BUTTON_H", "EditBar"]
+__all__ = ["BAR_H", "EditBar"]
 
-#: Высота кнопки. Меньше 32 px попадать мышью уже заметно тяжелее, а ниже
-#: рекомендаций по размеру цели не опускаемся сознательно.
-BUTTON_H = 34
+#: Высота шапки — как у всех шапок колонки в макете.
+BAR_H = 40
 
-#: Значок внутри кнопки. Крупнее, чем в транспорте: там кнопки идут плотным
-#: рядом и узнаются по месту, здесь у каждой своя роль.
-ICON_SIZE = 20
+#: Кнопки шапки: ключ действия, значок, подпись. Подпись есть только у
+#: главной, остальные — значками с подсказкой.
+_BUTTONS: tuple[tuple[str, str, str], ...] = (
+    ("edit.insert", "event_add", tr('Реплика')),
+    ("edit.duplicate", "event_duplicate", ""),
+    ("edit.delete", "event_delete", ""),
+)
 
 
 class EditBar(QWidget):
-    """Кнопки правки под кадром.
+    """Шапка списка.
 
     Заполняется после того, как собран реестр действий: окно строит виджеты
-    раньше, чем команды, и пустая полоса на это время — нормальное состояние.
+    раньше, чем команды, и пустая шапка на это время — нормальное состояние.
     """
+
+    #: Искать реплику с этим текстом начиная со следующей за текущей.
+    search_requested = Signal(str)
 
     def __init__(self, palette: Palette = DARK, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._palette = palette
         self._buttons: dict[str, QToolButton] = {}
 
-        # Своё оформление из темы: полоса должна читаться отдельной панелью,
-        # а не пустым местом между кадром и таймлайном. Без
-        # ``WA_StyledBackground`` обычный QWidget фон из таблицы стилей не
-        # рисует — правило просто не сработает.
-        self.setProperty("role", "editbar")
+        # Без ``WA_StyledBackground`` обычный QWidget фон из таблицы стилей
+        # не рисует — правило просто не сработает.
+        self.setProperty("role", "toolhead")
         self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setFixedHeight(BAR_H)
 
         self._row = QHBoxLayout(self)
-        self._row.setContentsMargins(10, 5, 10, 5)
-        self._row.setSpacing(6)
-        self._row.addStretch(1)
+        self._row.setContentsMargins(8, 0, 6, 0)
+        self._row.setSpacing(4)
+
+        self.search = QLineEdit()
+        self.search.setPlaceholderText(tr('Найти в репликах'))
+        self.search.setClearButtonEnabled(True)
+        self.search.setMinimumWidth(80)
+        self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._search_icon = self.search.addAction(
+            make_icon("search", palette.text_muted, 14), QLineEdit.LeadingPosition
+        )
+        self.search.setToolTip(tr('Enter — следующая реплика с этим текстом'))
+        self.search.returnPressed.connect(
+            lambda: self.search_requested.emit(self.search.text())
+        )
+        self._row.addWidget(self.search, 1)
 
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
 
@@ -73,64 +85,39 @@ class EditBar(QWidget):
         """Раскладывает кнопки по действиям из реестра.
 
         Пропущенные ключи не ошибка: плагин или урезанная сборка могут не
-        дать какой-то команды, и полоса должна собраться из того, что есть.
+        дать какой-то команды, и шапка должна собраться из того, что есть.
         """
-        self._clear()
+        for button in self._buttons.values():
+            self._row.removeWidget(button)
+            button.deleteLater()
+        self._buttons.clear()
 
-        groups: tuple[tuple[tuple[str, str, str], ...], ...] = (
-            (
-                ("edit.insert", "event_add", tr('Реплика')),
-                ("edit.duplicate", "event_duplicate", tr('Дублировать')),
-                ("edit.delete", "event_delete", tr('Удалить')),
-            ),
-            (
-                ("edit.add_track", "track_add", tr('Дорожка')),
-            ),
-        )
-
-        first = True
-        for group in groups:
-            present = [item for item in group if item[0] in actions]
-            if not present:
-                continue
-            if not first:
-                self._row.insertWidget(self._row.count() - 1, self._separator())
-            first = False
-            for key, icon, caption in present:
+        for key, icon, caption in _BUTTONS:
+            if key in actions:
                 button = self._button(actions[key], icon, caption)
                 self._buttons[key] = button
-                self._row.insertWidget(self._row.count() - 1, button)
+                self._row.addWidget(button)
 
     def _button(self, action: QAction, icon: str, caption: str) -> QToolButton:
         button = QToolButton()
         # Действие приносит с собой обработчик, доступность и сочетание —
         # кнопке остаётся вид.
         button.setDefaultAction(action)
-        button.setText(caption)
-        button.setIcon(make_icon(icon, self._palette.text_primary, ICON_SIZE))
-        button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
-        button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        button.setMinimumHeight(BUTTON_H)
         button.setCursor(Qt.PointingHandCursor)
-        button.setAutoRaise(True)
         button.setToolTip(_tip(action))
-        button.setProperty("icon_name", icon)
+        if caption:
+            button.setText(caption)
+            button.setProperty("role", "outlined")
+            button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            button.setFixedHeight(28)
+            set_icon(button, icon, "text", 16, self._palette)
+        else:
+            button.setProperty("role", "icon")
+            button.setToolButtonStyle(Qt.ToolButtonIconOnly)
+            button.setFixedSize(28, 28)
+            set_icon(button, icon, "muted", 16, self._palette)
+        button.setAccessibleName(caption or action.text())
         return button
-
-    def _separator(self) -> QFrame:
-        line = QFrame()
-        line.setFrameShape(QFrame.VLine)
-        line.setFixedWidth(1)
-        line.setFixedHeight(BUTTON_H - 10)
-        line.setStyleSheet(f"background: {self._palette.border}; border: none;")
-        return line
-
-    def _clear(self) -> None:
-        self._buttons.clear()
-        while self._row.count() > 1:
-            item = self._row.takeAt(0)
-            if (widget := item.widget()) is not None:
-                widget.deleteLater()
 
     # -- тема --------------------------------------------------------------------- #
 
@@ -138,18 +125,11 @@ class EditBar(QWidget):
         """Перерисовывает значки под новую тему.
 
         Значки рисуются кодом в цвет темы, то есть запечены в пиксели: сама
-        по себе смена таблицы стилей их не перекрасит, и на светлой теме
-        остался бы светлый значок на светлой кнопке.
+        по себе смена таблицы стилей их не перекрасит.
         """
         self._palette = palette
-        for button in self._buttons.values():
-            name = button.property("icon_name")
-            if name:
-                button.setIcon(make_icon(str(name), palette.text_primary, ICON_SIZE))
-        for index in range(self._row.count()):
-            widget = self._row.itemAt(index).widget()
-            if isinstance(widget, QFrame):
-                widget.setStyleSheet(f"background: {palette.border}; border: none;")
+        recolor(self, palette)
+        self._search_icon.setIcon(make_icon("search", palette.text_muted, 14))
 
     # -- для тестов и окна --------------------------------------------------------- #
 

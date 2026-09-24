@@ -72,10 +72,11 @@ class TestLane:
         assert TIME_LANE_H < RULER_H
         assert RULER_H - TIME_LANE_H == MARKER_LANE_H
 
-    def test_button_is_inside_the_lane(self, timeline: TimelineWidget) -> None:
-        """Иначе кнопка накрывает подписи времени."""
+    def test_button_sits_over_the_track_names(self, timeline: TimelineWidget) -> None:
+        """Кнопка — в углу над заголовками дорожек, а не на шкале: иначе
+        она накрывала бы подписи времени."""
         rect = timeline._marker_button_rect()
-        assert rect.top() >= TIME_LANE_H
+        assert rect.right() <= HEADER_W
         assert rect.bottom() <= RULER_H
 
     def test_button_does_not_overlap_the_track_buttons(
